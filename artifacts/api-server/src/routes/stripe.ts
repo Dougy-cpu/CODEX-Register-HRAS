@@ -134,9 +134,23 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
     const bookingId = parseInt(session.metadata?.bookingId || "0", 10);
 
     if (bookingId) {
+      const [existing] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
+
+      if (!existing) {
+        logger.warn({ bookingId }, "Stripe webhook: booking not found, skipping");
+        res.json({ received: true });
+        return;
+      }
+
+      if (existing.status === "paid" || existing.status === "invoiced") {
+        logger.info({ bookingId, status: existing.status }, "Stripe webhook: already processed, skipping duplicate event");
+        res.json({ received: true });
+        return;
+      }
+
       const prefix = "HRS";
       const num = Math.floor(10000 + Math.random() * 90000);
-      const orderRef = `${prefix}-2026-${num}`;
+      const orderRef = existing.orderReference || `${prefix}-2026-${num}`;
 
       await db
         .update(bookingsTable)
@@ -149,11 +163,10 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
         })
         .where(eq(bookingsTable.id, bookingId));
 
-      const [paidBooking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
-      if (paidBooking?.promoCode) {
+      if (existing.promoCode) {
         await db.update(promoCodesTable)
           .set({ usedCount: sql`${promoCodesTable.usedCount} + 1` })
-          .where(eq(promoCodesTable.code, paidBooking.promoCode));
+          .where(eq(promoCodesTable.code, existing.promoCode));
       }
 
       try {
