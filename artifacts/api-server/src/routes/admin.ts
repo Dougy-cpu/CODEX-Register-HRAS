@@ -7,7 +7,7 @@ import {
   promoCodesTable,
   discountTiersTable,
 } from "@workspace/db";
-import { adminAuth } from "../middleware/admin-auth";
+import { adminAuth, deriveAdminToken } from "../middleware/admin-auth";
 
 const router: IRouter = Router();
 
@@ -59,7 +59,7 @@ router.post("/admin/login", async (req, res): Promise<void> => {
     return;
   }
 
-  const token = process.env.ADMIN_TOKEN || adminPassword;
+  const token = deriveAdminToken(adminPassword);
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
   res.json({ token, expiresAt: expiresAt.toISOString() });

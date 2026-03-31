@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -27,6 +28,7 @@ interface Step4PaymentProps {
 }
 
 export default function Step4Payment({ booking }: Step4PaymentProps) {
+  const queryClient = useQueryClient();
   const updateBooking = useUpdateBooking();
   const validatePromoCode = useValidatePromoCode();
   const createStripeSession = useCreateStripeCheckoutSession();
@@ -57,7 +59,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
       const result = await validatePromoCode.mutateAsync({
         data: {
           code: promoCode,
-          passType: booking.passType as any,
+          passType: booking.passType as "single" | "team" | "business",
           quantity: booking.quantity
         }
       });
@@ -70,7 +72,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
           data: { promoCode }
         });
       }
-    } catch (e: any) {
+    } catch {
       setPromoError("Invalid promo code");
     }
   };
@@ -115,11 +117,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
         await createInvoice.mutateAsync({
           data: { bookingId: booking.id }
         });
-        await updateBooking.mutateAsync({
-          id: booking.id,
-          data: { currentStep: 5, status: "invoiced" }
-        });
-        window.location.reload();
+        queryClient.invalidateQueries({ queryKey: ["booking"] });
       }
     } catch (e) {
       console.error(e);
@@ -222,7 +220,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
         <div className="flex justify-between pt-4">
           <Button variant="outline" size="lg" className="px-8 h-14 text-lg border-border" onClick={async () => {
             await updateBooking.mutateAsync({ id: booking.id, data: { currentStep: 3 } });
-            window.location.reload();
+            queryClient.invalidateQueries({ queryKey: ["booking"] });
           }}>Back</Button>
           <Button 
             size="lg" 

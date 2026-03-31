@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { bookingsTable } from "@workspace/db";
 import { sendBookingEmails } from "../lib/email";
+import { syncBookingToSheets } from "../lib/google-sheets";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -106,11 +107,17 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
   try {
     if (webhookSecret && sig) {
       event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+    } else if (process.env.NODE_ENV === "production") {
+      logger.error("STRIPE_WEBHOOK_SECRET is not set in production — rejecting webhook");
+      res.status(400).json({ error: "Webhook not configured — set STRIPE_WEBHOOK_SECRET" });
+      return;
     } else {
-      event = req.body as Stripe.Event;
+      logger.warn("STRIPE_WEBHOOK_SECRET not set — accepting without verification (dev only)");
+      const raw = Buffer.isBuffer(req.body) ? req.body.toString() : req.body;
+      event = (typeof raw === "string" ? JSON.parse(raw) : raw) as Stripe.Event;
     }
   } catch (err) {
-    req.log.error({ err }, "Webhook signature verification failed");
+    logger.error({ err }, "Webhook signature verification failed");
     res.status(400).json({ error: "Webhook error" });
     return;
   }
@@ -128,8 +135,10 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
         .update(bookingsTable)
         .set({
           status: "paid",
+          currentStep: 5,
           stripePaymentIntentId: session.payment_intent as string,
           orderReference: orderRef,
+          paymentMethod: "card",
         })
         .where(eq(bookingsTable.id, bookingId));
 
@@ -137,6 +146,12 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
         await sendBookingEmails(bookingId);
       } catch (err) {
         logger.error({ err, bookingId }, "Failed to send booking emails after payment");
+      }
+
+      try {
+        await syncBookingToSheets(bookingId);
+      } catch (err) {
+        logger.error({ err, bookingId }, "Failed to sync booking to Google Sheets");
       }
     }
   }

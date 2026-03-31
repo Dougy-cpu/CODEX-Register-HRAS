@@ -35,13 +35,18 @@ export async function calculatePricing(
   if (!passInfo) throw new Error(`Unknown pass type: ${passType}`);
 
   const pricePerHead = passInfo.price;
-  const baseSubtotal = pricePerHead * quantity;
-  const originalPrice = passInfo.originalPrice * quantity;
+
+  // Team pass is a fixed-price bundle: 1 bundle = £499 for 3 seats.
+  // Other passes are per-unit: quantity drives the base price.
+  const billingUnits = passInfo.seats > 1 ? Math.ceil(quantity / passInfo.seats) : quantity;
+
+  const baseSubtotal = pricePerHead * billingUnits;
+  const originalPrice = passInfo.originalPrice * billingUnits;
 
   const tiers = await db
     .select()
     .from(discountTiersTable)
-    .where(eq(discountTiersTable.passType, passType as any))
+    .where(eq(discountTiersTable.passType, passType as "single" | "team" | "business"))
     .orderBy(discountTiersTable.minQuantity);
 
   let groupDiscountPercent = 0;

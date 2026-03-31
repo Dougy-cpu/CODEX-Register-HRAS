@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useCreateBooking, useUpdateBooking, useCreateAttendee, useUpdateAttendee } from "@workspace/api-client-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useQueryClient } from "@tanstack/react-query";
 
 const formSchema = z.object({
   attendeeType: z.enum(["hr_professional", "consultant_vendor"]),
@@ -40,6 +41,7 @@ export default function Step1Lead({ sessionToken, booking }: { sessionToken: str
     }
   });
 
+  const queryClient = useQueryClient();
   const createBooking = useCreateBooking();
   const updateBooking = useUpdateBooking();
   const createAttendee = useCreateAttendee();
@@ -104,8 +106,7 @@ export default function Step1Lead({ sessionToken, booking }: { sessionToken: str
       });
     }
 
-    // Reload booking
-    window.location.reload(); // Quick hack for now, or rely on react-query invalidate
+    queryClient.invalidateQueries({ queryKey: ["booking"] });
   };
 
   return (

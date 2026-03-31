@@ -8,8 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useQueryClient } from "@tanstack/react-query";
-import { RefreshCcw } from "lucide-react";
+import { RefreshCcw, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+const API_BASE = `${import.meta.env.BASE_URL}api`;
 
 export default function AdminEmails() {
   const { toast } = useToast();
@@ -34,6 +36,10 @@ export default function AdminEmails() {
 
   const [subject, setSubject] = useState("");
   const [htmlBody, setHtmlBody] = useState("");
+  const [testEmail, setTestEmail] = useState("");
+  const [testName, setTestName] = useState("");
+  const [isSendingTest, setIsSendingTest] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     if (templateData) {
@@ -53,6 +59,34 @@ export default function AdminEmails() {
     queryClient.invalidateQueries({ queryKey: ["welcomeTemplate"] });
   };
 
+  const handleTestSend = async () => {
+    if (!testEmail) {
+      toast({ title: "Email required", description: "Enter a recipient email address.", variant: "destructive" });
+      return;
+    }
+    setIsSendingTest(true);
+    try {
+      const token = localStorage.getItem("admin_token") || "";
+      const resp = await fetch(`${API_BASE}/email-templates/welcome/test-send`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-token": token,
+        },
+        body: JSON.stringify({ toEmail: testEmail, toName: testName || "Test User" }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error((err as { error?: string }).error || "Failed to send");
+      }
+      toast({ title: "Test Email Sent", description: `Test email dispatched to ${testEmail}.` });
+    } catch (e) {
+      toast({ title: "Send Failed", description: e instanceof Error ? e.message : "Failed to send test email.", variant: "destructive" });
+    } finally {
+      setIsSendingTest(false);
+    }
+  };
+
   const handleResend = async (bookingId: number) => {
     try {
       await resendEmails.mutateAsync({ bookingId });
@@ -60,7 +94,7 @@ export default function AdminEmails() {
         title: "Emails Resent",
         description: `Emails for booking #${bookingId} have been queued for resending.`
       });
-    } catch (e) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to resend emails.",
@@ -126,7 +160,7 @@ export default function AdminEmails() {
                     )}
                   </TableBody>
                 </Table>
-                
+
                 {logsData && logsData.total > 0 && (
                   <div className="p-4 border-t border-border flex justify-between items-center bg-muted/20">
                     <p className="text-sm text-muted-foreground">
@@ -149,39 +183,80 @@ export default function AdminEmails() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
           ) : (
-            <div className="bg-white p-6 border border-border shadow-sm space-y-6">
-              <div>
-                <h3 className="text-lg font-bold mb-2">Welcome Email Template</h3>
-                <p className="text-sm text-muted-foreground">This email is sent to all attendees upon successful registration.</p>
-              </div>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-bold uppercase tracking-wider">Subject Line</label>
-                  <Input 
-                    value={subject} 
-                    onChange={e => setSubject(e.target.value)} 
-                    className="h-12"
-                  />
+            <div className="space-y-6">
+              <div className="bg-white p-6 border border-border shadow-sm space-y-6">
+                <div>
+                  <h3 className="text-lg font-bold mb-1">Welcome Email Template</h3>
+                  <p className="text-sm text-muted-foreground">Sent to all attendees upon successful registration. Edit the HTML below then save.</p>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-bold uppercase tracking-wider">HTML Body</label>
-                  <div className="p-3 bg-muted/30 border border-border text-sm mb-2 font-mono text-muted-foreground">
-                    Available variables: {'{{firstName}}'}, {'{{lastName}}'}, {'{{passType}}'}, {'{{orderReference}}'}
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold uppercase tracking-wider">Subject Line</label>
+                    <Input
+                      value={subject}
+                      onChange={e => setSubject(e.target.value)}
+                      className="h-12"
+                    />
                   </div>
-                  <Textarea 
-                    value={htmlBody} 
-                    onChange={e => setHtmlBody(e.target.value)} 
-                    className="min-h-[400px] font-mono text-sm resize-y"
-                  />
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-bold uppercase tracking-wider">HTML Body</label>
+                      <Button variant="outline" size="sm" onClick={() => setShowPreview(p => !p)} className="text-xs">
+                        {showPreview ? "Edit HTML" : "Preview"}
+                      </Button>
+                    </div>
+                    <div className="p-3 bg-muted/30 border border-border text-sm mb-2 font-mono text-muted-foreground">
+                      Variables: {`{{firstName}}`}, {`{{lastName}}`}, {`{{passType}}`}, {`{{orderReference}}`}
+                    </div>
+                    {showPreview ? (
+                      <div
+                        className="border border-border rounded p-4 bg-white min-h-[400px] overflow-auto"
+                        dangerouslySetInnerHTML={{ __html: htmlBody }}
+                      />
+                    ) : (
+                      <Textarea
+                        value={htmlBody}
+                        onChange={e => setHtmlBody(e.target.value)}
+                        className="min-h-[400px] font-mono text-sm resize-y"
+                      />
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-4 border-t border-border">
+                  <Button onClick={handleSaveTemplate} disabled={updateTemplate.isPending} size="lg" className="px-8">
+                    {updateTemplate.isPending ? "Saving..." : "Save Template"}
+                  </Button>
                 </div>
               </div>
 
-              <div className="flex justify-end pt-4 border-t border-border">
-                <Button onClick={handleSaveTemplate} disabled={updateTemplate.isPending} size="lg" className="px-8">
-                  {updateTemplate.isPending ? "Saving..." : "Save Template"}
-                </Button>
+              <div className="bg-white p-6 border border-border shadow-sm space-y-4">
+                <div>
+                  <h3 className="text-base font-bold mb-1">Send Test Email</h3>
+                  <p className="text-sm text-muted-foreground">Send the current saved template to a test address to verify formatting before going live.</p>
+                </div>
+                <div className="flex gap-3 flex-wrap">
+                  <Input
+                    type="text"
+                    placeholder="Recipient name (optional)"
+                    value={testName}
+                    onChange={e => setTestName(e.target.value)}
+                    className="h-10 w-56"
+                  />
+                  <Input
+                    type="email"
+                    placeholder="test@example.com"
+                    value={testEmail}
+                    onChange={e => setTestEmail(e.target.value)}
+                    className="h-10 w-64"
+                  />
+                  <Button onClick={handleTestSend} disabled={isSendingTest} className="h-10 px-6">
+                    <Send className="w-4 h-4 mr-2" />
+                    {isSendingTest ? "Sending..." : "Send Test"}
+                  </Button>
+                </div>
               </div>
             </div>
           )}

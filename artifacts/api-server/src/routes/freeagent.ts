@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { bookingsTable, attendeesTable } from "@workspace/db";
 import { sendBookingEmails } from "../lib/email";
+import { syncBookingToSheets } from "../lib/google-sheets";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -57,7 +58,7 @@ async function findOrCreateFreeAgentContact(
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    const contacts = searchResp.data?.contacts || [];
+    const contacts = (searchResp.data?.contacts as Array<{ url: string }>) || [];
     if (contacts.length > 0) {
       return contacts[0].url;
     }
@@ -75,7 +76,7 @@ async function findOrCreateFreeAgentContact(
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
-    return createResp.data?.contact?.url || null;
+    return (createResp.data?.contact?.url as string) || null;
   } catch (err) {
     logger.error({ err }, "Failed to find/create FreeAgent contact");
     return null;
@@ -120,6 +121,14 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
   const num = Math.floor(10000 + Math.random() * 90000);
   const orderRef = `${prefix}-2026-${num}`;
 
+  // booking.subtotalAmount is subtotalAfterDiscounts (post-discount).
+  // Reconstruct the pre-discount base so we can show accurate line-item breakdown.
+  const subtotalAfterDiscounts = parseFloat(booking.subtotalAmount?.toString() || "0");
+  const vat = parseFloat(booking.vatAmount?.toString() || "0");
+  const groupDiscount = parseFloat(booking.groupDiscountAmount?.toString() || "0");
+  const promoDiscount = parseFloat(booking.promoDiscountAmount?.toString() || "0");
+  const baseAmount = subtotalAfterDiscounts + groupDiscount + promoDiscount;
+
   const token = await getFreeAgentToken();
 
   if (!token) {
@@ -127,6 +136,7 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
 
     await db.update(bookingsTable).set({
       status: "invoiced",
+      currentStep: 5,
       orderReference: orderRef,
       paymentMethod: "invoice",
     }).where(eq(bookingsTable.id, id));
@@ -135,6 +145,12 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
       await sendBookingEmails(id);
     } catch (err) {
       logger.error({ err }, "Failed to send booking emails after invoice");
+    }
+
+    try {
+      await syncBookingToSheets(id);
+    } catch (err) {
+      logger.error({ err }, "Failed to sync booking to Google Sheets");
     }
 
     res.json({
@@ -163,17 +179,21 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
     return;
   }
 
-  const subtotal = parseFloat(booking.subtotalAmount?.toString() || "0");
-  const vat = parseFloat(booking.vatAmount?.toString() || "0");
-  const groupDiscount = parseFloat(booking.groupDiscountAmount?.toString() || "0");
-  const promoDiscount = parseFloat(booking.promoDiscountAmount?.toString() || "0");
-  const pricePerHead = subtotal;
-
-  const invoiceItems = [
+  // Build invoice line items.
+  // Main line = pre-discount pass price so the invoice clearly shows the gross amount.
+  // Discount lines reduce it to the agreed subtotal.
+  // VAT is calculated on subtotalAfterDiscounts and shown as a separate line.
+  const invoiceItems: Array<{
+    description: string;
+    quantity: string;
+    price: string;
+    item_type: string;
+    sales_tax_rate: string;
+  }> = [
     {
-      description: `${passLabels[booking.passType]} × ${booking.quantity}`,
+      description: `${passLabels[booking.passType] || booking.passType} × ${booking.quantity}`,
       quantity: "1.0",
-      price: subtotal.toFixed(2),
+      price: baseAmount.toFixed(2),
       item_type: "Products",
       sales_tax_rate: "0.0",
     },
@@ -226,11 +246,12 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
-    const invoiceUrl = invoiceResp.data?.invoice?.url || null;
+    const invoiceUrl = (invoiceResp.data?.invoice?.url as string) || null;
     const invoiceId = invoiceUrl?.split("/").pop() || orderRef;
 
     await db.update(bookingsTable).set({
       status: "invoiced",
+      currentStep: 5,
       orderReference: orderRef,
       paymentMethod: "invoice",
       freeagentInvoiceId: invoiceId,
@@ -241,6 +262,12 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
       await sendBookingEmails(id);
     } catch (err) {
       logger.error({ err }, "Failed to send booking emails after FreeAgent invoice");
+    }
+
+    try {
+      await syncBookingToSheets(id);
+    } catch (err) {
+      logger.error({ err }, "Failed to sync booking to Google Sheets");
     }
 
     res.json({ invoiceId, invoiceUrl, invoiceReference: orderRef });

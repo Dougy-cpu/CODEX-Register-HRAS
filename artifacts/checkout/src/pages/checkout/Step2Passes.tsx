@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useUpdateBooking, useCalculatePricing, type PricingRequestPassType } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -54,12 +55,14 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
 
   const currentPricing = calculatePricingMutation.data;
 
+  const queryClient = useQueryClient();
+
   const handleContinue = async () => {
     await updateBooking.mutateAsync({
       id: booking.id,
-      data: { passType: selectedPass as any, quantity, currentStep: 3 },
+      data: { passType: selectedPass as "single" | "team" | "business", quantity, currentStep: 3 },
     });
-    window.location.reload();
+    queryClient.invalidateQueries({ queryKey: ["booking"] });
   };
 
   return (
@@ -296,7 +299,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
           className="px-8 h-14 text-lg border-border"
           onClick={async () => {
             await updateBooking.mutateAsync({ id: booking.id, data: { currentStep: 1 } });
-            window.location.reload();
+            queryClient.invalidateQueries({ queryKey: ["booking"] });
           }}
         >
           Back

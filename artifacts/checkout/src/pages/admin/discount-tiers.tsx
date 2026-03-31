@@ -35,7 +35,7 @@ export default function AdminDiscountTiers() {
     const passTiers = localTiers[passType] || [];
     await updateTiers.mutateAsync({
       data: {
-        passType: passType as any,
+        passType: passType as "single" | "team" | "business",
         tiers: passTiers.map(t => ({
           minQuantity: Number(t.minQuantity),
           discountPercent: Number(t.discountPercent),

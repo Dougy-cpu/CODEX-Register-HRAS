@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { z } from "zod";
 import { useUpdateBooking, useCreateAttendee, useUpdateAttendee } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -26,6 +27,7 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
   const updateBooking = useUpdateBooking();
   const createAttendee = useCreateAttendee();
   const updateAttendee = useUpdateAttendee();
+  const queryClient = useQueryClient();
 
   // Determine how many additional attendees we need
   const totalQuantity = booking.quantity;
@@ -110,7 +112,7 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
         id: booking.id,
         data: { currentStep: 4 }
       });
-      window.location.reload();
+      queryClient.invalidateQueries({ queryKey: ["booking"] });
     } catch (e) {
       console.error(e);
     } finally {
@@ -141,10 +143,10 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
         <div className="flex justify-between pt-4">
           <Button variant="outline" size="lg" className="px-8 h-14 text-lg border-border" onClick={async () => {
             await updateBooking.mutateAsync({ id: booking.id, data: { currentStep: 2 } });
-            window.location.reload();
+            queryClient.invalidateQueries({ queryKey: ["booking"] });
           }}>Back</Button>
           <Button size="lg" className="px-10 h-14 text-lg bg-primary hover:bg-primary/90 text-white border-none" onClick={() => {
-            updateBooking.mutateAsync({ id: booking.id, data: { currentStep: 4 } }).then(() => window.location.reload());
+            updateBooking.mutateAsync({ id: booking.id, data: { currentStep: 4 } }).then(() => queryClient.invalidateQueries({ queryKey: ["booking"] }));
           }}>Continue to Payment</Button>
         </div>
       </div>
@@ -228,7 +230,7 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
       <div className="flex justify-between pt-4">
         <Button variant="outline" size="lg" className="px-8 h-14 text-lg border-border" onClick={async () => {
           await updateBooking.mutateAsync({ id: booking.id, data: { currentStep: 2 } });
-          window.location.reload();
+          queryClient.invalidateQueries({ queryKey: ["booking"] });
         }}>Back</Button>
         <Button 
           size="lg" 

@@ -1,4 +1,5 @@
 import PDFDocument from "pdfkit";
+import { PASS_PRICES } from "./pricing";
 
 interface BookingForPdf {
   id: number;
@@ -32,12 +33,6 @@ const passLabels: Record<string, string> = {
   business: "Business Pass — HR Analytics Summit",
 };
 
-const PASS_PRICES: Record<string, number> = {
-  single: 199,
-  team: 499,
-  business: 599,
-};
-
 export function generatePdfReceipt(
   booking: BookingForPdf,
   attendees: AttendeeForPdf[]
@@ -50,8 +45,7 @@ export function generatePdfReceipt(
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    const formatCurrency = (n: number) =>
-      `£${n.toFixed(2)}`;
+    const formatCurrency = (n: number) => `£${n.toFixed(2)}`;
 
     const lead = attendees.find((a) => a.isLead) || attendees[0];
     const dateStr = new Date().toLocaleDateString("en-GB", {
@@ -60,12 +54,21 @@ export function generatePdfReceipt(
       year: "numeric",
     });
 
-    const subtotal = parseFloat(booking.subtotalAmount?.toString() || "0");
+    // booking.subtotalAmount IS subtotalAfterDiscounts (stored post-discount).
+    const subtotalAfterDiscounts = parseFloat(booking.subtotalAmount?.toString() || "0");
     const vat = parseFloat(booking.vatAmount?.toString() || "0");
     const total = parseFloat(booking.totalAmount?.toString() || "0");
     const promoDiscount = parseFloat(booking.promoDiscountAmount?.toString() || "0");
     const groupDiscount = parseFloat(booking.groupDiscountAmount?.toString() || "0");
-    const pricePerHead = PASS_PRICES[booking.passType] || 0;
+
+    // Reconstruct gross amount shown in the top line item.
+    const baseAmount = subtotalAfterDiscounts + groupDiscount + promoDiscount;
+
+    // For team pass (bundle product): billing is 1 bundle, qty shown = 1.
+    const passInfo = PASS_PRICES[booking.passType];
+    const isBundlePass = passInfo ? passInfo.seats > 1 : false;
+    const displayQty = isBundlePass ? 1 : booking.quantity;
+    const displayUnitPrice = baseAmount / Math.max(displayQty, 1);
 
     doc
       .fontSize(22)
@@ -147,9 +150,9 @@ export function generatePdfReceipt(
       .fontSize(11)
       .fillColor("#000")
       .text(passLabels[booking.passType] || booking.passType, 50, rowY, { width: 310 })
-      .text(String(booking.quantity), 370, rowY, { width: 50, align: "right" })
-      .text(formatCurrency(pricePerHead), 420, rowY, { width: 70, align: "right" })
-      .text(formatCurrency(pricePerHead * booking.quantity), 490, rowY, { width: 55, align: "right" });
+      .text(String(displayQty), 370, rowY, { width: 50, align: "right" })
+      .text(formatCurrency(displayUnitPrice), 420, rowY, { width: 70, align: "right" })
+      .text(formatCurrency(baseAmount), 490, rowY, { width: 55, align: "right" });
 
     rowY += 24;
 
@@ -182,11 +185,12 @@ export function generatePdfReceipt(
 
     rowY += 10;
 
+    // Subtotal (excl. VAT) = subtotalAfterDiscounts — discounts already subtracted above.
     doc
       .fontSize(11)
       .fillColor("#333")
       .text("Subtotal (excl. VAT)", 50, rowY)
-      .text(formatCurrency(subtotal - groupDiscount - promoDiscount), 490, rowY, { width: 55, align: "right" });
+      .text(formatCurrency(subtotalAfterDiscounts), 490, rowY, { width: 55, align: "right" });
 
     rowY += 20;
 
