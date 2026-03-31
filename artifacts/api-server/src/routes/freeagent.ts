@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import axios from "axios";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { bookingsTable, attendeesTable, promoCodesTable } from "@workspace/db";
+import { bookingsTable, attendeesTable, promoCodesTable, eventSettingsTable } from "@workspace/db";
 import { sendBookingEmails, sendOrganiserNotification } from "../lib/email";
 import { syncBookingToSheets } from "../lib/google-sheets";
 import { logger } from "../lib/logger";
@@ -13,17 +13,50 @@ const FREEAGENT_BASE = "https://api.freeagent.com/v2";
 
 interface FreeAgentTokenResponse {
   access_token: string;
+  refresh_token?: string;
+  expires_in?: number;
 }
 
+/**
+ * Get a valid FreeAgent access token.
+ *
+ * Strategy:
+ *  1. Check the DB for a cached access token that hasn't expired yet → return it.
+ *  2. Otherwise, read the refresh token from the DB (falls back to the env var on
+ *     first run).  Exchange it for a new access + refresh token pair.
+ *  3. Persist both tokens back to the DB so token rotation is never lost between
+ *     server restarts.
+ */
 async function getFreeAgentToken(): Promise<string | null> {
-  const refreshToken = process.env.FREEAGENT_REFRESH_TOKEN;
   const clientId = process.env.FREEAGENT_CLIENT_ID;
   const clientSecret = process.env.FREEAGENT_CLIENT_SECRET;
 
-  if (!refreshToken || !clientId || !clientSecret) {
+  if (!clientId || !clientSecret) {
+    logger.warn("FreeAgent client credentials not configured");
     return null;
   }
 
+  // ── 1. Try cached access token ────────────────────────────────────────────
+  const [settings] = await db.select().from(eventSettingsTable);
+  if (settings?.freeagentAccessToken && settings.freeagentTokenExpiresAt) {
+    const expiresAt = new Date(settings.freeagentTokenExpiresAt).getTime();
+    // Use cached token if it still has more than 5 minutes left
+    if (expiresAt - Date.now() > 5 * 60 * 1000) {
+      return settings.freeagentAccessToken;
+    }
+  }
+
+  // ── 2. Determine which refresh token to use ───────────────────────────────
+  const refreshToken =
+    settings?.freeagentRefreshToken ||
+    process.env.FREEAGENT_REFRESH_TOKEN;
+
+  if (!refreshToken) {
+    logger.warn("No FreeAgent refresh token available");
+    return null;
+  }
+
+  // ── 3. Exchange for a new access token ────────────────────────────────────
   try {
     const response = await axios.post<FreeAgentTokenResponse>(
       "https://api.freeagent.com/v2/token_endpoint",
@@ -38,7 +71,28 @@ async function getFreeAgentToken(): Promise<string | null> {
         auth: { username: clientId, password: clientSecret },
       }
     );
-    return response.data.access_token;
+
+    const { access_token, refresh_token: newRefreshToken, expires_in = 3600 } = response.data;
+
+    // ── 4. Persist both tokens to DB ─────────────────────────────────────────
+    const expiresAt = new Date(Date.now() + expires_in * 1000);
+
+    if (settings) {
+      await db.update(eventSettingsTable).set({
+        freeagentAccessToken: access_token,
+        freeagentRefreshToken: newRefreshToken || refreshToken,
+        freeagentTokenExpiresAt: expiresAt,
+      });
+    } else {
+      await db.insert(eventSettingsTable).values({
+        freeagentAccessToken: access_token,
+        freeagentRefreshToken: newRefreshToken || refreshToken,
+        freeagentTokenExpiresAt: expiresAt,
+      });
+    }
+
+    logger.info("FreeAgent access token refreshed and cached in DB");
+    return access_token;
   } catch (err) {
     logger.error({ err }, "Failed to get FreeAgent token");
     return null;
@@ -106,8 +160,11 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
     return;
   }
 
-  // Idempotency guard: if booking is already invoiced or paid, return existing data.
-  if (booking.status === "invoiced" || booking.status === "paid") {
+  // Idempotency guard: if booking is already fully invoiced with a real FreeAgent invoice,
+  // or is paid, return the existing data without creating a duplicate.
+  // Exception: if booking was marked "invoiced" but has no FA invoice ID, allow retry.
+  const alreadyHasFAInvoice = !!booking.freeagentInvoiceId;
+  if (booking.status === "paid" || (booking.status === "invoiced" && alreadyHasFAInvoice)) {
     res.json({
       invoiceId: booking.freeagentInvoiceId || `manual-${booking.orderReference}`,
       invoiceUrl: booking.freeagentInvoiceUrl || null,
@@ -137,7 +194,8 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
 
   const prefix = "HRS";
   const num = Math.floor(10000 + Math.random() * 90000);
-  const orderRef = `${prefix}-2026-${num}`;
+  // Reuse existing order reference if this booking already has one (retry scenario)
+  const orderRef = booking.orderReference || `${prefix}-2026-${num}`;
 
   // booking.subtotalAmount is subtotalAfterDiscounts (post-discount).
   // Reconstruct the pre-discount base so we can show accurate line-item breakdown.

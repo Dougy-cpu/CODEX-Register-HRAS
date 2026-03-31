@@ -12,6 +12,9 @@ export const eventSettingsTable = pgTable("event_settings", {
   logoDataUrl: text("logo_data_url"),
   fromName: text("from_name").notNull().default("HR Analytics Summit"),
   fromEmail: text("from_email").notNull().default("noreply@hranalyticssummit.com"),
+  freeagentRefreshToken: text("freeagent_refresh_token"),
+  freeagentAccessToken: text("freeagent_access_token"),
+  freeagentTokenExpiresAt: timestamp("freeagent_token_expires_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
 
