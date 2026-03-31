@@ -238,6 +238,7 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
           payment_terms_in_days: 14,
           reference: orderRef,
           invoice_items: invoiceItems,
+          send_new_invoice_emails: true,
         },
       },
       { headers: { Authorization: `Bearer ${token}` } }

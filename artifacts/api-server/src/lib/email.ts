@@ -325,9 +325,14 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
     }
   }
 
-  const attachments = pdfBuffer
-    ? [{ filename: pdfFilename, content: pdfBuffer, contentType: "application/pdf" }]
-    : [];
+  const attachments: Array<{ filename: string; content: Buffer; contentType: string }> = [];
+  if (pdfBuffer) {
+    attachments.push({ filename: pdfFilename, content: pdfBuffer, contentType: "application/pdf" });
+  }
+  const companyInfoPdf = getCompanyInfoPdf();
+  if (companyInfoPdf) {
+    attachments.push({ filename: "DBL-company-information.pdf", content: companyInfoPdf, contentType: "application/pdf" });
+  }
 
   const confirmSent = await sendMail({
     to: lead.workEmail,
@@ -469,9 +474,14 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
     }
   }
 
-  const attachments = pdfBuffer
-    ? [{ filename: pdfFilename, content: pdfBuffer, contentType: "application/pdf" }]
-    : [];
+  const attachments: Array<{ filename: string; content: Buffer; contentType: string }> = [];
+  if (pdfBuffer) {
+    attachments.push({ filename: pdfFilename, content: pdfBuffer, contentType: "application/pdf" });
+  }
+  const companyInfoPdfResend = getCompanyInfoPdf();
+  if (companyInfoPdfResend) {
+    attachments.push({ filename: "DBL-company-information.pdf", content: companyInfoPdfResend, contentType: "application/pdf" });
+  }
 
   const sent = await sendMail({
     to: lead.workEmail,
