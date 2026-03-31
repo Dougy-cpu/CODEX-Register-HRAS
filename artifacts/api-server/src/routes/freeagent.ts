@@ -248,20 +248,19 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
     const invoiceId = invoiceUrl?.split("/").pop() || orderRef;
     let paymentUrl: string | null = (invoiceData.payment_url as string) || null;
 
-    // Mark the invoice as Sent via a separate PUT call
-    // (FreeAgent ignores status on creation in some configurations)
+    // Mark the invoice as Sent using FreeAgent's transitions API
     if (invoiceUrl) {
       try {
         const sentResp = await axios.put(
-          invoiceUrl,
-          { invoice: { status: "Sent" } },
+          `${invoiceUrl}/transitions/mark_as_sent`,
+          {},
           { headers: { Authorization: `Bearer ${token}` } }
         );
         // Re-read payment_url from the updated invoice in case it's only available post-send
         if (!paymentUrl) {
           paymentUrl = (sentResp.data?.invoice?.payment_url as string) || null;
         }
-        logger.info({ invoiceId }, "FreeAgent invoice marked as Sent");
+        logger.info({ invoiceId }, "FreeAgent invoice marked as Sent (Open)");
       } catch (sentErr) {
         logger.warn({ sentErr }, "Could not mark FreeAgent invoice as Sent — it may remain as Draft");
       }
