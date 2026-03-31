@@ -106,6 +106,17 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
     return;
   }
 
+  // Idempotency guard: if booking is already invoiced or paid, return existing data.
+  if (booking.status === "invoiced" || booking.status === "paid") {
+    res.json({
+      invoiceId: booking.freeagentInvoiceId || `manual-${booking.orderReference}`,
+      invoiceUrl: booking.freeagentInvoiceUrl || null,
+      invoiceReference: booking.orderReference || "",
+      alreadyProcessed: true,
+    });
+    return;
+  }
+
   const attendees = await db
     .select()
     .from(attendeesTable)
