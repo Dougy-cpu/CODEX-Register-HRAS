@@ -41,25 +41,28 @@ router.post("/bookings/:bookingId/attendees", async (req, res): Promise<void> =>
     }
   }
 
-  const { firstName, lastName, jobTitle, company, workEmail, phone, gdprConsent, isLead, seatIndex } = req.body;
+  const { firstName, lastName, jobTitle, company, workEmail, phone, gdprConsent, isLead, seatIndex, isTbc } = req.body;
 
-  if (!firstName || !lastName || !jobTitle || !company || !workEmail) {
+  if (!isTbc && (!firstName || !lastName || !jobTitle || !company || !workEmail)) {
     res.status(400).json({ error: "firstName, lastName, jobTitle, company, workEmail are required" });
     return;
   }
+
+  const tbcEmail = `tbc-${bookingId}-${seatIndex ?? 0}@tbc.placeholder`;
 
   const [attendee] = await db
     .insert(attendeesTable)
     .values({
       bookingId,
-      firstName,
-      lastName,
-      jobTitle,
-      company,
-      workEmail,
+      isTbc: !!isTbc,
+      firstName: isTbc ? "TBC" : firstName,
+      lastName: isTbc ? "TBC" : lastName,
+      jobTitle: isTbc ? "TBC" : jobTitle,
+      company: isTbc ? (company || "TBC") : company,
+      workEmail: isTbc ? tbcEmail : workEmail,
       phone: phone || null,
-      gdprConsent: !!gdprConsent,
-      gdprConsentAt: gdprConsent ? new Date() : null,
+      gdprConsent: isTbc ? false : !!gdprConsent,
+      gdprConsentAt: (!isTbc && gdprConsent) ? new Date() : null,
       isLead: !!isLead,
       seatIndex: seatIndex ?? 0,
     })
@@ -98,18 +101,34 @@ router.patch("/bookings/:bookingId/attendees/:attendeeId", async (req, res): Pro
     return;
   }
 
-  const { firstName, lastName, jobTitle, company, workEmail, phone, gdprConsent } = req.body;
+  const { firstName, lastName, jobTitle, company, workEmail, phone, gdprConsent, isTbc } = req.body;
 
   const updateData: Partial<typeof attendeesTable.$inferInsert> = {};
-  if (firstName !== undefined) updateData.firstName = firstName;
-  if (lastName !== undefined) updateData.lastName = lastName;
-  if (jobTitle !== undefined) updateData.jobTitle = jobTitle;
-  if (company !== undefined) updateData.company = company;
-  if (workEmail !== undefined) updateData.workEmail = workEmail;
-  if (phone !== undefined) updateData.phone = phone || null;
-  if (gdprConsent !== undefined) {
-    updateData.gdprConsent = !!gdprConsent;
-    updateData.gdprConsentAt = gdprConsent ? new Date() : null;
+
+  if (isTbc !== undefined) {
+    updateData.isTbc = !!isTbc;
+    if (isTbc) {
+      updateData.firstName = "TBC";
+      updateData.lastName = "TBC";
+      updateData.jobTitle = "TBC";
+      updateData.company = company || existing.company || "TBC";
+      updateData.workEmail = `tbc-${bookingId}-${existing.seatIndex}@tbc.placeholder`;
+      updateData.gdprConsent = false;
+      updateData.gdprConsentAt = null;
+    }
+  }
+
+  if (!isTbc) {
+    if (firstName !== undefined) updateData.firstName = firstName;
+    if (lastName !== undefined) updateData.lastName = lastName;
+    if (jobTitle !== undefined) updateData.jobTitle = jobTitle;
+    if (company !== undefined) updateData.company = company;
+    if (workEmail !== undefined) updateData.workEmail = workEmail;
+    if (phone !== undefined) updateData.phone = phone || null;
+    if (gdprConsent !== undefined) {
+      updateData.gdprConsent = !!gdprConsent;
+      updateData.gdprConsentAt = gdprConsent ? new Date() : null;
+    }
   }
 
   const [updated] = await db

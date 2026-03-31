@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Checkbox } from "@/components/ui/checkbox";
-import { User } from "lucide-react";
+import { User, Clock, Info } from "lucide-react";
 import type { BookingWithAttendees } from "@/types/booking";
 
 const attendeeSchema = z.object({
@@ -30,6 +30,7 @@ interface AttendeeFormData {
   phone: string;
   gdprConsent: boolean;
   id?: number;
+  isTbc?: boolean;
 }
 
 interface Step3AttendeesProps {
@@ -76,6 +77,7 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
           phone: existing?.phone || "",
           gdprConsent: existing?.gdprConsent || false,
           id: existing?.id,
+          isTbc: (existing as any)?.isTbc || false,
         });
       }
     }
@@ -84,6 +86,14 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
 
   const [forMeFlags, setForMeFlags] = useState<boolean[]>(() =>
     Array.from({ length: totalSeats }, (_, i) => i === 0)
+  );
+
+  const [tbcFlags, setTbcFlags] = useState<boolean[]>(() =>
+    Array.from({ length: totalSeats }, (_, i) => {
+      if (i === 0) return false;
+      const existing = additionalAttendees[i - 1];
+      return (existing as any)?.isTbc || false;
+    })
   );
 
   const [errors, setErrors] = useState<(Partial<Record<keyof AttendeeFormData, string>> | null)[]>(
@@ -97,7 +107,10 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
     const timer = setTimeout(async () => {
       for (let i = 0; i < formsData.length; i++) {
         const form = formsData[i];
-        if (!form.firstName || !form.workEmail) continue;
+        const isTbc = tbcFlags[i];
+
+        if (!isTbc && (!form.firstName || !form.workEmail)) continue;
+
         if (i === 0) {
           if (leadAttendee?.id) {
             try {
@@ -123,30 +136,33 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
               await updateAttendee.mutateAsync({
                 bookingId: booking.id,
                 attendeeId: existingId,
-                data: {
-                  firstName: form.firstName,
-                  lastName: form.lastName,
-                  jobTitle: form.jobTitle,
-                  company: form.company,
-                  workEmail: form.workEmail,
-                  phone: form.phone || null,
-                  gdprConsent: form.gdprConsent,
-                },
+                data: isTbc
+                  ? { isTbc: true, company: leadDefaults.company } as any
+                  : {
+                      firstName: form.firstName,
+                      lastName: form.lastName,
+                      jobTitle: form.jobTitle,
+                      company: form.company,
+                      workEmail: form.workEmail,
+                      phone: form.phone || null,
+                      gdprConsent: form.gdprConsent,
+                    },
               });
-            } else {
+            } else if (isTbc) {
               const created = await createAttendee.mutateAsync({
                 bookingId: booking.id,
                 data: {
                   isLead: false,
-                  firstName: form.firstName,
-                  lastName: form.lastName,
-                  jobTitle: form.jobTitle,
-                  company: form.company,
-                  workEmail: form.workEmail,
-                  phone: form.phone || null,
-                  gdprConsent: form.gdprConsent,
+                  isTbc: true,
+                  firstName: "TBC",
+                  lastName: "TBC",
+                  jobTitle: "TBC",
+                  company: leadDefaults.company || "TBC",
+                  workEmail: `tbc-${booking.id}-${i}@tbc.placeholder`,
+                  phone: null,
+                  gdprConsent: false,
                   seatIndex: i,
-                },
+                } as any,
               });
               autosaveIdsRef.current[i] = created.id;
             }
@@ -155,7 +171,7 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
       }
     }, 1500);
     return () => clearTimeout(timer);
-  }, [formsData]);
+  }, [formsData, tbcFlags]);
 
   const handleForMeToggle = (index: number, checked: boolean) => {
     const newFlags = [...forMeFlags];
@@ -188,6 +204,30 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
     setFormsData(newForms);
   };
 
+  const handleTbcToggle = (index: number, checked: boolean) => {
+    const newTbc = [...tbcFlags];
+    newTbc[index] = checked;
+    setTbcFlags(newTbc);
+
+    if (checked) {
+      const newForms = [...formsData];
+      newForms[index] = {
+        ...newForms[index],
+        firstName: "",
+        lastName: "",
+        jobTitle: "",
+        company: leadDefaults.company,
+        workEmail: "",
+        phone: "",
+        gdprConsent: false,
+      };
+      setFormsData(newForms);
+      const newErrors = [...errors];
+      newErrors[index] = null;
+      setErrors(newErrors);
+    }
+  };
+
   const updateFormData = <K extends keyof AttendeeFormData>(index: number, field: K, value: AttendeeFormData[K]) => {
     const newFormsData = [...formsData];
     newFormsData[index] = { ...newFormsData[index], [field]: value };
@@ -204,6 +244,7 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
     const newErrors: (Partial<Record<keyof AttendeeFormData, string>> | null)[] = Array(totalSeats).fill(null);
 
     for (let i = 0; i < totalSeats; i++) {
+      if (tbcFlags[i]) continue;
       const result = attendeeSchema.safeParse(formsData[i]);
       if (!result.success) {
         allValid = false;
@@ -225,6 +266,8 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
     try {
       for (let i = 0; i < totalSeats; i++) {
         const data = formsData[i];
+        const isTbc = tbcFlags[i];
+
         if (i === 0) {
           if (leadAttendee?.id) {
             await updateAttendee.mutateAsync({
@@ -247,31 +290,47 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
             await updateAttendee.mutateAsync({
               bookingId: booking.id,
               attendeeId: existingId,
-              data: {
-                firstName: data.firstName,
-                lastName: data.lastName,
-                jobTitle: data.jobTitle,
-                company: data.company,
-                workEmail: data.workEmail,
-                phone: data.phone || null,
-                gdprConsent: data.gdprConsent,
-              },
+              data: isTbc
+                ? { isTbc: true, company: leadDefaults.company } as any
+                : {
+                    firstName: data.firstName,
+                    lastName: data.lastName,
+                    jobTitle: data.jobTitle,
+                    company: data.company,
+                    workEmail: data.workEmail,
+                    phone: data.phone || null,
+                    gdprConsent: data.gdprConsent,
+                  },
             });
           } else {
-            await createAttendee.mutateAsync({
+            const created = await createAttendee.mutateAsync({
               bookingId: booking.id,
-              data: {
-                isLead: false,
-                firstName: data.firstName,
-                lastName: data.lastName,
-                jobTitle: data.jobTitle,
-                company: data.company,
-                workEmail: data.workEmail,
-                phone: data.phone || null,
-                gdprConsent: data.gdprConsent,
-                seatIndex: i,
-              },
+              data: isTbc
+                ? {
+                    isLead: false,
+                    isTbc: true,
+                    firstName: "TBC",
+                    lastName: "TBC",
+                    jobTitle: "TBC",
+                    company: leadDefaults.company || "TBC",
+                    workEmail: `tbc-${booking.id}-${i}@tbc.placeholder`,
+                    phone: null,
+                    gdprConsent: false,
+                    seatIndex: i,
+                  } as any
+                : {
+                    isLead: false,
+                    firstName: data.firstName,
+                    lastName: data.lastName,
+                    jobTitle: data.jobTitle,
+                    company: data.company,
+                    workEmail: data.workEmail,
+                    phone: data.phone || null,
+                    gdprConsent: data.gdprConsent,
+                    seatIndex: i,
+                  },
             });
+            autosaveIdsRef.current[i] = created.id;
           }
         }
       }
@@ -299,11 +358,25 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
         </p>
       </div>
 
+      {/* TBC info banner — shown only for multi-ticket bookings */}
+      {totalSeats > 1 && (
+        <div className="flex gap-3 bg-blue-50 border border-blue-200 rounded p-4 text-sm text-blue-800">
+          <Info className="w-4 h-4 shrink-0 mt-0.5" />
+          <p>
+            <span className="font-semibold">Not sure who's attending yet?</span>{" "}
+            Mark any additional ticket as <span className="font-semibold">TBC</span> to complete your booking now and confirm the attendee details later — just contact us after booking.
+          </p>
+        </div>
+      )}
+
       <Accordion type="single" value={openItem} onValueChange={setOpenItem} className="space-y-4">
         {formsData.map((data, index) => {
           const fieldErrors = errors[index];
           const isForMe = forMeFlags[index];
-          const label = data.firstName && data.lastName
+          const isTbc = tbcFlags[index];
+          const label = isTbc
+            ? "TBC — details to be confirmed"
+            : data.firstName && data.lastName
             ? `${data.firstName} ${data.lastName}`
             : "Pending details";
 
@@ -312,105 +385,138 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
               <AccordionTrigger className="hover:no-underline py-6">
                 <div className="flex flex-col text-left">
                   <span className="font-bold text-xl">Attendee {index + 1}</span>
-                  <span className="text-sm text-muted-foreground font-normal">{label}</span>
+                  <span className={`text-sm font-normal ${isTbc ? "text-amber-600 font-medium" : "text-muted-foreground"}`}>
+                    {label}
+                  </span>
                 </div>
               </AccordionTrigger>
               <AccordionContent className="pb-6">
-                <div className="mb-5 pt-4 border-t border-border">
-                  <button
-                    type="button"
-                    onClick={() => handleForMeToggle(index, !isForMe)}
-                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-medium transition-all ${
-                      isForMe
-                        ? "bg-primary text-white border-primary"
-                        : "bg-white text-foreground border-border hover:border-primary/50"
-                    }`}
-                  >
-                    <User className="w-4 h-4" />
-                    This ticket is for me
-                  </button>
-                  {isForMe && (
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Pre-filled from your profile. Edit any field to customise.
-                    </p>
+                <div className="mb-5 pt-4 border-t border-border flex flex-wrap gap-2">
+                  {/* "This ticket is for me" — Attendee 1 only */}
+                  {index === 0 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleForMeToggle(index, !isForMe)}
+                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                          isForMe
+                            ? "bg-primary text-white border-primary"
+                            : "bg-white text-foreground border-border hover:border-primary/50"
+                        }`}
+                      >
+                        <User className="w-4 h-4" />
+                        This ticket is for me
+                      </button>
+                      {isForMe && (
+                        <p className="w-full mt-1 text-xs text-muted-foreground">
+                          Pre-filled from your profile. Edit any field to customise.
+                        </p>
+                      )}
+                    </>
+                  )}
+
+                  {/* "Not confirmed yet (TBC)" — Attendees 2+ only */}
+                  {index > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => handleTbcToggle(index, !isTbc)}
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                        isTbc
+                          ? "bg-amber-500 text-white border-amber-500"
+                          : "bg-white text-foreground border-border hover:border-amber-400"
+                      }`}
+                    >
+                      <Clock className="w-4 h-4" />
+                      Not confirmed yet (TBC)
+                    </button>
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">First Name *</label>
-                    <Input
-                      value={data.firstName}
-                      onChange={(e) => updateFormData(index, "firstName", e.target.value)}
-                      className={`h-12 bg-white ${fieldErrors?.firstName ? "border-destructive" : ""}`}
-                    />
-                    {fieldErrors?.firstName && <p className="text-xs text-destructive">{fieldErrors.firstName}</p>}
+                {/* TBC state — hide form, show friendly message */}
+                {isTbc ? (
+                  <div className="bg-amber-50 border border-amber-200 rounded p-4 text-sm text-amber-800">
+                    <p className="font-semibold mb-1">This ticket is marked as TBC</p>
+                    <p>You can confirm this attendee's details later — just contact us after booking and we'll update the registration for you.</p>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Last Name *</label>
-                    <Input
-                      value={data.lastName}
-                      onChange={(e) => updateFormData(index, "lastName", e.target.value)}
-                      className={`h-12 bg-white ${fieldErrors?.lastName ? "border-destructive" : ""}`}
-                    />
-                    {fieldErrors?.lastName && <p className="text-xs text-destructive">{fieldErrors.lastName}</p>}
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Work Email *</label>
-                    <Input
-                      type="email"
-                      value={data.workEmail}
-                      onChange={(e) => updateFormData(index, "workEmail", e.target.value)}
-                      className={`h-12 bg-white ${fieldErrors?.workEmail ? "border-destructive" : ""}`}
-                    />
-                    {fieldErrors?.workEmail && <p className="text-xs text-destructive">{fieldErrors.workEmail}</p>}
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Phone (optional)</label>
-                    <Input
-                      value={data.phone}
-                      onChange={(e) => updateFormData(index, "phone", e.target.value)}
-                      className="h-12 bg-white"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Job Title *</label>
-                    <Input
-                      value={data.jobTitle}
-                      onChange={(e) => updateFormData(index, "jobTitle", e.target.value)}
-                      className={`h-12 bg-white ${fieldErrors?.jobTitle ? "border-destructive" : ""}`}
-                    />
-                    {fieldErrors?.jobTitle && <p className="text-xs text-destructive">{fieldErrors.jobTitle}</p>}
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Company *</label>
-                    <Input
-                      value={data.company}
-                      onChange={(e) => updateFormData(index, "company", e.target.value)}
-                      className={`h-12 bg-white ${fieldErrors?.company ? "border-destructive" : ""}`}
-                    />
-                    {fieldErrors?.company && <p className="text-xs text-destructive">{fieldErrors.company}</p>}
-                  </div>
-                </div>
-
-                <div className="pt-6 mt-6 border-t border-border">
-                  <div className="flex items-start space-x-3">
-                    <Checkbox
-                      checked={data.gdprConsent}
-                      onCheckedChange={(val) => updateFormData(index, "gdprConsent", !!val)}
-                      className="mt-1"
-                    />
-                    <div className="space-y-1 leading-none">
-                      <label className="font-normal text-base cursor-pointer">
-                        I understand how my data will be processed in accordance with{" "}
-                        <a href="https://peoplestrategyhub.com/your-data-gdpr" target="_blank" rel="noreferrer" className="underline text-primary hover:text-primary/80">GDPR</a>
-                        {" "}and{" "}
-                        <a href="https://www.hranalyticssummit.com/terms-and-conditions" target="_blank" rel="noreferrer" className="underline text-primary hover:text-primary/80">Conference T&Cs</a>
-                      </label>
-                      {fieldErrors?.gdprConsent && <p className="text-xs text-destructive">{fieldErrors.gdprConsent}</p>}
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">First Name *</label>
+                        <Input
+                          value={data.firstName}
+                          onChange={(e) => updateFormData(index, "firstName", e.target.value)}
+                          className={`h-12 bg-white ${fieldErrors?.firstName ? "border-destructive" : ""}`}
+                        />
+                        {fieldErrors?.firstName && <p className="text-xs text-destructive">{fieldErrors.firstName}</p>}
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Last Name *</label>
+                        <Input
+                          value={data.lastName}
+                          onChange={(e) => updateFormData(index, "lastName", e.target.value)}
+                          className={`h-12 bg-white ${fieldErrors?.lastName ? "border-destructive" : ""}`}
+                        />
+                        {fieldErrors?.lastName && <p className="text-xs text-destructive">{fieldErrors.lastName}</p>}
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Work Email *</label>
+                        <Input
+                          type="email"
+                          value={data.workEmail}
+                          onChange={(e) => updateFormData(index, "workEmail", e.target.value)}
+                          className={`h-12 bg-white ${fieldErrors?.workEmail ? "border-destructive" : ""}`}
+                        />
+                        {fieldErrors?.workEmail && <p className="text-xs text-destructive">{fieldErrors.workEmail}</p>}
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Phone (optional)</label>
+                        <Input
+                          value={data.phone}
+                          onChange={(e) => updateFormData(index, "phone", e.target.value)}
+                          className="h-12 bg-white"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Job Title *</label>
+                        <Input
+                          value={data.jobTitle}
+                          onChange={(e) => updateFormData(index, "jobTitle", e.target.value)}
+                          className={`h-12 bg-white ${fieldErrors?.jobTitle ? "border-destructive" : ""}`}
+                        />
+                        {fieldErrors?.jobTitle && <p className="text-xs text-destructive">{fieldErrors.jobTitle}</p>}
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Company *</label>
+                        <Input
+                          value={data.company}
+                          onChange={(e) => updateFormData(index, "company", e.target.value)}
+                          className={`h-12 bg-white ${fieldErrors?.company ? "border-destructive" : ""}`}
+                        />
+                        {fieldErrors?.company && <p className="text-xs text-destructive">{fieldErrors.company}</p>}
+                      </div>
                     </div>
-                  </div>
-                </div>
+
+                    <div className="pt-6 mt-6 border-t border-border">
+                      <div className="flex items-start space-x-3">
+                        <Checkbox
+                          checked={data.gdprConsent}
+                          onCheckedChange={(val) => updateFormData(index, "gdprConsent", !!val)}
+                          className="mt-1"
+                        />
+                        <div className="space-y-1 leading-none">
+                          <label className="font-normal text-base cursor-pointer">
+                            I understand how my data will be processed in accordance with{" "}
+                            <a href="https://peoplestrategyhub.com/your-data-gdpr" target="_blank" rel="noreferrer" className="underline text-primary hover:text-primary/80">GDPR</a>
+                            {" "}and{" "}
+                            <a href="https://www.hranalyticssummit.com/terms-and-conditions" target="_blank" rel="noreferrer" className="underline text-primary hover:text-primary/80">Conference T&Cs</a>
+                          </label>
+                          {fieldErrors?.gdprConsent && <p className="text-xs text-destructive">{fieldErrors.gdprConsent}</p>}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 {index < totalSeats - 1 && (
                   <div className="flex justify-end mt-6">

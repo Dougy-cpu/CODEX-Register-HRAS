@@ -1,4 +1,4 @@
-modules = ["nodejs-24"]
+modules = ["nodejs-24", "postgresql-16"]
 
 [[artifacts]]
 id = "artifacts/api-server"
@@ -33,3 +33,6 @@ timeoutMs = 20000
 FREEAGENT_CLIENT_ID = "ZuB3ZkYghCkkWqU9aGm45A"
 FREEAGENT_CLIENT_SECRET = "ny0W4D2wIUeo_-6mUcA_lA"
 FREEAGENT_REFRESH_TOKEN = "1hnNsxzTl6IZpYqvrVWNuowYKy02O-brX7gr7jlxu"
+
+[nix]
+channel = "stable-25_05"

@@ -36,9 +36,22 @@ function ExpandedRegistrationDetail({ id }: { id: number }) {
         <div className="space-y-2">
           {data?.attendees?.map((a, i) => (
             <div key={i} className="text-sm border border-border rounded p-2 bg-white">
-              <p className="font-medium">{a.firstName} {a.lastName} {a.isLead ? <span className="text-xs text-primary font-bold ml-1">LEAD</span> : null}</p>
-              <p className="text-muted-foreground">{a.jobTitle} · {a.company}</p>
-              <p className="text-muted-foreground">{a.workEmail}</p>
+              {(a as any).isTbc ? (
+                <>
+                  <p className="font-medium text-amber-700">
+                    TBC
+                    {a.isLead ? <span className="text-xs text-primary font-bold ml-1">LEAD</span> : null}
+                    <span className="ml-2 text-xs font-normal bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded">To be confirmed</span>
+                  </p>
+                  <p className="text-muted-foreground">Seat {a.seatIndex + 1} — attendee details pending</p>
+                </>
+              ) : (
+                <>
+                  <p className="font-medium">{a.firstName} {a.lastName} {a.isLead ? <span className="text-xs text-primary font-bold ml-1">LEAD</span> : null}</p>
+                  <p className="text-muted-foreground">{a.jobTitle} · {a.company}</p>
+                  <p className="text-muted-foreground">{a.workEmail}</p>
+                </>
+              )}
             </div>
           ))}
           {(!data?.attendees || data.attendees.length === 0) && (
