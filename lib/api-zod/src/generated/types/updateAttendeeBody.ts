@@ -7,6 +7,7 @@
  */
 
 export interface UpdateAttendeeBody {
+  isTbc?: boolean;
   firstName?: string;
   lastName?: string;
   jobTitle?: string;

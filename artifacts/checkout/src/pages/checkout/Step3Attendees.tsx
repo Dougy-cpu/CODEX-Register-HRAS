@@ -30,7 +30,6 @@ interface AttendeeFormData {
   phone: string;
   gdprConsent: boolean;
   id?: number;
-  isTbc?: boolean;
 }
 
 interface Step3AttendeesProps {
@@ -69,15 +68,14 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
       } else {
         const existing = additionalAttendees[i - 1];
         forms.push({
-          firstName: existing?.firstName || "",
-          lastName: existing?.lastName || "",
-          jobTitle: existing?.jobTitle || "",
-          company: existing?.company || leadAttendee?.company || "",
-          workEmail: existing?.workEmail || "",
-          phone: existing?.phone || "",
-          gdprConsent: existing?.gdprConsent || false,
+          firstName: existing?.isTbc ? "" : (existing?.firstName || ""),
+          lastName: existing?.isTbc ? "" : (existing?.lastName || ""),
+          jobTitle: existing?.isTbc ? "" : (existing?.jobTitle || ""),
+          company: existing?.isTbc ? (leadAttendee?.company || "") : (existing?.company || leadAttendee?.company || ""),
+          workEmail: existing?.isTbc ? "" : (existing?.workEmail || ""),
+          phone: existing?.isTbc ? "" : (existing?.phone || ""),
+          gdprConsent: existing?.isTbc ? false : (existing?.gdprConsent || false),
           id: existing?.id,
-          isTbc: (existing as any)?.isTbc || false,
         });
       }
     }
@@ -92,7 +90,7 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
     Array.from({ length: totalSeats }, (_, i) => {
       if (i === 0) return false;
       const existing = additionalAttendees[i - 1];
-      return (existing as any)?.isTbc || false;
+      return existing?.isTbc ?? false;
     })
   );
 
@@ -137,8 +135,9 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
                 bookingId: booking.id,
                 attendeeId: existingId,
                 data: isTbc
-                  ? { isTbc: true, company: leadDefaults.company } as any
+                  ? { isTbc: true, company: leadDefaults.company }
                   : {
+                      isTbc: false,
                       firstName: form.firstName,
                       lastName: form.lastName,
                       jobTitle: form.jobTitle,
@@ -154,15 +153,10 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
                 data: {
                   isLead: false,
                   isTbc: true,
-                  firstName: "TBC",
-                  lastName: "TBC",
-                  jobTitle: "TBC",
-                  company: leadDefaults.company || "TBC",
-                  workEmail: `tbc-${booking.id}-${i}@tbc.placeholder`,
-                  phone: null,
                   gdprConsent: false,
+                  company: leadDefaults.company || "TBC",
                   seatIndex: i,
-                } as any,
+                },
               });
               autosaveIdsRef.current[i] = created.id;
             }
@@ -291,8 +285,9 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
               bookingId: booking.id,
               attendeeId: existingId,
               data: isTbc
-                ? { isTbc: true, company: leadDefaults.company } as any
+                ? { isTbc: true, company: leadDefaults.company }
                 : {
+                    isTbc: false,
                     firstName: data.firstName,
                     lastName: data.lastName,
                     jobTitle: data.jobTitle,
@@ -309,17 +304,13 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
                 ? {
                     isLead: false,
                     isTbc: true,
-                    firstName: "TBC",
-                    lastName: "TBC",
-                    jobTitle: "TBC",
-                    company: leadDefaults.company || "TBC",
-                    workEmail: `tbc-${booking.id}-${i}@tbc.placeholder`,
-                    phone: null,
                     gdprConsent: false,
+                    company: leadDefaults.company || "TBC",
                     seatIndex: i,
-                  } as any
+                  }
                 : {
                     isLead: false,
+                    isTbc: false,
                     firstName: data.firstName,
                     lastName: data.lastName,
                     jobTitle: data.jobTitle,
@@ -358,7 +349,6 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
         </p>
       </div>
 
-      {/* TBC info banner — shown only for multi-ticket bookings */}
       {totalSeats > 1 && (
         <div className="flex gap-3 bg-blue-50 border border-blue-200 rounded p-4 text-sm text-blue-800">
           <Info className="w-4 h-4 shrink-0 mt-0.5" />
@@ -392,7 +382,6 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
               </AccordionTrigger>
               <AccordionContent className="pb-6">
                 <div className="mb-5 pt-4 border-t border-border flex flex-wrap gap-2">
-                  {/* "This ticket is for me" — Attendee 1 only */}
                   {index === 0 && (
                     <>
                       <button
@@ -415,7 +404,6 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
                     </>
                   )}
 
-                  {/* "Not confirmed yet (TBC)" — Attendees 2+ only */}
                   {index > 0 && (
                     <button
                       type="button"
@@ -432,7 +420,6 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
                   )}
                 </div>
 
-                {/* TBC state — hide form, show friendly message */}
                 {isTbc ? (
                   <div className="bg-amber-50 border border-amber-200 rounded p-4 text-sm text-amber-800">
                     <p className="font-semibold mb-1">This ticket is marked as TBC</p>

@@ -17,9 +17,11 @@ export interface Attendee {
   workEmail: string;
   /** @nullable */
   phone?: string | null;
+  isTbc: boolean;
   gdprConsent: boolean;
   /** @nullable */
   gdprConsentAt?: Date | null;
+  seatIndex?: number;
   createdAt: Date;
   updatedAt: Date;
 }

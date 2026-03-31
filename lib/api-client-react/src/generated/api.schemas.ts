@@ -109,9 +109,11 @@ export interface Attendee {
   workEmail: string;
   /** @nullable */
   phone?: string | null;
+  isTbc: boolean;
   gdprConsent: boolean;
   /** @nullable */
   gdprConsentAt?: string | null;
+  seatIndex?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -207,11 +209,12 @@ export interface UpdateBookingBody {
 
 export interface CreateAttendeeBody {
   isLead?: boolean;
-  firstName: string;
-  lastName: string;
-  jobTitle: string;
-  company: string;
-  workEmail: string;
+  isTbc?: boolean;
+  firstName?: string;
+  lastName?: string;
+  jobTitle?: string;
+  company?: string;
+  workEmail?: string;
   /** @nullable */
   phone?: string | null;
   gdprConsent: boolean;
@@ -219,6 +222,7 @@ export interface CreateAttendeeBody {
 }
 
 export interface UpdateAttendeeBody {
+  isTbc?: boolean;
   firstName?: string;
   lastName?: string;
   jobTitle?: string;

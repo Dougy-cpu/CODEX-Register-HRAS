@@ -36,14 +36,14 @@ function ExpandedRegistrationDetail({ id }: { id: number }) {
         <div className="space-y-2">
           {data?.attendees?.map((a, i) => (
             <div key={i} className="text-sm border border-border rounded p-2 bg-white">
-              {(a as any).isTbc ? (
+              {a.isTbc ? (
                 <>
                   <p className="font-medium text-amber-700">
                     TBC
                     {a.isLead ? <span className="text-xs text-primary font-bold ml-1">LEAD</span> : null}
                     <span className="ml-2 text-xs font-normal bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded">To be confirmed</span>
                   </p>
-                  <p className="text-muted-foreground">Seat {a.seatIndex + 1} — attendee details pending</p>
+                  <p className="text-muted-foreground">Seat {(a.seatIndex ?? 0) + 1} — attendee details pending</p>
                 </>
               ) : (
                 <>
