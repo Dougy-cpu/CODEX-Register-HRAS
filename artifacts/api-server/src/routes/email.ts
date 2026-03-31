@@ -104,10 +104,10 @@ router.post("/admin/email-logs/:bookingId/resend", adminAuth, async (req, res): 
   const raw = Array.isArray(req.params.bookingId) ? req.params.bookingId[0] : req.params.bookingId;
   const bookingId = parseInt(raw, 10);
 
-  const { sendBookingEmails } = await import("../lib/email");
-  await sendBookingEmails(bookingId);
+  const { resendConfirmationAndReceipt } = await import("../lib/email");
+  await resendConfirmationAndReceipt(bookingId);
 
-  res.json({ success: true, message: "Emails resent successfully" });
+  res.json({ success: true, message: "Confirmation and PDF receipt resent successfully" });
 });
 
 export default router;

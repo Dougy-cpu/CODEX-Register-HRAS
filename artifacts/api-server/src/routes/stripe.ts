@@ -1,8 +1,8 @@
 import { Router, type IRouter } from "express";
 import Stripe from "stripe";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { bookingsTable } from "@workspace/db";
+import { bookingsTable, promoCodesTable } from "@workspace/db";
 import { sendBookingEmails, sendOrganiserNotification } from "../lib/email";
 import { syncBookingToSheets } from "../lib/google-sheets";
 import { logger } from "../lib/logger";
@@ -148,6 +148,13 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
           paymentMethod: "card",
         })
         .where(eq(bookingsTable.id, bookingId));
+
+      const [paidBooking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
+      if (paidBooking?.promoCode) {
+        await db.update(promoCodesTable)
+          .set({ usedCount: sql`${promoCodesTable.usedCount} + 1` })
+          .where(eq(promoCodesTable.code, paidBooking.promoCode));
+      }
 
       try {
         await sendBookingEmails(bookingId);

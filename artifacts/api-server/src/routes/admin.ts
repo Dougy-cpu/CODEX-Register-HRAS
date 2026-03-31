@@ -52,14 +52,12 @@ function formatTier(t: typeof discountTiersTable.$inferSelect) {
 
 router.post("/admin/login", async (req, res): Promise<void> => {
   const { password } = req.body;
-  const rawPassword = process.env.ADMIN_PASSWORD;
+  const adminPassword = process.env.ADMIN_PASSWORD;
 
-  if (!rawPassword && process.env.NODE_ENV === "production") {
+  if (!adminPassword) {
     res.status(503).json({ error: "Admin authentication not configured — set ADMIN_PASSWORD" });
     return;
   }
-
-  const adminPassword = rawPassword || "admin123";
 
   if (!password || password !== adminPassword) {
     res.status(401).json({ error: "Invalid credentials" });

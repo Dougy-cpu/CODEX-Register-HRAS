@@ -249,6 +249,116 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
   await sendWelcomeEmail(bookingId, lead.firstName, lead.workEmail);
 }
 
+export async function resendConfirmationAndReceipt(bookingId: number): Promise<void> {
+  const [booking] = await db
+    .select()
+    .from(bookingsTable)
+    .where(eq(bookingsTable.id, bookingId));
+
+  if (!booking) {
+    logger.warn({ bookingId }, "Booking not found for email resend");
+    return;
+  }
+
+  const attendees = await db
+    .select()
+    .from(attendeesTable)
+    .where(eq(attendeesTable.bookingId, bookingId));
+
+  const lead = attendees.find((a) => a.isLead) || attendees[0];
+  if (!lead) {
+    logger.warn({ bookingId }, "No lead attendee found for email resend");
+    return;
+  }
+
+  const passLabels: Record<string, string> = {
+    single: "Single Pass",
+    team: "Team Pass (3 seats)",
+    business: "Business Pass",
+  };
+  const passLabel = passLabels[booking.passType] || booking.passType;
+
+  const subtotal = parseFloat(booking.subtotalAmount?.toString() || "0");
+  const vat = parseFloat(booking.vatAmount?.toString() || "0");
+  const total = parseFloat(booking.totalAmount?.toString() || "0");
+  const promoDiscount = parseFloat(booking.promoDiscountAmount?.toString() || "0");
+  const groupDiscount = parseFloat(booking.groupDiscountAmount?.toString() || "0");
+
+  const formatCurrency = (n: number) =>
+    new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(n);
+
+  const attendeeRows = attendees
+    .map(
+      (a) => `<tr>
+      <td style="padding: 8px 4px; border-bottom: 1px solid #eee;">${a.isLead ? "✓ Lead" : ""}</td>
+      <td style="padding: 8px 4px; border-bottom: 1px solid #eee;">${a.firstName} ${a.lastName}</td>
+      <td style="padding: 8px 4px; border-bottom: 1px solid #eee;">${a.jobTitle}</td>
+      <td style="padding: 8px 4px; border-bottom: 1px solid #eee;">${a.company}</td>
+      <td style="padding: 8px 4px; border-bottom: 1px solid #eee;">${a.workEmail}</td>
+    </tr>`
+    )
+    .join("");
+
+  const confirmationHtml = wrapInBrandedLayout(`
+    <h2>Booking Confirmed!</h2>
+    <p>Dear ${lead.firstName},</p>
+    <p>Thank you for registering for the <strong>HR Analytics Summit 2026</strong>. Your booking is confirmed.</p>
+    <div class="info-box">
+      <strong>Order Reference:</strong> ${booking.orderReference || `#${bookingId}`}<br>
+      <strong>Pass Type:</strong> ${passLabel}<br>
+      <strong>Quantity:</strong> ${booking.quantity} ${booking.quantity === 1 ? "pass" : "passes"}
+    </div>
+    <h3>Registered Attendees</h3>
+    <table width="100%" cellspacing="0" cellpadding="0" style="font-size: 14px;">
+      <thead><tr style="background: #f5f5f5;">
+        <th style="padding: 8px 4px; text-align: left;">Lead</th>
+        <th style="padding: 8px 4px; text-align: left;">Name</th>
+        <th style="padding: 8px 4px; text-align: left;">Job Title</th>
+        <th style="padding: 8px 4px; text-align: left;">Company</th>
+        <th style="padding: 8px 4px; text-align: left;">Email</th>
+      </tr></thead>
+      <tbody>${attendeeRows}</tbody>
+    </table>
+    <h3>Price Summary</h3>
+    <div class="price-row"><span>Subtotal (excl. VAT)</span><span>${formatCurrency(subtotal)}</span></div>
+    ${groupDiscount > 0 ? `<div class="price-row"><span>Group Discount</span><span>-${formatCurrency(groupDiscount)}</span></div>` : ""}
+    ${promoDiscount > 0 ? `<div class="price-row"><span>Promo Code (${booking.promoCode})</span><span>-${formatCurrency(promoDiscount)}</span></div>` : ""}
+    <div class="price-row"><span>VAT (20%)</span><span>${formatCurrency(vat)}</span></div>
+    <div class="price-total"><span>Total</span><span>${formatCurrency(total)}</span></div>
+    <div class="info-box" style="margin-top: 24px;">
+      <strong>Event Details</strong><br>
+      <strong>Date:</strong> 3 September 2026<br>
+      <strong>Venue:</strong> 155 Bishopsgate, London, EC2M 3TQ
+    </div>
+    <p>A PDF VAT receipt is attached to this email for your records.</p>
+    <p>We look forward to seeing you at the HR Analytics Summit!</p>
+  `);
+
+  let pdfBuffer: Buffer | null = null;
+  try {
+    pdfBuffer = await generatePdfReceipt(booking, attendees);
+  } catch (err) {
+    logger.error({ err }, "Failed to generate PDF for resend");
+  }
+
+  const attachments = pdfBuffer
+    ? [{ filename: `receipt-${booking.orderReference || bookingId}.pdf`, content: pdfBuffer, contentType: "application/pdf" }]
+    : [];
+
+  const sent = await sendMail({
+    to: lead.workEmail,
+    subject: `Booking Confirmed — HR Analytics Summit 2026 (${booking.orderReference || `#${bookingId}`})`,
+    html: confirmationHtml,
+    attachments,
+  });
+
+  await logEmail(bookingId, lead.workEmail, "confirmation", sent ? "sent" : "failed",
+    sent ? undefined : "SMTP not configured or send failed");
+  if (pdfBuffer) {
+    await logEmail(bookingId, lead.workEmail, "receipt", sent ? "sent" : "failed");
+  }
+}
+
 export async function sendOrganiserNotification(bookingId: number): Promise<void> {
   const organiserEmail = process.env.ORGANISER_EMAIL;
   if (!organiserEmail) {

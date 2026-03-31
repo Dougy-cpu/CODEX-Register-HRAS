@@ -1,8 +1,8 @@
 import { Router, type IRouter } from "express";
 import axios from "axios";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { bookingsTable, attendeesTable } from "@workspace/db";
+import { bookingsTable, attendeesTable, promoCodesTable } from "@workspace/db";
 import { sendBookingEmails, sendOrganiserNotification } from "../lib/email";
 import { syncBookingToSheets } from "../lib/google-sheets";
 import { logger } from "../lib/logger";
@@ -148,6 +148,12 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
       paymentMethod: "invoice",
     }).where(eq(bookingsTable.id, id));
 
+    if (booking.promoCode) {
+      await db.update(promoCodesTable)
+        .set({ usedCount: sql`${promoCodesTable.usedCount} + 1` })
+        .where(eq(promoCodesTable.code, booking.promoCode));
+    }
+
     try {
       await sendBookingEmails(id);
     } catch (err) {
@@ -270,6 +276,12 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
       freeagentInvoiceId: invoiceId,
       freeagentInvoiceUrl: invoiceUrl,
     }).where(eq(bookingsTable.id, id));
+
+    if (booking.promoCode) {
+      await db.update(promoCodesTable)
+        .set({ usedCount: sql`${promoCodesTable.usedCount} + 1` })
+        .where(eq(promoCodesTable.code, booking.promoCode));
+    }
 
     try {
       await sendBookingEmails(id);

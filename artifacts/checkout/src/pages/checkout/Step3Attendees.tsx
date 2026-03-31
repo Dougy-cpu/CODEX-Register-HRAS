@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { z } from "zod";
 import { useUpdateBooking, useCreateAttendee, useUpdateAttendee } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -70,6 +70,55 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
     return initial;
   });
 
+  const autosaveIdsRef = useRef<(number | undefined)[]>(formsData.map(f => f.id));
+
+  useEffect(() => {
+    if (formsData.length === 0) return;
+    const timer = setTimeout(async () => {
+      for (let i = 0; i < formsData.length; i++) {
+        const form = formsData[i];
+        if (!form.firstName || !form.workEmail) continue;
+        const existingId = form.id ?? autosaveIdsRef.current[i];
+        try {
+          if (existingId) {
+            await updateAttendee.mutateAsync({
+              bookingId: booking.id,
+              attendeeId: existingId,
+              data: {
+                firstName: form.firstName,
+                lastName: form.lastName,
+                jobTitle: form.jobTitle,
+                company: form.company,
+                workEmail: form.workEmail,
+                phone: form.phone || null,
+                gdprConsent: form.gdprConsent,
+              },
+            });
+          } else {
+            const created = await createAttendee.mutateAsync({
+              bookingId: booking.id,
+              data: {
+                isLead: false,
+                firstName: form.firstName,
+                lastName: form.lastName,
+                jobTitle: form.jobTitle,
+                company: form.company,
+                workEmail: form.workEmail,
+                phone: form.phone || null,
+                gdprConsent: form.gdprConsent,
+                seatIndex: i + 1,
+              },
+            });
+            autosaveIdsRef.current[i] = created.id;
+          }
+        } catch {
+          // Silent fail — autosave is best-effort
+        }
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [formsData]);
+
   const handleContinue = async () => {
     // Validate all forms manually
     let allValid = true;
@@ -88,10 +137,11 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
     try {
       for (let i = 0; i < expectedAdditionalCount; i++) {
         const data = formsData[i];
-        if (data.id) {
+        const existingId = data.id ?? autosaveIdsRef.current[i];
+        if (existingId) {
           await updateAttendee.mutateAsync({
             bookingId: booking.id,
-            attendeeId: data.id,
+            attendeeId: existingId,
             data: {
               firstName: data.firstName,
               lastName: data.lastName,
