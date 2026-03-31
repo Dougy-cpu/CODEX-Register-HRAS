@@ -88,12 +88,19 @@ export async function sendMail(options: {
   const fromEmail = options.fromEmail || FROM_EMAIL;
 
   try {
+    const nodemailerAttachments = (options.attachments || []).map((a) => ({
+      filename: a.filename,
+      content: a.content.toString("base64"),
+      encoding: "base64",
+      contentType: a.contentType,
+      contentDisposition: "attachment" as const,
+    }));
     await transporter.sendMail({
       from: `"${fromName}" <${fromEmail}>`,
       to: options.to,
       subject: options.subject,
       html: options.html,
-      attachments: options.attachments,
+      attachments: nodemailerAttachments,
     });
     return true;
   } catch (err) {

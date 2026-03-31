@@ -38,7 +38,7 @@ export function generatePdfReceipt(
   attendees: AttendeeForPdf[]
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50, size: "A4" });
+    const doc = new PDFDocument({ margin: 50, size: "A4", compress: false });
     const chunks: Buffer[] = [];
 
     doc.on("data", (chunk: Buffer) => chunks.push(chunk));

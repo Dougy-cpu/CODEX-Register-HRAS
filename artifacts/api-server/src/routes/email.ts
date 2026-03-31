@@ -238,4 +238,30 @@ router.post("/admin/email-logs/:bookingId/resend", adminAuth, async (req, res): 
   res.json({ success: true, message: "Confirmation and PDF receipt resent successfully" });
 });
 
+// Debug: download the receipt PDF directly for a booking (to verify it's valid)
+router.get("/admin/email-logs/:bookingId/receipt-pdf", adminAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.bookingId) ? req.params.bookingId[0] : req.params.bookingId;
+  const bookingId = parseInt(raw, 10);
+
+  try {
+    const { db } = await import("@workspace/db");
+    const { bookingsTable, attendeesTable } = await import("@workspace/db");
+    const { eq } = await import("drizzle-orm");
+    const { generatePdfReceipt } = await import("../lib/pdf");
+
+    const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
+    if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
+
+    const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
+    const pdfBuffer = await generatePdfReceipt(booking, attendees);
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="receipt-${booking.orderReference || bookingId}.pdf"`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+    res.end(pdfBuffer);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
 export default router;

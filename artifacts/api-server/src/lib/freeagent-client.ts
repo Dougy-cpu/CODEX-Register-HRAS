@@ -93,9 +93,9 @@ export async function downloadFreeAgentInvoicePdf(
 
   async function attempt(): Promise<Buffer | null> {
     try {
-      // FreeAgent supports content negotiation: request the invoice URL
-      // with Accept: application/pdf to get the PDF directly.
-      const resp = await axios.get<ArrayBuffer>(baseUrl, {
+      // FreeAgent serves invoice PDFs at the base URL with a .pdf suffix.
+      const pdfUrl = baseUrl + ".pdf";
+      const resp = await axios.get<ArrayBuffer>(pdfUrl, {
         headers: { Authorization: `Bearer ${token}`, Accept: "application/pdf" },
         responseType: "arraybuffer",
         maxRedirects: 5,
