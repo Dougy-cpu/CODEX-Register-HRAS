@@ -110,8 +110,6 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
     queryClient.invalidateQueries({ queryKey: ["booking"] });
   };
 
-  const businessDiscountLabel = getBusinessDiscountLabel(quantity);
-
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div>
@@ -151,7 +149,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
               <div className="flex items-baseline gap-2 mb-1">
                 <span className="text-3xl font-bold">£199</span>
                 <span className="text-sm text-muted-foreground line-through">£429</span>
-                <span className="text-sm font-bold text-primary">54% off</span>
+                <span className="text-sm font-bold text-primary">54% off per ticket</span>
               </div>
               <p className="text-sm text-muted-foreground mb-4">Per ticket, ex VAT</p>
 
