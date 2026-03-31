@@ -42,7 +42,6 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
 
   const [selectedPass, setSelectedPass] = useState<PricingRequestPassType>(resolveInitialPass);
   const [quantity, setQuantity] = useState<number>(() => {
-    if (isVendor) return 1;
     return booking.quantity || 1;
   });
 
@@ -239,10 +238,27 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
 
           {selectedPass === "business" && (
             <>
-              <h2 className="text-xl font-bold">1 attendee</h2>
+              <h2 className="text-xl font-bold">How many Business Passes?</h2>
               <p className="text-sm text-muted-foreground">
-                The Business Pass is for 1 attendee with enhanced access and branding.
+                Each Business Pass covers 1 attendee with enhanced access and company branding.
               </p>
+              <div className="w-56">
+                <Select
+                  value={quantity.toString()}
+                  onValueChange={(val) => setQuantity(parseInt(val, 10))}
+                >
+                  <SelectTrigger className="h-12 bg-white">
+                    <SelectValue placeholder="Select quantity" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 10 }, (_, i) => i + 1).map((num) => (
+                      <SelectItem key={num} value={num.toString()}>
+                        {num} pass{num > 1 ? "es" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </>
           )}
         </div>
@@ -256,7 +272,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                   {selectedPass === "team"
                     ? "Team Pass (3 attendees)"
                     : selectedPass === "business"
-                    ? "Business Pass"
+                    ? `${quantity} × Business Pass`
                     : `${quantity} × Single Pass`}
                 </span>
                 <span>£{currentPricing.baseSubtotal.toFixed(2)}</span>

@@ -3,7 +3,7 @@ import axios from "axios";
 import { eq } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { bookingsTable, attendeesTable } from "@workspace/db";
-import { sendBookingEmails } from "../lib/email";
+import { sendBookingEmails, sendOrganiserNotification } from "../lib/email";
 import { syncBookingToSheets } from "../lib/google-sheets";
 import { logger } from "../lib/logger";
 
@@ -99,6 +99,13 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
     return;
   }
 
+  const sessionHeader = req.headers["x-booking-session"] as string | undefined;
+  const ownsBooking = sessionHeader && booking.sessionToken && sessionHeader === booking.sessionToken;
+  if (!ownsBooking) {
+    res.status(403).json({ error: "Forbidden — invalid booking session" });
+    return;
+  }
+
   const attendees = await db
     .select()
     .from(attendeesTable)
@@ -145,6 +152,12 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
       await sendBookingEmails(id);
     } catch (err) {
       logger.error({ err }, "Failed to send booking emails after invoice");
+    }
+
+    try {
+      await sendOrganiserNotification(id);
+    } catch (err) {
+      logger.error({ err }, "Failed to send organiser notification after invoice");
     }
 
     try {
@@ -262,6 +275,12 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
       await sendBookingEmails(id);
     } catch (err) {
       logger.error({ err }, "Failed to send booking emails after FreeAgent invoice");
+    }
+
+    try {
+      await sendOrganiserNotification(id);
+    } catch (err) {
+      logger.error({ err }, "Failed to send organiser notification after FreeAgent invoice");
     }
 
     try {

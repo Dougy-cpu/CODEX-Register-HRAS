@@ -249,6 +249,49 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
   await sendWelcomeEmail(bookingId, lead.firstName, lead.workEmail);
 }
 
+export async function sendOrganiserNotification(bookingId: number): Promise<void> {
+  const organiserEmail = process.env.ORGANISER_EMAIL;
+  if (!organiserEmail) {
+    logger.info({ bookingId }, "ORGANISER_EMAIL not set — skipping organiser notification");
+    return;
+  }
+
+  const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
+  if (!booking) return;
+
+  const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
+  const lead = attendees.find((a) => a.isLead) || attendees[0];
+
+  const passLabels: Record<string, string> = {
+    single: "Single Pass",
+    team: "Team Pass (3 seats)",
+    business: "Business Pass",
+  };
+
+  const total = parseFloat(booking.totalAmount?.toString() || "0");
+  const subject = `New Registration: ${booking.orderReference || `#${bookingId}`} — ${lead ? `${lead.firstName} ${lead.lastName}` : "Unknown"}`;
+  const html = wrapInBrandedLayout(`
+    <h2 style="margin:0 0 16px">New Registration Received</h2>
+    <table style="width:100%;border-collapse:collapse;font-size:14px">
+      <tr><td style="padding:6px 0;color:#666;width:160px">Order Reference</td><td><strong>${booking.orderReference || `#${bookingId}`}</strong></td></tr>
+      <tr><td style="padding:6px 0;color:#666">Lead Attendee</td><td>${lead ? `${lead.firstName} ${lead.lastName}` : "—"}</td></tr>
+      <tr><td style="padding:6px 0;color:#666">Company</td><td>${lead?.company || "—"}</td></tr>
+      <tr><td style="padding:6px 0;color:#666">Email</td><td>${lead?.workEmail || "—"}</td></tr>
+      <tr><td style="padding:6px 0;color:#666">Pass</td><td>${passLabels[booking.passType] || booking.passType}</td></tr>
+      <tr><td style="padding:6px 0;color:#666">Quantity</td><td>${booking.quantity}</td></tr>
+      <tr><td style="padding:6px 0;color:#666">Total (inc. VAT)</td><td><strong>£${total.toFixed(2)}</strong></td></tr>
+      <tr><td style="padding:6px 0;color:#666">Payment</td><td>${booking.paymentMethod || "—"}</td></tr>
+    </table>
+  `);
+
+  try {
+    await sendMail({ to: organiserEmail, subject, html });
+    logger.info({ bookingId, organiserEmail }, "Organiser notification sent");
+  } catch (err) {
+    logger.error({ err, bookingId }, "Failed to send organiser notification");
+  }
+}
+
 export async function sendWelcomeEmail(
   bookingId: number | null,
   firstName: string,

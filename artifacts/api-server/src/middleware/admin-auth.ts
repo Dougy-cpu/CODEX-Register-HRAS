@@ -10,15 +10,13 @@ export function deriveAdminToken(password: string): string {
 export function adminAuth(req: Request, res: Response, next: NextFunction): void {
   const adminPassword = process.env.ADMIN_PASSWORD;
 
-  // In production, admin access is disabled if ADMIN_PASSWORD is not configured.
-  if (!adminPassword && process.env.NODE_ENV === "production") {
+  if (!adminPassword) {
     res.status(503).json({ error: "Admin authentication not configured — set ADMIN_PASSWORD" });
     return;
   }
 
   const token = req.headers["x-admin-token"] as string | undefined;
-  const effectivePassword = adminPassword || "admin123";
-  const expectedToken = deriveAdminToken(effectivePassword);
+  const expectedToken = deriveAdminToken(adminPassword);
 
   if (!token || token !== expectedToken) {
     res.status(401).json({ error: "Unauthorized — invalid admin token" });

@@ -3,7 +3,7 @@ import Stripe from "stripe";
 import { eq } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { bookingsTable } from "@workspace/db";
-import { sendBookingEmails } from "../lib/email";
+import { sendBookingEmails, sendOrganiserNotification } from "../lib/email";
 import { syncBookingToSheets } from "../lib/google-sheets";
 import { logger } from "../lib/logger";
 
@@ -36,6 +36,13 @@ router.post("/stripe/create-checkout-session", async (req, res): Promise<void> =
 
   if (!booking) {
     res.status(404).json({ error: "Booking not found" });
+    return;
+  }
+
+  const sessionHeader = req.headers["x-booking-session"] as string | undefined;
+  const ownsBooking = sessionHeader && booking.sessionToken && sessionHeader === booking.sessionToken;
+  if (!ownsBooking) {
+    res.status(403).json({ error: "Forbidden — invalid booking session" });
     return;
   }
 
@@ -146,6 +153,12 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
         await sendBookingEmails(bookingId);
       } catch (err) {
         logger.error({ err, bookingId }, "Failed to send booking emails after payment");
+      }
+
+      try {
+        await sendOrganiserNotification(bookingId);
+      } catch (err) {
+        logger.error({ err, bookingId }, "Failed to send organiser notification after payment");
       }
 
       try {

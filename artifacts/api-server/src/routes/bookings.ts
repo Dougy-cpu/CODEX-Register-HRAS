@@ -10,9 +10,8 @@ function isAdminRequest(req: import("express").Request): boolean {
   const token = req.headers["x-admin-token"] as string | undefined;
   if (!token) return false;
   const password = process.env.ADMIN_PASSWORD;
-  if (!password && process.env.NODE_ENV === "production") return false;
-  const effectivePassword = password || "admin123";
-  return token === deriveAdminToken(effectivePassword);
+  if (!password) return false;
+  return token === deriveAdminToken(password);
 }
 
 const router: IRouter = Router();
@@ -129,6 +128,13 @@ router.get("/bookings/:id", async (req, res): Promise<void> => {
   const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, id));
   if (!booking) {
     res.status(404).json({ error: "Booking not found" });
+    return;
+  }
+
+  const sessionHeader = req.headers["x-booking-session"] as string | undefined;
+  const ownsBooking = sessionHeader && booking.sessionToken && sessionHeader === booking.sessionToken;
+  if (!ownsBooking && !isAdminRequest(req)) {
+    res.status(403).json({ error: "Forbidden" });
     return;
   }
 

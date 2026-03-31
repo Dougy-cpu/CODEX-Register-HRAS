@@ -19,9 +19,8 @@ function isAdminRequest(req: import("express").Request): boolean {
   const token = req.headers["x-admin-token"] as string | undefined;
   if (!token) return false;
   const password = process.env.ADMIN_PASSWORD;
-  if (!password && process.env.NODE_ENV === "production") return false;
-  const effectivePassword = password || "admin123";
-  return token === deriveAdminToken(effectivePassword);
+  if (!password) return false;
+  return token === deriveAdminToken(password);
 }
 
 router.post("/bookings/:bookingId/attendees", async (req, res): Promise<void> => {

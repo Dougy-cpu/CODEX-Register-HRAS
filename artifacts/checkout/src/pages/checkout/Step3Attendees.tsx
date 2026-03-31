@@ -20,6 +20,17 @@ const attendeeSchema = z.object({
   }),
 });
 
+interface AttendeeFormData {
+  firstName: string;
+  lastName: string;
+  jobTitle: string;
+  company: string;
+  workEmail: string;
+  phone: string;
+  gdprConsent: boolean;
+  id?: number;
+}
+
 interface Step3AttendeesProps {
   booking: BookingWithAttendees;
 }
@@ -41,7 +52,7 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // We will maintain state for all forms locally, then submit all at once
-  const [formsData, setFormsData] = useState<any[]>(() => {
+  const [formsData, setFormsData] = useState<AttendeeFormData[]>(() => {
     const initial = [];
     for (let i = 0; i < expectedAdditionalCount; i++) {
       const existing = additionalAttendees[i];
@@ -121,7 +132,7 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
     }
   };
 
-  const updateFormData = (index: number, field: string, value: any) => {
+  const updateFormData = <K extends keyof AttendeeFormData>(index: number, field: K, value: AttendeeFormData[K]) => {
     const newFormsData = [...formsData];
     newFormsData[index] = { ...newFormsData[index], [field]: value };
     setFormsData(newFormsData);

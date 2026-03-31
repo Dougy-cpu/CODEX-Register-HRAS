@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
+import Image from "@tiptap/extension-image";
 import { useListEmailLogs, useGetWelcomeEmailTemplate, useUpdateWelcomeEmailTemplate, useResendBookingEmails } from "@workspace/api-client-react";
 import AdminLayout from "@/components/layout/AdminLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,12 +11,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useQueryClient } from "@tanstack/react-query";
-import { RefreshCcw, Send, Bold, Italic, Heading2, List, ListOrdered, Link2, Code, RotateCcw } from "lucide-react";
+import { RefreshCcw, Send, Bold, Italic, Heading2, List, ListOrdered, Link2, Code, RotateCcw, ImageIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const API_BASE = `${import.meta.env.BASE_URL}api`;
 
-function TipTapToolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
+function TipTapToolbar({ editor, onImageUpload }: { editor: ReturnType<typeof useEditor>; onImageUpload: () => void }) {
   if (!editor) return null;
 
   const handleSetLink = () => {
@@ -50,17 +51,47 @@ function TipTapToolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
       <span className="w-px bg-border mx-1 self-stretch" />
       {btn(editor.isActive("link"), handleSetLink, "Link", <Link2 className="w-4 h-4" />)}
       {btn(editor.isActive("code"), () => editor.chain().focus().toggleCode().run(), "Inline Code", <Code className="w-4 h-4" />)}
+      {btn(false, onImageUpload, "Insert Image", <ImageIcon className="w-4 h-4" />)}
       <span className="w-px bg-border mx-1 self-stretch" />
       {btn(false, () => editor.chain().focus().undo().run(), "Undo", <RotateCcw className="w-4 h-4" />)}
     </div>
   );
 }
 
+const BRANDED_PREVIEW_WRAPPER = (body: string) => `
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>
+  body{margin:0;background:#FCFBFA;font-family:Figtree,Arial,sans-serif;font-size:15px;color:#000}
+  .wrapper{max-width:600px;margin:40px auto;background:#fff;border:1px solid #e5e5e5}
+  .header{background:#E74F3E;padding:24px 32px;text-align:center}
+  .header strong{font-size:20px;color:#fff;letter-spacing:.5px}
+  .header div{font-size:13px;color:rgba(255,255,255,.8);margin-top:4px}
+  .content{padding:32px}
+  .footer{border-top:1px solid #e5e5e5;padding:20px 32px;text-align:center;font-size:12px;color:#999}
+  .footer a{color:#E74F3E;text-decoration:none}
+</style></head>
+<body>
+<div class="wrapper">
+  <div class="header">
+    <strong>HR Analytics Summit</strong>
+    <div>3 September 2026 · 155 Bishopsgate, London</div>
+  </div>
+  <div class="content">${body}</div>
+  <div class="footer">
+    <p>&copy; 2026 HR Analytics Summit. All rights reserved.</p>
+    <p><a href="https://www.hranalyticssummit.com">www.hranalyticssummit.com</a></p>
+    <p style="font-size:11px;color:#999">People Strategy Hub Ltd · London, UK</p>
+  </div>
+</div>
+</body></html>`;
+
 export default function AdminEmails() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("logs");
   const [page, setPage] = useState(1);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const { data: logsData, isLoading: logsLoading } = useListEmailLogs(
     { page, limit: 20 },
@@ -90,6 +121,7 @@ export default function AdminEmails() {
     extensions: [
       StarterKit,
       Link.configure({ openOnClick: false }),
+      Image.configure({ inline: false, allowBase64: true }),
     ],
     content: "",
     editorProps: {
@@ -98,6 +130,24 @@ export default function AdminEmails() {
       },
     },
   });
+
+  const handleImageUpload = () => {
+    imageInputRef.current?.click();
+  };
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editor) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const src = ev.target?.result as string;
+      if (src) {
+        editor.chain().focus().setImage({ src }).run();
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
 
   useEffect(() => {
     if (templateData) {
@@ -271,14 +321,23 @@ export default function AdminEmails() {
                     <div className="p-3 bg-muted/30 border border-border text-sm mb-2 font-mono text-muted-foreground">
                       Variables: {`{{firstName}}`}, {`{{lastName}}`}, {`{{passType}}`}, {`{{orderReference}}`}
                     </div>
+                    <input
+                      ref={imageInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleImageFileChange}
+                    />
                     {showPreview ? (
-                      <div
-                        className="border border-border rounded p-4 bg-white min-h-[400px] overflow-auto"
-                        dangerouslySetInnerHTML={{ __html: editor ? editor.getHTML() : "" }}
+                      <iframe
+                        className="border border-border rounded w-full min-h-[500px]"
+                        sandbox="allow-same-origin"
+                        srcDoc={BRANDED_PREVIEW_WRAPPER(editor ? editor.getHTML() : "")}
+                        title="Email Preview"
                       />
                     ) : (
                       <div className="border border-border rounded overflow-hidden bg-white">
-                        <TipTapToolbar editor={editor} />
+                        <TipTapToolbar editor={editor} onImageUpload={handleImageUpload} />
                         <EditorContent editor={editor} />
                       </div>
                     )}
