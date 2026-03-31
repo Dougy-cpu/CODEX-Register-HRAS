@@ -7,9 +7,10 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Check } from "lucide-react";
+import type { BookingWithAttendees } from "@/types/booking";
 
 interface Step2PassesProps {
-  booking: any;
+  booking: BookingWithAttendees;
 }
 
 const SINGLE_BENEFITS = [

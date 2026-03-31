@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Checkbox } from "@/components/ui/checkbox";
+import type { BookingWithAttendees } from "@/types/booking";
 
 const attendeeSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -20,7 +21,7 @@ const attendeeSchema = z.object({
 });
 
 interface Step3AttendeesProps {
-  booking: any;
+  booking: BookingWithAttendees;
 }
 
 export default function Step3Attendees({ booking }: Step3AttendeesProps) {

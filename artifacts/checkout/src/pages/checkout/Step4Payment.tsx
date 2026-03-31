@@ -15,6 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Check } from "lucide-react";
+import type { BookingWithAttendees } from "@/types/booking";
 
 const invoiceSchema = z.object({
   billingName: z.string().min(1, "Billing name is required"),
@@ -24,7 +25,7 @@ const invoiceSchema = z.object({
 });
 
 interface Step4PaymentProps {
-  booking: any;
+  booking: BookingWithAttendees;
 }
 
 export default function Step4Payment({ booking }: Step4PaymentProps) {

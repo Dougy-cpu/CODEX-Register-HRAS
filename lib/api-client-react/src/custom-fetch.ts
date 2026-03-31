@@ -366,6 +366,14 @@ export async function customFetch<T = unknown>(
     }
   }
 
+  // Forward booking session token for ownership verification on booking mutations
+  if (typeof window !== "undefined" && window.sessionStorage) {
+    const bookingSession = window.sessionStorage.getItem("booking_session");
+    if (bookingSession && !headers.has("x-booking-session")) {
+      headers.set("x-booking-session", bookingSession);
+    }
+  }
+
   const requestInfo = { method, url: resolveUrl(input) };
 
   const response = await fetch(input, { ...init, method, headers });

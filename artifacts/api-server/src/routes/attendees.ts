@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { attendeesTable, bookingsTable } from "@workspace/db";
+import { deriveAdminToken } from "../middleware/admin-auth";
 
 const router: IRouter = Router();
 
@@ -14,6 +15,13 @@ function formatAttendee(a: typeof attendeesTable.$inferSelect) {
   };
 }
 
+function isAdminRequest(req: import("express").Request): boolean {
+  const token = req.headers["x-admin-token"] as string | undefined;
+  if (!token) return false;
+  const password = process.env.ADMIN_PASSWORD || "admin123";
+  return token === deriveAdminToken(password);
+}
+
 router.post("/bookings/:bookingId/attendees", async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.bookingId) ? req.params.bookingId[0] : req.params.bookingId;
   const bookingId = parseInt(raw, 10);
@@ -22,6 +30,14 @@ router.post("/bookings/:bookingId/attendees", async (req, res): Promise<void> =>
   if (!booking) {
     res.status(404).json({ error: "Booking not found" });
     return;
+  }
+
+  if (!isAdminRequest(req)) {
+    const sessionToken = req.headers["x-booking-session"] as string | undefined;
+    if (!sessionToken || sessionToken !== booking.sessionToken) {
+      res.status(403).json({ error: "Forbidden — session token mismatch" });
+      return;
+    }
   }
 
   const { firstName, lastName, jobTitle, company, workEmail, phone, gdprConsent, isLead, seatIndex } = req.body;
@@ -56,6 +72,20 @@ router.patch("/bookings/:bookingId/attendees/:attendeeId", async (req, res): Pro
   const rawAttendee = Array.isArray(req.params.attendeeId) ? req.params.attendeeId[0] : req.params.attendeeId;
   const bookingId = parseInt(rawBooking, 10);
   const attendeeId = parseInt(rawAttendee, 10);
+
+  const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
+  if (!booking) {
+    res.status(404).json({ error: "Booking not found" });
+    return;
+  }
+
+  if (!isAdminRequest(req)) {
+    const sessionToken = req.headers["x-booking-session"] as string | undefined;
+    if (!sessionToken || sessionToken !== booking.sessionToken) {
+      res.status(403).json({ error: "Forbidden — session token mismatch" });
+      return;
+    }
+  }
 
   const [existing] = await db
     .select()

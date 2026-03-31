@@ -25,19 +25,28 @@ function getSheetsClient() {
   return { sheets, spreadsheetId };
 }
 
+// One row per attendee — booking-level fields repeated per row for flat analysis.
 const SHEET_HEADERS = [
   "Order Reference",
-  "Date",
-  "Lead Name",
-  "Lead Email",
-  "Company",
+  "Booking Date",
   "Pass Type",
   "Quantity",
+  "Attendee Type",
+  "Payment Method",
+  "Booking Status",
+  "Seat Index",
+  "Is Lead",
+  "First Name",
+  "Last Name",
+  "Job Title",
+  "Company",
+  "Work Email",
+  "Phone",
+  "GDPR Consent",
+  "GDPR Consent At",
   "Subtotal (exc VAT)",
   "VAT",
   "Total (inc VAT)",
-  "Payment Method",
-  "Status",
   "Promo Code",
   "Group Discount",
   "Promo Discount",
@@ -47,7 +56,7 @@ async function ensureSheetHeaders(
   sheets: ReturnType<typeof google.sheets>,
   spreadsheetId: string
 ): Promise<void> {
-  const range = "Sheet1!A1:O1";
+  const range = "Sheet1!A1:W1";
   const existing = await sheets.spreadsheets.values.get({ spreadsheetId, range });
 
   if (!existing.data.values || existing.data.values.length === 0) {
@@ -84,35 +93,50 @@ export async function syncBookingToSheets(bookingId: number): Promise<void> {
     .from(attendeesTable)
     .where(eq(attendeesTable.bookingId, bookingId));
 
-  const lead = allAttendees.find((a) => a.isLead) || allAttendees[0];
+  if (allAttendees.length === 0) {
+    logger.warn({ bookingId }, "No attendees found for Google Sheets sync");
+    return;
+  }
 
   await ensureSheetHeaders(sheets, spreadsheetId);
 
-  const row = [
+  // One row per attendee — booking pricing fields are repeated for each row.
+  const rows = allAttendees.map((attendee) => [
     booking.orderReference || `#${booking.id}`,
     new Date(booking.createdAt).toISOString().split("T")[0],
-    lead ? `${lead.firstName} ${lead.lastName}` : "",
-    lead?.workEmail || "",
-    lead?.company || "",
     booking.passType,
     String(booking.quantity),
+    booking.attendeeType,
+    booking.paymentMethod || "",
+    booking.status,
+    String(attendee.seatIndex),
+    attendee.isLead ? "Yes" : "No",
+    attendee.firstName,
+    attendee.lastName,
+    attendee.jobTitle || "",
+    attendee.company,
+    attendee.workEmail,
+    attendee.phone || "",
+    attendee.gdprConsent ? "Yes" : "No",
+    attendee.gdprConsentAt ? new Date(attendee.gdprConsentAt).toISOString() : "",
     booking.subtotalAmount?.toString() || "0",
     booking.vatAmount?.toString() || "0",
     booking.totalAmount?.toString() || "0",
-    booking.paymentMethod || "",
-    booking.status,
     booking.promoCode || "",
     booking.groupDiscountAmount?.toString() || "0",
     booking.promoDiscountAmount?.toString() || "0",
-  ];
+  ]);
 
   await sheets.spreadsheets.values.append({
     spreadsheetId,
-    range: "Sheet1!A:O",
+    range: "Sheet1!A:W",
     valueInputOption: "RAW",
     insertDataOption: "INSERT_ROWS",
-    requestBody: { values: [row] },
+    requestBody: { values: rows },
   });
 
-  logger.info({ bookingId, orderRef: booking.orderReference }, "Booking synced to Google Sheets");
+  logger.info(
+    { bookingId, orderRef: booking.orderReference, attendeeCount: rows.length },
+    "Booking attendees synced to Google Sheets"
+  );
 }

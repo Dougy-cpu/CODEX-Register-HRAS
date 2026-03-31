@@ -1,9 +1,10 @@
 import { useEffect } from "react";
 import { CheckCircle2, FileText, Calendar, MapPin, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { BookingWithAttendees } from "@/types/booking";
 
 interface ConfirmationProps {
-  booking: any;
+  booking: BookingWithAttendees;
 }
 
 export default function Confirmation({ booking }: ConfirmationProps) {
@@ -77,7 +78,7 @@ export default function Confirmation({ booking }: ConfirmationProps) {
           <div>
             <h3 className="text-sm text-muted-foreground font-bold uppercase tracking-wider mb-3">Attendees</h3>
             <div className="space-y-3">
-              {booking.attendees?.map((attendee: any, i: number) => (
+              {booking.attendees?.map((attendee, i) => (
                 <div key={i} className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-bold">
                     {attendee.firstName.charAt(0)}{attendee.lastName.charAt(0)}

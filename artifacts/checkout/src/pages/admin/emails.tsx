@@ -1,17 +1,60 @@
 import { useState, useEffect } from "react";
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Link from "@tiptap/extension-link";
 import { useListEmailLogs, useGetWelcomeEmailTemplate, useUpdateWelcomeEmailTemplate, useResendBookingEmails } from "@workspace/api-client-react";
 import AdminLayout from "@/components/layout/AdminLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useQueryClient } from "@tanstack/react-query";
-import { RefreshCcw, Send } from "lucide-react";
+import { RefreshCcw, Send, Bold, Italic, Heading2, List, ListOrdered, Link2, Code, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const API_BASE = `${import.meta.env.BASE_URL}api`;
+
+function TipTapToolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
+  if (!editor) return null;
+
+  const handleSetLink = () => {
+    const url = window.prompt("Enter URL:");
+    if (url) {
+      editor.chain().focus().setLink({ href: url }).run();
+    } else {
+      editor.chain().focus().unsetLink().run();
+    }
+  };
+
+  const btn = (active: boolean, onClick: () => void, title: string, children: React.ReactNode) => (
+    <button
+      type="button"
+      title={title}
+      onClick={onClick}
+      className={`p-1.5 rounded text-sm transition-colors ${active ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground hover:text-foreground"}`}
+    >
+      {children}
+    </button>
+  );
+
+  return (
+    <div className="flex flex-wrap gap-0.5 p-2 border-b border-border bg-muted/30">
+      {btn(editor.isActive("bold"), () => editor.chain().focus().toggleBold().run(), "Bold", <Bold className="w-4 h-4" />)}
+      {btn(editor.isActive("italic"), () => editor.chain().focus().toggleItalic().run(), "Italic", <Italic className="w-4 h-4" />)}
+      <span className="w-px bg-border mx-1 self-stretch" />
+      {btn(editor.isActive("heading", { level: 2 }), () => editor.chain().focus().toggleHeading({ level: 2 }).run(), "Heading 2", <Heading2 className="w-4 h-4" />)}
+      <span className="w-px bg-border mx-1 self-stretch" />
+      {btn(editor.isActive("bulletList"), () => editor.chain().focus().toggleBulletList().run(), "Bullet List", <List className="w-4 h-4" />)}
+      {btn(editor.isActive("orderedList"), () => editor.chain().focus().toggleOrderedList().run(), "Ordered List", <ListOrdered className="w-4 h-4" />)}
+      <span className="w-px bg-border mx-1 self-stretch" />
+      {btn(editor.isActive("link"), handleSetLink, "Link", <Link2 className="w-4 h-4" />)}
+      {btn(editor.isActive("code"), () => editor.chain().focus().toggleCode().run(), "Inline Code", <Code className="w-4 h-4" />)}
+      <span className="w-px bg-border mx-1 self-stretch" />
+      {btn(false, () => editor.chain().focus().undo().run(), "Undo", <RotateCcw className="w-4 h-4" />)}
+    </div>
+  );
+}
 
 export default function AdminEmails() {
   const { toast } = useToast();
@@ -35,20 +78,35 @@ export default function AdminEmails() {
   const resendEmails = useResendBookingEmails();
 
   const [subject, setSubject] = useState("");
-  const [htmlBody, setHtmlBody] = useState("");
+  const [showPreview, setShowPreview] = useState(false);
   const [testEmail, setTestEmail] = useState("");
   const [testName, setTestName] = useState("");
   const [isSendingTest, setIsSendingTest] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Link.configure({ openOnClick: false }),
+    ],
+    content: "",
+    editorProps: {
+      attributes: {
+        class: "prose prose-sm max-w-none focus:outline-none min-h-[360px] px-4 py-3",
+      },
+    },
+  });
 
   useEffect(() => {
     if (templateData) {
       setSubject(templateData.subject);
-      setHtmlBody(templateData.htmlBody);
+      if (editor && templateData.htmlBody) {
+        editor.commands.setContent(templateData.htmlBody);
+      }
     }
-  }, [templateData]);
+  }, [templateData, editor]);
 
   const handleSaveTemplate = async () => {
+    const htmlBody = editor ? editor.getHTML() : "";
     await updateTemplate.mutateAsync({
       data: { subject, htmlBody }
     });
@@ -187,7 +245,7 @@ export default function AdminEmails() {
               <div className="bg-white p-6 border border-border shadow-sm space-y-6">
                 <div>
                   <h3 className="text-lg font-bold mb-1">Welcome Email Template</h3>
-                  <p className="text-sm text-muted-foreground">Sent to all attendees upon successful registration. Edit the HTML below then save.</p>
+                  <p className="text-sm text-muted-foreground">Sent to all attendees upon successful registration. Edit the content below then save.</p>
                 </div>
 
                 <div className="space-y-4">
@@ -202,9 +260,9 @@ export default function AdminEmails() {
 
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <label className="text-sm font-bold uppercase tracking-wider">HTML Body</label>
+                      <label className="text-sm font-bold uppercase tracking-wider">Email Body</label>
                       <Button variant="outline" size="sm" onClick={() => setShowPreview(p => !p)} className="text-xs">
-                        {showPreview ? "Edit HTML" : "Preview"}
+                        {showPreview ? "Edit" : "Preview HTML"}
                       </Button>
                     </div>
                     <div className="p-3 bg-muted/30 border border-border text-sm mb-2 font-mono text-muted-foreground">
@@ -213,14 +271,13 @@ export default function AdminEmails() {
                     {showPreview ? (
                       <div
                         className="border border-border rounded p-4 bg-white min-h-[400px] overflow-auto"
-                        dangerouslySetInnerHTML={{ __html: htmlBody }}
+                        dangerouslySetInnerHTML={{ __html: editor ? editor.getHTML() : "" }}
                       />
                     ) : (
-                      <Textarea
-                        value={htmlBody}
-                        onChange={e => setHtmlBody(e.target.value)}
-                        className="min-h-[400px] font-mono text-sm resize-y"
-                      />
+                      <div className="border border-border rounded overflow-hidden bg-white">
+                        <TipTapToolbar editor={editor} />
+                        <EditorContent editor={editor} />
+                      </div>
                     )}
                   </div>
                 </div>

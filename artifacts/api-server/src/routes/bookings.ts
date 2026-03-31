@@ -4,6 +4,14 @@ import { db } from "@workspace/db";
 import { bookingsTable, attendeesTable } from "@workspace/db";
 import { calculatePricing } from "../lib/pricing";
 import { v4 as uuidv4 } from "uuid";
+import { deriveAdminToken } from "../middleware/admin-auth";
+
+function isAdminRequest(req: import("express").Request): boolean {
+  const token = req.headers["x-admin-token"] as string | undefined;
+  if (!token) return false;
+  const password = process.env.ADMIN_PASSWORD || "admin123";
+  return token === deriveAdminToken(password);
+}
 
 const router: IRouter = Router();
 
@@ -143,6 +151,16 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
     return;
   }
 
+  const admin = isAdminRequest(req);
+
+  if (!admin) {
+    const sessionToken = req.headers["x-booking-session"] as string | undefined;
+    if (!sessionToken || sessionToken !== existing.sessionToken) {
+      res.status(403).json({ error: "Forbidden — session token mismatch" });
+      return;
+    }
+  }
+
   const {
     passType,
     attendeeType,
@@ -154,6 +172,7 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
     billingCompany,
     billingEmail,
     billingAddress,
+    // status is admin/webhook-only — excluded from public PATCH body
     status,
   } = req.body;
 
@@ -181,10 +200,11 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
   if (billingCompany !== undefined) updateData.billingCompany = billingCompany;
   if (billingEmail !== undefined) updateData.billingEmail = billingEmail;
   if (billingAddress !== undefined) updateData.billingAddress = billingAddress;
-  if (status !== undefined) updateData.status = status;
 
-  if (status === "paid" || status === "invoiced") {
-    if (!existing.orderReference) {
+  // Only admin requests may mutate status
+  if (admin && status !== undefined) {
+    updateData.status = status;
+    if ((status === "paid" || status === "invoiced") && !existing.orderReference) {
       updateData.orderReference = generateOrderRef();
     }
   }

@@ -8,6 +8,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useCreateBooking, useUpdateBooking, useCreateAttendee, useUpdateAttendee } from "@workspace/api-client-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useQueryClient } from "@tanstack/react-query";
+import type { BookingWithAttendees } from "@/types/booking";
 
 const formSchema = z.object({
   attendeeType: z.enum(["hr_professional", "consultant_vendor"]),
@@ -24,8 +25,8 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-export default function Step1Lead({ sessionToken, booking }: { sessionToken: string, booking: any }) {
-  const leadAttendee = booking?.attendees?.find((a: any) => a.isLead);
+export default function Step1Lead({ sessionToken, booking }: { sessionToken: string, booking: BookingWithAttendees | undefined }) {
+  const leadAttendee = booking?.attendees?.find((a) => a.isLead);
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -63,9 +64,9 @@ export default function Step1Lead({ sessionToken, booking }: { sessionToken: str
       });
       bookingId = newBooking.id;
     } else {
-      // Update existing booking
+      // Update existing booking (booking is non-null in this branch)
       await updateBooking.mutateAsync({
-        id: bookingId,
+        id: booking.id,
         data: {
           attendeeType: data.attendeeType,
           currentStep: 2
