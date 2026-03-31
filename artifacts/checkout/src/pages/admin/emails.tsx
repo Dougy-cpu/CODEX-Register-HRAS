@@ -62,11 +62,14 @@ export default function AdminEmails() {
   const [activeTab, setActiveTab] = useState("logs");
   const [page, setPage] = useState(1);
 
-  const { data: logsData, isLoading: logsLoading } = useListEmailLogs(undefined, {
-    query: {
-      queryKey: ["emailLogs", page],
+  const { data: logsData, isLoading: logsLoading } = useListEmailLogs(
+    { page, limit: 20 },
+    {
+      query: {
+        queryKey: ["emailLogs", page],
+      }
     }
-  });
+  );
 
   const { data: templateData, isLoading: templateLoading } = useGetWelcomeEmailTemplate({
     query: {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListRegistrations } from "@workspace/api-client-react";
+import { useListRegistrations, useGetRegistration } from "@workspace/api-client-react";
 import AdminLayout from "@/components/layout/AdminLayout";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -7,17 +7,68 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronRight, Search } from "lucide-react";
 
+function ExpandedRegistrationDetail({ id }: { id: number }) {
+  const { data, isLoading } = useGetRegistration(id, {
+    query: { queryKey: ["registration", id] }
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-6">
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-8">
+      <div>
+        <h4 className="font-bold mb-3 uppercase text-xs tracking-wider text-muted-foreground">Booking Details</h4>
+        <div className="space-y-2 text-sm">
+          <p><span className="font-medium">Company:</span> {data?.attendees?.find(a => a.isLead)?.company || "-"}</p>
+          <p><span className="font-medium">Payment Method:</span> {data?.paymentMethod || "-"}</p>
+          <p><span className="font-medium">Promo Code:</span> {data?.promoCode || "-"}</p>
+          <p><span className="font-medium">Billing Email:</span> {data?.billingEmail || "-"}</p>
+        </div>
+      </div>
+      <div>
+        <h4 className="font-bold mb-3 uppercase text-xs tracking-wider text-muted-foreground">Attendees</h4>
+        <div className="space-y-2">
+          {data?.attendees?.map((a, i) => (
+            <div key={i} className="text-sm border border-border rounded p-2 bg-white">
+              <p className="font-medium">{a.firstName} {a.lastName} {a.isLead ? <span className="text-xs text-primary font-bold ml-1">LEAD</span> : null}</p>
+              <p className="text-muted-foreground">{a.jobTitle} · {a.company}</p>
+              <p className="text-muted-foreground">{a.workEmail}</p>
+            </div>
+          ))}
+          {(!data?.attendees || data.attendees.length === 0) && (
+            <p className="text-sm text-muted-foreground">No attendees yet.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminRegistrations() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
-  const { data, isLoading } = useListRegistrations(undefined, {
-    query: {
-      queryKey: ["registrations", search, status, page],
+  const { data, isLoading } = useListRegistrations(
+    {
+      search: search.trim() || undefined,
+      status: status !== "all" ? status : undefined,
+      page,
+      limit: 20,
+    },
+    {
+      query: {
+        queryKey: ["registrations", search, status, page],
+      }
     }
-  });
+  );
 
   return (
     <AdminLayout title="Registrations">
@@ -29,14 +80,14 @@ export default function AdminRegistrations() {
             <Input 
               placeholder="Search by name, email or reference..." 
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               className="pl-10 h-12"
             />
           </div>
         </div>
         <div className="w-full md:w-64">
           <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">Status</label>
-          <Select value={status} onValueChange={setStatus}>
+          <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
             <SelectTrigger className="h-12 bg-white">
               <SelectValue placeholder="All Statuses" />
             </SelectTrigger>
@@ -44,8 +95,8 @@ export default function AdminRegistrations() {
               <SelectItem value="all">All Statuses</SelectItem>
               <SelectItem value="paid">Paid</SelectItem>
               <SelectItem value="invoiced">Invoiced</SelectItem>
-              <SelectItem value="pending_payment">Pending Payment</SelectItem>
-              <SelectItem value="partial">Partial</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
@@ -104,16 +155,7 @@ export default function AdminRegistrations() {
                   {expandedId === reg.id && (
                     <TableRow className="bg-muted/10">
                       <TableCell colSpan={8} className="p-6">
-                        <div className="grid grid-cols-2 gap-8">
-                          <div>
-                            <h4 className="font-bold mb-3 uppercase text-xs tracking-wider text-muted-foreground">Booking Details</h4>
-                            <div className="space-y-2 text-sm">
-                              <p><span className="font-medium">Company:</span> {reg.leadCompany}</p>
-                              <p><span className="font-medium">Payment Method:</span> {reg.paymentMethod || "-"}</p>
-                              <p><span className="font-medium">Current Step:</span> {reg.currentStep}</p>
-                            </div>
-                          </div>
-                        </div>
+                        <ExpandedRegistrationDetail id={reg.id} />
                       </TableCell>
                     </TableRow>
                   )}

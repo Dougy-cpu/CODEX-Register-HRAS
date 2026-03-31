@@ -9,8 +9,10 @@ import { deriveAdminToken } from "../middleware/admin-auth";
 function isAdminRequest(req: import("express").Request): boolean {
   const token = req.headers["x-admin-token"] as string | undefined;
   if (!token) return false;
-  const password = process.env.ADMIN_PASSWORD || "admin123";
-  return token === deriveAdminToken(password);
+  const password = process.env.ADMIN_PASSWORD;
+  if (!password && process.env.NODE_ENV === "production") return false;
+  const effectivePassword = password || "admin123";
+  return token === deriveAdminToken(effectivePassword);
 }
 
 const router: IRouter = Router();

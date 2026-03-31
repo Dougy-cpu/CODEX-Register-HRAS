@@ -32,8 +32,8 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
 
   // Determine how many additional attendees we need
   const totalQuantity = booking.quantity;
-  const leadAttendee = booking.attendees?.find((a: any) => a.isLead);
-  const additionalAttendees = booking.attendees?.filter((a: any) => !a.isLead) || [];
+  const leadAttendee = booking.attendees?.find((a) => a.isLead);
+  const additionalAttendees = booking.attendees?.filter((a) => !a.isLead) || [];
 
   const expectedAdditionalCount = totalQuantity - 1;
 
@@ -48,7 +48,7 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
       initial.push({
         firstName: existing?.firstName || "",
         lastName: existing?.lastName || "",
-        jobTitle: existing?.jobTitle || leadAttendee?.company ? "" : "", 
+        jobTitle: existing?.jobTitle || "",
         company: existing?.company || leadAttendee?.company || "",
         workEmail: existing?.workEmail || "",
         phone: existing?.phone || "",
