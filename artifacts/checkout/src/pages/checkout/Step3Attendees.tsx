@@ -147,16 +147,29 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
                       gdprConsent: form.gdprConsent,
                     },
               });
-            } else if (isTbc) {
+            } else {
               const created = await createAttendee.mutateAsync({
                 bookingId: booking.id,
-                data: {
-                  isLead: false,
-                  isTbc: true,
-                  gdprConsent: false,
-                  company: leadDefaults.company || "TBC",
-                  seatIndex: i,
-                },
+                data: isTbc
+                  ? {
+                      isLead: false,
+                      isTbc: true,
+                      gdprConsent: false,
+                      company: leadDefaults.company || "TBC",
+                      seatIndex: i,
+                    }
+                  : {
+                      isLead: false,
+                      isTbc: false,
+                      firstName: form.firstName,
+                      lastName: form.lastName,
+                      jobTitle: form.jobTitle,
+                      company: form.company,
+                      workEmail: form.workEmail,
+                      phone: form.phone || null,
+                      gdprConsent: form.gdprConsent,
+                      seatIndex: i,
+                    },
               });
               autosaveIdsRef.current[i] = created.id;
             }

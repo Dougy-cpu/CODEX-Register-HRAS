@@ -105,6 +105,11 @@ router.patch("/bookings/:bookingId/attendees/:attendeeId", async (req, res): Pro
 
   const updateData: Partial<typeof attendeesTable.$inferInsert> = {};
 
+  if (isTbc && existing.isLead) {
+    res.status(400).json({ error: "The lead attendee cannot be marked as TBC" });
+    return;
+  }
+
   if (isTbc !== undefined) {
     updateData.isTbc = !!isTbc;
     if (isTbc) {
@@ -113,6 +118,7 @@ router.patch("/bookings/:bookingId/attendees/:attendeeId", async (req, res): Pro
       updateData.jobTitle = "TBC";
       updateData.company = company || existing.company || "TBC";
       updateData.workEmail = `tbc-${bookingId}-${existing.seatIndex}@tbc.placeholder`;
+      updateData.phone = null;
       updateData.gdprConsent = false;
       updateData.gdprConsentAt = null;
     }
