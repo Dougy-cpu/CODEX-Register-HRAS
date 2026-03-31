@@ -14,49 +14,97 @@ function ExpandedRegistrationDetail({ id }: { id: number }) {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center py-6">
+      <div className="flex justify-center py-8">
         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
       </div>
     );
   }
 
+  const lead = data?.attendees?.find(a => a.isLead);
+
   return (
-    <div className="grid grid-cols-2 gap-8">
-      <div>
-        <h4 className="font-bold mb-3 uppercase text-xs tracking-wider text-muted-foreground">Booking Details</h4>
-        <div className="space-y-2 text-sm">
-          <p><span className="font-medium">Company:</span> {data?.attendees?.find(a => a.isLead)?.company || "-"}</p>
-          <p><span className="font-medium">Payment Method:</span> {data?.paymentMethod || "-"}</p>
-          <p><span className="font-medium">Promo Code:</span> {data?.promoCode || "-"}</p>
-          <p><span className="font-medium">Billing Email:</span> {data?.billingEmail || "-"}</p>
+    <div className="space-y-6">
+      {/* Booking meta strip */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+        <div className="bg-white border border-border p-3">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">Company</p>
+          <p className="font-medium">{lead?.company || data?.billingCompany || "—"}</p>
+        </div>
+        <div className="bg-white border border-border p-3">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">Payment</p>
+          <p className="font-medium capitalize">{data?.paymentMethod || "—"}</p>
+        </div>
+        <div className="bg-white border border-border p-3">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">Billing Email</p>
+          <p className="font-medium truncate">{data?.billingEmail || lead?.workEmail || "—"}</p>
+        </div>
+        <div className="bg-white border border-border p-3">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">Promo Code</p>
+          <p className="font-medium">{data?.promoCode || "—"}</p>
         </div>
       </div>
+
+      {/* Attendee table */}
       <div>
-        <h4 className="font-bold mb-3 uppercase text-xs tracking-wider text-muted-foreground">Attendees</h4>
-        <div className="space-y-2">
-          {data?.attendees?.map((a, i) => (
-            <div key={i} className="text-sm border border-border rounded p-2 bg-white">
-              {a.isTbc ? (
-                <>
-                  <p className="font-medium text-amber-700">
-                    TBC
-                    {a.isLead ? <span className="text-xs text-primary font-bold ml-1">LEAD</span> : null}
-                    <span className="ml-2 text-xs font-normal bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded">To be confirmed</span>
-                  </p>
-                  <p className="text-muted-foreground">Seat {(a.seatIndex ?? 0) + 1} — attendee details pending</p>
-                </>
-              ) : (
-                <>
-                  <p className="font-medium">{a.firstName} {a.lastName} {a.isLead ? <span className="text-xs text-primary font-bold ml-1">LEAD</span> : null}</p>
-                  <p className="text-muted-foreground">{a.jobTitle} · {a.company}</p>
-                  <p className="text-muted-foreground">{a.workEmail}</p>
-                </>
+        <h4 className="font-bold mb-3 uppercase text-xs tracking-wider text-muted-foreground">
+          All Attendees ({data?.attendees?.length ?? 0})
+        </h4>
+        <div className="border border-border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50">
+              <tr>
+                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground w-8">#</th>
+                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">Name</th>
+                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">Job Title</th>
+                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">Company</th>
+                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">Email</th>
+                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">Phone</th>
+                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">GDPR</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {data?.attendees
+                ?.slice()
+                .sort((a, b) => (a.seatIndex ?? 0) - (b.seatIndex ?? 0))
+                .map((a) => (
+                  <tr key={a.seatIndex ?? a.id} className={a.isLead ? "bg-primary/5" : "bg-white"}>
+                    <td className="p-3 text-muted-foreground">{(a.seatIndex ?? 0) + 1}</td>
+                    <td className="p-3">
+                      {a.isTbc ? (
+                        <span className="inline-flex items-center gap-1.5 text-amber-700 font-medium italic">
+                          TBC — pending
+                        </span>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{a.firstName} {a.lastName}</span>
+                          {a.isLead && (
+                            <span className="text-[10px] font-bold bg-primary text-white px-1.5 py-0.5 uppercase tracking-wider">Lead</span>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td className="p-3 text-muted-foreground">{a.isTbc ? "—" : (a.jobTitle || "—")}</td>
+                    <td className="p-3 text-muted-foreground">{a.isTbc ? "—" : (a.company || "—")}</td>
+                    <td className="p-3 text-muted-foreground">{a.isTbc ? "—" : (a.workEmail || "—")}</td>
+                    <td className="p-3 text-muted-foreground">{a.isTbc ? "—" : (a.phone || "—")}</td>
+                    <td className="p-3">
+                      {a.isTbc ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : a.gdprConsent ? (
+                        <span className="text-[10px] font-bold bg-green-100 text-green-800 px-1.5 py-0.5 uppercase">✓ Yes</span>
+                      ) : (
+                        <span className="text-[10px] font-bold bg-red-100 text-red-800 px-1.5 py-0.5 uppercase">No</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              {(!data?.attendees || data.attendees.length === 0) && (
+                <tr>
+                  <td colSpan={7} className="p-6 text-center text-muted-foreground">No attendees recorded yet.</td>
+                </tr>
               )}
-            </div>
-          ))}
-          {(!data?.attendees || data.attendees.length === 0) && (
-            <p className="text-sm text-muted-foreground">No attendees yet.</p>
-          )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
