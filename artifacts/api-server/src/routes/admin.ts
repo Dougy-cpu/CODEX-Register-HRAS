@@ -6,6 +6,7 @@ import {
   attendeesTable,
   promoCodesTable,
   discountTiersTable,
+  notificationEmailsTable,
 } from "@workspace/db";
 import { adminAuth, deriveAdminToken, getAdminPassword } from "../middleware/admin-auth";
 
@@ -346,6 +347,40 @@ router.put("/admin/discount-tiers", adminAuth, async (req, res): Promise<void> =
     .returning();
 
   res.json(inserted.map(formatTier));
+});
+
+router.get("/admin/notification-emails", adminAuth, async (_req, res): Promise<void> => {
+  const emails = await db
+    .select()
+    .from(notificationEmailsTable)
+    .orderBy(notificationEmailsTable.createdAt);
+  res.json(emails.map(e => ({
+    ...e,
+    createdAt: e.createdAt.toISOString(),
+  })));
+});
+
+router.post("/admin/notification-emails", adminAuth, async (req, res): Promise<void> => {
+  const { email, label } = req.body;
+  if (!email || typeof email !== "string" || !email.includes("@")) {
+    res.status(400).json({ error: "A valid email address is required" });
+    return;
+  }
+  try {
+    const [inserted] = await db
+      .insert(notificationEmailsTable)
+      .values({ email: email.trim().toLowerCase(), label: label?.trim() || null })
+      .returning();
+    res.status(201).json({ ...inserted, createdAt: inserted.createdAt.toISOString() });
+  } catch {
+    res.status(409).json({ error: "This email address is already in the list" });
+  }
+});
+
+router.delete("/admin/notification-emails/:id", adminAuth, async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  await db.delete(notificationEmailsTable).where(eq(notificationEmailsTable.id, id));
+  res.status(204).end();
 });
 
 export default router;

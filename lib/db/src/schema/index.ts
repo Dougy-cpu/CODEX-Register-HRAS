@@ -4,3 +4,4 @@ export * from "./promo-codes";
 export * from "./discount-tiers";
 export * from "./email-templates";
 export * from "./email-logs";
+export * from "./notification-emails";

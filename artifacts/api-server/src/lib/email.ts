@@ -1,7 +1,7 @@
 import nodemailer from "nodemailer";
 import { logger } from "./logger";
 import { db } from "@workspace/db";
-import { emailLogsTable, emailTemplatesTable, bookingsTable, attendeesTable } from "@workspace/db";
+import { emailLogsTable, emailTemplatesTable, bookingsTable, attendeesTable, notificationEmailsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { generatePdfReceipt } from "./pdf";
 
@@ -360,14 +360,23 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
 }
 
 export async function sendOrganiserNotification(bookingId: number): Promise<void> {
-  const organiserEmail = process.env.ORGANISER_EMAIL;
-  if (!organiserEmail) {
-    logger.info({ bookingId }, "ORGANISER_EMAIL not set — skipping organiser notification");
-    return;
-  }
-
   const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
   if (!booking) return;
+
+  const storedEmails = await db
+    .select()
+    .from(notificationEmailsTable)
+    .orderBy(notificationEmailsTable.createdAt);
+
+  const recipients: string[] = storedEmails.map((e) => e.email);
+  if (process.env.ORGANISER_EMAIL && !recipients.includes(process.env.ORGANISER_EMAIL.toLowerCase())) {
+    recipients.push(process.env.ORGANISER_EMAIL);
+  }
+
+  if (recipients.length === 0) {
+    logger.info({ bookingId }, "No notification recipients configured — skipping organiser notification");
+    return;
+  }
 
   const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
   const lead = attendees.find((a) => a.isLead) || attendees[0];
@@ -378,28 +387,82 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
     business: "Business Pass",
   };
 
+  const subtotal = parseFloat(booking.subtotalAmount?.toString() || "0");
+  const vat = parseFloat(booking.vatAmount?.toString() || "0");
   const total = parseFloat(booking.totalAmount?.toString() || "0");
+  const groupDiscount = parseFloat(booking.groupDiscountAmount?.toString() || "0");
+  const promoDiscount = parseFloat(booking.promoDiscountAmount?.toString() || "0");
+
+  const attendeeRows = attendees.map((a, i) => `
+    <tr style="background:${i % 2 === 0 ? "#f9f9f9" : "#fff"}">
+      <td style="padding:8px 10px;border:1px solid #e5e5e5">${a.firstName} ${a.lastName}${a.isLead ? ' <span style="font-size:11px;color:#E74F3E;font-weight:bold">(Buyer)</span>' : ""}</td>
+      <td style="padding:8px 10px;border:1px solid #e5e5e5">${a.workEmail}</td>
+      <td style="padding:8px 10px;border:1px solid #e5e5e5">${a.jobTitle || "—"}</td>
+      <td style="padding:8px 10px;border:1px solid #e5e5e5">${a.company || "—"}</td>
+    </tr>
+  `).join("");
+
   const subject = `New Registration: ${booking.orderReference || `#${bookingId}`} — ${lead ? `${lead.firstName} ${lead.lastName}` : "Unknown"}`;
+
   const html = wrapInBrandedLayout(`
-    <h2 style="margin:0 0 16px">New Registration Received</h2>
-    <table style="width:100%;border-collapse:collapse;font-size:14px">
-      <tr><td style="padding:6px 0;color:#666;width:160px">Order Reference</td><td><strong>${booking.orderReference || `#${bookingId}`}</strong></td></tr>
-      <tr><td style="padding:6px 0;color:#666">Lead Attendee</td><td>${lead ? `${lead.firstName} ${lead.lastName}` : "—"}</td></tr>
-      <tr><td style="padding:6px 0;color:#666">Company</td><td>${lead?.company || "—"}</td></tr>
-      <tr><td style="padding:6px 0;color:#666">Email</td><td>${lead?.workEmail || "—"}</td></tr>
-      <tr><td style="padding:6px 0;color:#666">Pass</td><td>${passLabels[booking.passType] || booking.passType}</td></tr>
-      <tr><td style="padding:6px 0;color:#666">Quantity</td><td>${booking.quantity}</td></tr>
-      <tr><td style="padding:6px 0;color:#666">Total (inc. VAT)</td><td><strong>£${total.toFixed(2)}</strong></td></tr>
-      <tr><td style="padding:6px 0;color:#666">Payment</td><td>${booking.paymentMethod || "—"}</td></tr>
+    <h2 style="margin:0 0 8px;font-size:22px">New Registration Received</h2>
+    <p style="margin:0 0 24px;color:#666">A new booking has been completed on the HR Analytics Summit checkout.</p>
+
+    <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:0.05em;color:#888">Order Details</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px">
+      <tr><td style="padding:7px 0;color:#666;width:180px;border-bottom:1px solid #f0f0f0">Order Reference</td><td style="border-bottom:1px solid #f0f0f0"><strong style="font-family:monospace">${booking.orderReference || `#${bookingId}`}</strong></td></tr>
+      <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Pass Type</td><td style="border-bottom:1px solid #f0f0f0">${passLabels[booking.passType] || booking.passType}</td></tr>
+      <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Quantity</td><td style="border-bottom:1px solid #f0f0f0">${booking.quantity} ${booking.quantity === 1 ? "ticket" : "tickets"}</td></tr>
+      <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Payment Method</td><td style="border-bottom:1px solid #f0f0f0">${booking.paymentMethod === "card" ? "Credit/Debit Card" : booking.paymentMethod === "invoice" ? "Invoice" : "—"}</td></tr>
+      <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Status</td><td style="border-bottom:1px solid #f0f0f0"><strong style="color:${booking.status === "paid" ? "#16a34a" : "#d97706"}">${booking.status === "paid" ? "Paid" : booking.status === "invoiced" ? "Invoiced (Awaiting Payment)" : booking.status}</strong></td></tr>
+      ${booking.promoCode ? `<tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Promo Code</td><td style="border-bottom:1px solid #f0f0f0">${booking.promoCode}</td></tr>` : ""}
+    </table>
+
+    <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:0.05em;color:#888">Pricing</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px">
+      <tr><td style="padding:7px 0;color:#666;width:180px;border-bottom:1px solid #f0f0f0">Base Subtotal</td><td style="border-bottom:1px solid #f0f0f0">£${subtotal.toFixed(2)}</td></tr>
+      ${groupDiscount > 0 ? `<tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Group Discount</td><td style="border-bottom:1px solid #f0f0f0;color:#E74F3E">-£${groupDiscount.toFixed(2)}</td></tr>` : ""}
+      ${promoDiscount > 0 ? `<tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Promo Discount</td><td style="border-bottom:1px solid #f0f0f0;color:#E74F3E">-£${promoDiscount.toFixed(2)}</td></tr>` : ""}
+      <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">VAT (20%)</td><td style="border-bottom:1px solid #f0f0f0">£${vat.toFixed(2)}</td></tr>
+      <tr><td style="padding:7px 0;font-weight:bold;border-bottom:1px solid #f0f0f0">Total</td><td style="border-bottom:1px solid #f0f0f0"><strong>£${total.toFixed(2)}</strong></td></tr>
+    </table>
+
+    ${booking.paymentMethod === "invoice" && booking.billingName ? `
+    <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:0.05em;color:#888">Billing Details</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px">
+      <tr><td style="padding:7px 0;color:#666;width:180px;border-bottom:1px solid #f0f0f0">Billing Contact</td><td style="border-bottom:1px solid #f0f0f0">${booking.billingName}</td></tr>
+      <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Company</td><td style="border-bottom:1px solid #f0f0f0">${booking.billingCompany || "—"}</td></tr>
+      <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Invoice Email</td><td style="border-bottom:1px solid #f0f0f0">${booking.billingEmail || "—"}</td></tr>
+      <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Address</td><td style="border-bottom:1px solid #f0f0f0">${(booking.billingAddress || "—").replace(/\n/g, "<br>")}</td></tr>
+    </table>
+    ` : ""}
+
+    <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:0.05em;color:#888">Attendees (${attendees.length})</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:24px">
+      <thead>
+        <tr style="background:#1e293b;color:#fff">
+          <th style="padding:9px 10px;text-align:left;border:1px solid #1e293b">Name</th>
+          <th style="padding:9px 10px;text-align:left;border:1px solid #1e293b">Work Email</th>
+          <th style="padding:9px 10px;text-align:left;border:1px solid #1e293b">Job Title</th>
+          <th style="padding:9px 10px;text-align:left;border:1px solid #1e293b">Company</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${attendeeRows || '<tr><td colspan="4" style="padding:10px;border:1px solid #e5e5e5;color:#888">No attendee details recorded yet</td></tr>'}
+      </tbody>
     </table>
   `);
 
-  try {
-    await sendMail({ to: organiserEmail, subject, html });
-    logger.info({ bookingId, organiserEmail }, "Organiser notification sent");
-  } catch (err) {
-    logger.error({ err, bookingId }, "Failed to send organiser notification");
+  let sentCount = 0;
+  for (const to of recipients) {
+    try {
+      await sendMail({ to, subject, html });
+      sentCount++;
+    } catch (err) {
+      logger.error({ err, bookingId, to }, "Failed to send organiser notification");
+    }
   }
+  logger.info({ bookingId, sentCount, total: recipients.length }, "Organiser notifications sent");
 }
 
 export async function sendWelcomeEmail(

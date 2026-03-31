@@ -11,6 +11,7 @@ import AdminRegistrations from "@/pages/admin/registrations";
 import AdminPromoCodes from "@/pages/admin/promo-codes";
 import AdminDiscountTiers from "@/pages/admin/discount-tiers";
 import AdminEmails from "@/pages/admin/emails";
+import AdminNotifications from "@/pages/admin/notifications";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,6 +32,7 @@ function Router() {
       <Route path="/admin/promo-codes" component={AdminPromoCodes} />
       <Route path="/admin/discount-tiers" component={AdminDiscountTiers} />
       <Route path="/admin/emails" component={AdminEmails} />
+      <Route path="/admin/notifications" component={AdminNotifications} />
       <Route component={NotFound} />
     </Switch>
   );

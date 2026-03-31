@@ -1,7 +1,7 @@
 import { ReactNode, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import logoUrl from "@assets/logo.webp";
-import { LayoutDashboard, Users, Tag, Percent, Mail, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, Tag, Percent, Mail, Bell, LogOut } from "lucide-react";
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -24,6 +24,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
     { href: "/admin/promo-codes", label: "Promo Codes", icon: Tag },
     { href: "/admin/discount-tiers", label: "Discounts", icon: Percent },
     { href: "/admin/emails", label: "Emails", icon: Mail },
+    { href: "/admin/notifications", label: "Notifications", icon: Bell },
   ];
 
   const handleLogout = () => {
