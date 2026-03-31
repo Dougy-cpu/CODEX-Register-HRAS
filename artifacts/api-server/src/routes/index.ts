@@ -1,8 +1,26 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import bookingsRouter from "./bookings";
+import attendeesRouter from "./attendees";
+import pricingRouter from "./pricing";
+import promoCodesRouter from "./promo-codes";
+import discountTiersRouter from "./discount-tiers";
+import stripeRouter from "./stripe";
+import freeagentRouter from "./freeagent";
+import emailRouter from "./email";
+import adminRouter from "./admin";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(bookingsRouter);
+router.use(attendeesRouter);
+router.use(pricingRouter);
+router.use(promoCodesRouter);
+router.use(discountTiersRouter);
+router.use(stripeRouter);
+router.use(freeagentRouter);
+router.use(emailRouter);
+router.use(adminRouter);
 
 export default router;

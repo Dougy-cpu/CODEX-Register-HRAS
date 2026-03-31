@@ -1,0 +1,346 @@
+import { Router, type IRouter } from "express";
+import { eq, desc, ilike, or, and, sql, count } from "drizzle-orm";
+import { db } from "@workspace/db";
+import {
+  bookingsTable,
+  attendeesTable,
+  promoCodesTable,
+  discountTiersTable,
+} from "@workspace/db";
+import { adminAuth } from "../middleware/admin-auth";
+
+const router: IRouter = Router();
+
+function formatBooking(b: typeof bookingsTable.$inferSelect) {
+  return {
+    ...b,
+    subtotalAmount: parseFloat(b.subtotalAmount?.toString() || "0"),
+    vatAmount: parseFloat(b.vatAmount?.toString() || "0"),
+    totalAmount: parseFloat(b.totalAmount?.toString() || "0"),
+    promoDiscountAmount: b.promoDiscountAmount ? parseFloat(b.promoDiscountAmount.toString()) : null,
+    groupDiscountAmount: b.groupDiscountAmount ? parseFloat(b.groupDiscountAmount.toString()) : null,
+    createdAt: b.createdAt.toISOString(),
+    updatedAt: b.updatedAt.toISOString(),
+  };
+}
+
+function formatAttendee(a: typeof attendeesTable.$inferSelect) {
+  return {
+    ...a,
+    gdprConsentAt: a.gdprConsentAt ? a.gdprConsentAt.toISOString() : null,
+    createdAt: a.createdAt.toISOString(),
+    updatedAt: a.updatedAt.toISOString(),
+  };
+}
+
+function formatPromoCode(p: typeof promoCodesTable.$inferSelect) {
+  return {
+    ...p,
+    discountValue: parseFloat(p.discountValue.toString()),
+    validFrom: p.validFrom ? p.validFrom.toISOString() : null,
+    validUntil: p.validUntil ? p.validUntil.toISOString() : null,
+    createdAt: p.createdAt.toISOString(),
+  };
+}
+
+function formatTier(t: typeof discountTiersTable.$inferSelect) {
+  return {
+    ...t,
+    discountPercent: parseFloat(t.discountPercent.toString()),
+  };
+}
+
+router.post("/admin/login", async (req, res): Promise<void> => {
+  const { password } = req.body;
+  const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
+
+  if (!password || password !== adminPassword) {
+    res.status(401).json({ error: "Invalid credentials" });
+    return;
+  }
+
+  const token = process.env.ADMIN_TOKEN || adminPassword;
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+  res.json({ token, expiresAt: expiresAt.toISOString() });
+});
+
+router.get("/admin/stats", adminAuth, async (_req, res): Promise<void> => {
+  const allBookings = await db.select().from(bookingsTable);
+
+  const completed = allBookings.filter((b) => b.status === "paid" || b.status === "invoiced");
+  const partial = allBookings.filter((b) => b.status === "partial");
+
+  const totalRevenue = completed.reduce(
+    (sum, b) => sum + parseFloat(b.totalAmount?.toString() || "0"),
+    0
+  );
+  const totalVat = completed.reduce(
+    (sum, b) => sum + parseFloat(b.vatAmount?.toString() || "0"),
+    0
+  );
+
+  const passCounts = {
+    single: allBookings.filter((b) => b.passType === "single").length,
+    team: allBookings.filter((b) => b.passType === "team").length,
+    business: allBookings.filter((b) => b.passType === "business").length,
+  };
+
+  const paymentMethodCounts = {
+    card: completed.filter((b) => b.paymentMethod === "card").length,
+    invoice: completed.filter((b) => b.paymentMethod === "invoice").length,
+  };
+
+  const allAttendees = await db.select().from(attendeesTable);
+
+  const recentBookings = allBookings
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, 10);
+
+  const recentWithLeads = await Promise.all(
+    recentBookings.map(async (booking) => {
+      const lead = allAttendees.find((a) => a.bookingId === booking.id && a.isLead);
+      return {
+        ...formatBooking(booking),
+        leadName: lead ? `${lead.firstName} ${lead.lastName}` : null,
+        leadEmail: lead?.workEmail || null,
+        leadCompany: lead?.company || null,
+      };
+    })
+  );
+
+  res.json({
+    totalRegistrations: allBookings.length,
+    completedRegistrations: completed.length,
+    partialRegistrations: partial.length,
+    totalRevenue: parseFloat(totalRevenue.toFixed(2)),
+    totalVat: parseFloat(totalVat.toFixed(2)),
+    passCounts,
+    paymentMethodCounts,
+    recentRegistrations: recentWithLeads,
+  });
+});
+
+router.get("/admin/registrations", adminAuth, async (req, res): Promise<void> => {
+  const page = parseInt(req.query.page as string || "1", 10);
+  const limit = parseInt(req.query.limit as string || "25", 10);
+  const offset = (page - 1) * limit;
+  const statusFilter = req.query.status as string | undefined;
+  const search = req.query.search as string | undefined;
+
+  const allBookings = await db.select().from(bookingsTable).orderBy(desc(bookingsTable.createdAt));
+  const allAttendees = await db.select().from(attendeesTable);
+
+  let filtered = allBookings;
+  if (statusFilter) {
+    filtered = filtered.filter((b) => b.status === statusFilter);
+  }
+
+  if (search) {
+    const searchLower = search.toLowerCase();
+    const matchingAttendeeBookingIds = allAttendees
+      .filter(
+        (a) =>
+          a.firstName.toLowerCase().includes(searchLower) ||
+          a.lastName.toLowerCase().includes(searchLower) ||
+          a.workEmail.toLowerCase().includes(searchLower) ||
+          a.company.toLowerCase().includes(searchLower)
+      )
+      .map((a) => a.bookingId);
+
+    filtered = filtered.filter(
+      (b) =>
+        matchingAttendeeBookingIds.includes(b.id) ||
+        (b.orderReference && b.orderReference.toLowerCase().includes(searchLower))
+    );
+  }
+
+  const total = filtered.length;
+  const paginated = filtered.slice(offset, offset + limit);
+
+  const result = paginated.map((booking) => {
+    const lead = allAttendees.find((a) => a.bookingId === booking.id && a.isLead);
+    return {
+      ...formatBooking(booking),
+      leadName: lead ? `${lead.firstName} ${lead.lastName}` : null,
+      leadEmail: lead?.workEmail || null,
+      leadCompany: lead?.company || null,
+    };
+  });
+
+  res.json({ registrations: result, total, page, limit });
+});
+
+router.get("/admin/registrations/export", adminAuth, async (req, res): Promise<void> => {
+  const statusFilter = req.query.status as string | undefined;
+
+  let bookings = await db.select().from(bookingsTable).orderBy(desc(bookingsTable.createdAt));
+  if (statusFilter) {
+    bookings = bookings.filter((b) => b.status === statusFilter);
+  }
+
+  const attendees = await db.select().from(attendeesTable);
+
+  const csvRows: string[] = [];
+  csvRows.push(
+    "Order Reference,Status,Pass Type,Attendee Type,Quantity,Subtotal,VAT,Total,Payment Method,Lead Name,Lead Email,Lead Company,Lead Job Title,Lead Phone,GDPR Consent,GDPR Consent At,Promo Code,Group Discount,Created At"
+  );
+
+  for (const booking of bookings) {
+    const lead = attendees.find((a) => a.bookingId === booking.id && a.isLead);
+    const row = [
+      booking.orderReference || "",
+      booking.status,
+      booking.passType,
+      booking.attendeeType,
+      booking.quantity,
+      parseFloat(booking.subtotalAmount?.toString() || "0").toFixed(2),
+      parseFloat(booking.vatAmount?.toString() || "0").toFixed(2),
+      parseFloat(booking.totalAmount?.toString() || "0").toFixed(2),
+      booking.paymentMethod || "",
+      lead ? `${lead.firstName} ${lead.lastName}` : "",
+      lead?.workEmail || "",
+      lead?.company || "",
+      lead?.jobTitle || "",
+      lead?.phone || "",
+      lead?.gdprConsent ? "Yes" : "No",
+      lead?.gdprConsentAt ? lead.gdprConsentAt.toISOString() : "",
+      booking.promoCode || "",
+      booking.groupDiscountAmount ? parseFloat(booking.groupDiscountAmount.toString()).toFixed(2) : "0",
+      booking.createdAt.toISOString(),
+    ]
+      .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+      .join(",");
+    csvRows.push(row);
+  }
+
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="registrations-${new Date().toISOString().split("T")[0]}.csv"`
+  );
+  res.send(csvRows.join("\n"));
+});
+
+router.get("/admin/registrations/:id", adminAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+
+  const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, id));
+  if (!booking) {
+    res.status(404).json({ error: "Booking not found" });
+    return;
+  }
+
+  const attendees = await db
+    .select()
+    .from(attendeesTable)
+    .where(eq(attendeesTable.bookingId, id));
+
+  res.json({
+    ...formatBooking(booking),
+    attendees: attendees.map(formatAttendee),
+  });
+});
+
+router.get("/admin/promo-codes", adminAuth, async (_req, res): Promise<void> => {
+  const codes = await db.select().from(promoCodesTable).orderBy(desc(promoCodesTable.createdAt));
+  res.json(codes.map(formatPromoCode));
+});
+
+router.post("/admin/promo-codes", adminAuth, async (req, res): Promise<void> => {
+  const { code, discountType, discountValue, maxUses, validFrom, validUntil, isActive, description } = req.body;
+
+  if (!code || !discountType || discountValue === undefined) {
+    res.status(400).json({ error: "code, discountType, and discountValue are required" });
+    return;
+  }
+
+  const [promo] = await db
+    .insert(promoCodesTable)
+    .values({
+      code: (code as string).toUpperCase(),
+      discountType,
+      discountValue: discountValue.toString(),
+      maxUses: maxUses || null,
+      validFrom: validFrom ? new Date(validFrom) : null,
+      validUntil: validUntil ? new Date(validUntil) : null,
+      isActive: isActive !== false,
+      description: description || null,
+    })
+    .returning();
+
+  res.status(201).json(formatPromoCode(promo));
+});
+
+router.patch("/admin/promo-codes/:id", adminAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+
+  const [existing] = await db.select().from(promoCodesTable).where(eq(promoCodesTable.id, id));
+  if (!existing) {
+    res.status(404).json({ error: "Promo code not found" });
+    return;
+  }
+
+  const { code, discountType, discountValue, maxUses, validFrom, validUntil, isActive, description } = req.body;
+
+  const updateData: Partial<typeof promoCodesTable.$inferInsert> = {};
+  if (code !== undefined) updateData.code = (code as string).toUpperCase();
+  if (discountType !== undefined) updateData.discountType = discountType;
+  if (discountValue !== undefined) updateData.discountValue = discountValue.toString();
+  if (maxUses !== undefined) updateData.maxUses = maxUses;
+  if (validFrom !== undefined) updateData.validFrom = validFrom ? new Date(validFrom) : null;
+  if (validUntil !== undefined) updateData.validUntil = validUntil ? new Date(validUntil) : null;
+  if (isActive !== undefined) updateData.isActive = isActive;
+  if (description !== undefined) updateData.description = description;
+
+  const [updated] = await db
+    .update(promoCodesTable)
+    .set(updateData)
+    .where(eq(promoCodesTable.id, id))
+    .returning();
+
+  res.json(formatPromoCode(updated));
+});
+
+router.delete("/admin/promo-codes/:id", adminAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+
+  const [existing] = await db.select().from(promoCodesTable).where(eq(promoCodesTable.id, id));
+  if (!existing) {
+    res.status(404).json({ error: "Promo code not found" });
+    return;
+  }
+
+  await db.delete(promoCodesTable).where(eq(promoCodesTable.id, id));
+  res.sendStatus(204);
+});
+
+router.put("/admin/discount-tiers", adminAuth, async (req, res): Promise<void> => {
+  const { passType, tiers } = req.body;
+
+  if (!passType || !Array.isArray(tiers)) {
+    res.status(400).json({ error: "passType and tiers array are required" });
+    return;
+  }
+
+  await db.delete(discountTiersTable).where(eq(discountTiersTable.passType, passType));
+
+  const inserted = await db
+    .insert(discountTiersTable)
+    .values(
+      tiers.map((tier: { minQuantity: number; discountPercent: number; label?: string }) => ({
+        passType,
+        minQuantity: tier.minQuantity,
+        discountPercent: tier.discountPercent.toString(),
+        label: tier.label || null,
+      }))
+    )
+    .returning();
+
+  res.json(inserted.map(formatTier));
+});
+
+export default router;

@@ -358,6 +358,14 @@ export async function customFetch<T = unknown>(
     }
   }
 
+  // Support for admin_token from localStorage
+  if (typeof window !== "undefined" && window.localStorage) {
+    const adminToken = window.localStorage.getItem("admin_token");
+    if (adminToken && !headers.has("x-admin-token")) {
+      headers.set("x-admin-token", adminToken);
+    }
+  }
+
   const requestInfo = { method, url: resolveUrl(input) };
 
   const response = await fetch(input, { ...init, method, headers });
