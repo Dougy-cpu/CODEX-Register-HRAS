@@ -99,9 +99,6 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
   const handleSelectPass = (pass: PricingRequestPassType) => {
     setSelectedPass(pass);
     if (pass === "team") setQuantity(3);
-    if (pass === "single" && quantity === 3) {
-      // keep 3 — valid single quantity, matches "most popular" hint
-    }
   };
 
   const handleContinue = async () => {
@@ -285,10 +282,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
         <div className="flex justify-center">
           <Card className="relative p-6 border-2 border-primary bg-primary/5 w-full max-w-xl">
             {/* Badge row */}
-            <div className="flex items-center justify-between mb-4">
-              <Badge className="bg-accent text-accent-foreground border-none font-bold uppercase tracking-wider text-xs">
-                Vendor Pass
-              </Badge>
+            <div className="flex items-center justify-end mb-4">
               <InventoryBadge remaining={inventory.business} />
             </div>
 
@@ -300,7 +294,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
               <span className="text-sm text-muted-foreground line-through">£999</span>
               <span className="text-sm font-bold text-primary">40% off</span>
             </div>
-            <p className="text-sm text-muted-foreground mb-5">Per pass, ex VAT</p>
+            <p className="text-sm text-muted-foreground mb-5">Per pass, ex VAT — group discounts apply for multiple</p>
 
             <div className="space-y-2.5">
               {SINGLE_BENEFITS.map(b => (
