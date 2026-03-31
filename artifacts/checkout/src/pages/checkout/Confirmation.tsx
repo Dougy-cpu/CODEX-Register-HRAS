@@ -99,6 +99,23 @@ export default function Confirmation({ booking }: ConfirmationProps) {
           Return to Website
         </Button>
       </div>
+
+      {import.meta.env.DEV && (
+        <div className="pt-4 border-t border-dashed border-border mt-4">
+          <p className="text-xs text-muted-foreground mb-3 font-mono uppercase tracking-wider">Dev only</p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-dashed border-muted-foreground/50 text-muted-foreground hover:text-foreground"
+            onClick={() => {
+              sessionStorage.removeItem("booking_session");
+              window.location.href = "/";
+            }}
+          >
+            ↺ Start new test registration
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
