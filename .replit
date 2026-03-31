@@ -39,6 +39,7 @@ SMTP_USER = "douglas@peoplestrategyhub.com"
 SMTP_PASS = "vmoy uean sqxl acoa"
 FROM_EMAIL = "douglas@peoplestrategyhub.com"
 FROM_NAME = "HR Analytics Summit"
+STRIPE_SECRET_KEY = "Ky83iYhKXyEyb1zuiUy45whbUGvR8nlRVfzdVi2UACasL9c4fkgQehgvW8QOXQye900PczdLeel"
 
 [nix]
 channel = "stable-25_05"
