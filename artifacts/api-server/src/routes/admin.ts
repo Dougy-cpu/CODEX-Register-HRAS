@@ -356,7 +356,7 @@ router.get("/admin/passes/inventory", adminAuth, async (_req, res): Promise<void
 });
 
 router.put("/admin/passes/inventory/:passType", adminAuth, async (req, res): Promise<void> => {
-  const passType = req.params.passType;
+  const passType = req.params["passType"] as string;
   if (!["single", "business"].includes(passType)) {
     res.status(400).json({ error: "Invalid pass type" });
     return;
@@ -407,7 +407,7 @@ router.post("/admin/notification-emails", adminAuth, async (req, res): Promise<v
 });
 
 router.delete("/admin/notification-emails/:id", adminAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(req.params["id"] as string, 10);
   await db.delete(notificationEmailsTable).where(eq(notificationEmailsTable.id, id));
   res.status(204).end();
 });

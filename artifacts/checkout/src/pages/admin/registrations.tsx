@@ -95,8 +95,8 @@ export default function AdminRegistrations() {
               <SelectItem value="all">All Statuses</SelectItem>
               <SelectItem value="paid">Paid</SelectItem>
               <SelectItem value="invoiced">Invoiced</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="partial">Partial (in progress)</SelectItem>
+              <SelectItem value="pending_payment">Pending Payment</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
