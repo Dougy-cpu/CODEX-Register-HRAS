@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Checkbox } from "@/components/ui/checkbox";
+import { User } from "lucide-react";
 import type { BookingWithAttendees } from "@/types/booking";
 
 const attendeeSchema = z.object({
@@ -41,34 +42,53 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
   const updateAttendee = useUpdateAttendee();
   const queryClient = useQueryClient();
 
-  // Determine how many additional attendees we need
-  const totalQuantity = booking.quantity;
+  const totalSeats = booking.quantity;
   const leadAttendee = booking.attendees?.find((a) => a.isLead);
   const additionalAttendees = booking.attendees?.filter((a) => !a.isLead) || [];
 
-  const expectedAdditionalCount = totalQuantity - 1;
+  const leadDefaults: AttendeeFormData = {
+    firstName: leadAttendee?.firstName || "",
+    lastName: leadAttendee?.lastName || "",
+    jobTitle: leadAttendee?.jobTitle || "",
+    company: leadAttendee?.company || "",
+    workEmail: leadAttendee?.workEmail || "",
+    phone: leadAttendee?.phone || "",
+    gdprConsent: leadAttendee?.gdprConsent || false,
+    id: leadAttendee?.id,
+  };
 
   const [openItem, setOpenItem] = useState<string>("attendee-0");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // We will maintain state for all forms locally, then submit all at once
   const [formsData, setFormsData] = useState<AttendeeFormData[]>(() => {
-    const initial = [];
-    for (let i = 0; i < expectedAdditionalCount; i++) {
-      const existing = additionalAttendees[i];
-      initial.push({
-        firstName: existing?.firstName || "",
-        lastName: existing?.lastName || "",
-        jobTitle: existing?.jobTitle || "",
-        company: existing?.company || leadAttendee?.company || "",
-        workEmail: existing?.workEmail || "",
-        phone: existing?.phone || "",
-        gdprConsent: existing?.gdprConsent || false,
-        id: existing?.id
-      });
+    const forms: AttendeeFormData[] = [];
+    for (let i = 0; i < totalSeats; i++) {
+      if (i === 0) {
+        forms.push({ ...leadDefaults });
+      } else {
+        const existing = additionalAttendees[i - 1];
+        forms.push({
+          firstName: existing?.firstName || "",
+          lastName: existing?.lastName || "",
+          jobTitle: existing?.jobTitle || "",
+          company: existing?.company || leadAttendee?.company || "",
+          workEmail: existing?.workEmail || "",
+          phone: existing?.phone || "",
+          gdprConsent: existing?.gdprConsent || false,
+          id: existing?.id,
+        });
+      }
     }
-    return initial;
+    return forms;
   });
+
+  const [forMeFlags, setForMeFlags] = useState<boolean[]>(() =>
+    Array.from({ length: totalSeats }, (_, i) => i === 0)
+  );
+
+  const [errors, setErrors] = useState<(Partial<Record<keyof AttendeeFormData, string>> | null)[]>(
+    Array(totalSeats).fill(null)
+  );
 
   const autosaveIdsRef = useRef<(number | undefined)[]>(formsData.map(f => f.id));
 
@@ -78,101 +98,187 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
       for (let i = 0; i < formsData.length; i++) {
         const form = formsData[i];
         if (!form.firstName || !form.workEmail) continue;
-        const existingId = form.id ?? autosaveIdsRef.current[i];
-        try {
-          if (existingId) {
-            await updateAttendee.mutateAsync({
-              bookingId: booking.id,
-              attendeeId: existingId,
-              data: {
-                firstName: form.firstName,
-                lastName: form.lastName,
-                jobTitle: form.jobTitle,
-                company: form.company,
-                workEmail: form.workEmail,
-                phone: form.phone || null,
-                gdprConsent: form.gdprConsent,
-              },
-            });
-          } else {
-            const created = await createAttendee.mutateAsync({
-              bookingId: booking.id,
-              data: {
-                isLead: false,
-                firstName: form.firstName,
-                lastName: form.lastName,
-                jobTitle: form.jobTitle,
-                company: form.company,
-                workEmail: form.workEmail,
-                phone: form.phone || null,
-                gdprConsent: form.gdprConsent,
-                seatIndex: i + 1,
-              },
-            });
-            autosaveIdsRef.current[i] = created.id;
+        if (i === 0) {
+          if (leadAttendee?.id) {
+            try {
+              await updateAttendee.mutateAsync({
+                bookingId: booking.id,
+                attendeeId: leadAttendee.id,
+                data: {
+                  firstName: form.firstName,
+                  lastName: form.lastName,
+                  jobTitle: form.jobTitle,
+                  company: form.company,
+                  workEmail: form.workEmail,
+                  phone: form.phone || null,
+                  gdprConsent: form.gdprConsent,
+                },
+              });
+            } catch { /* silent */ }
           }
-        } catch {
-          // Silent fail — autosave is best-effort
+        } else {
+          const existingId = form.id ?? autosaveIdsRef.current[i];
+          try {
+            if (existingId) {
+              await updateAttendee.mutateAsync({
+                bookingId: booking.id,
+                attendeeId: existingId,
+                data: {
+                  firstName: form.firstName,
+                  lastName: form.lastName,
+                  jobTitle: form.jobTitle,
+                  company: form.company,
+                  workEmail: form.workEmail,
+                  phone: form.phone || null,
+                  gdprConsent: form.gdprConsent,
+                },
+              });
+            } else {
+              const created = await createAttendee.mutateAsync({
+                bookingId: booking.id,
+                data: {
+                  isLead: false,
+                  firstName: form.firstName,
+                  lastName: form.lastName,
+                  jobTitle: form.jobTitle,
+                  company: form.company,
+                  workEmail: form.workEmail,
+                  phone: form.phone || null,
+                  gdprConsent: form.gdprConsent,
+                  seatIndex: i,
+                },
+              });
+              autosaveIdsRef.current[i] = created.id;
+            }
+          } catch { /* silent */ }
         }
       }
     }, 1500);
     return () => clearTimeout(timer);
   }, [formsData]);
 
+  const handleForMeToggle = (index: number, checked: boolean) => {
+    const newFlags = [...forMeFlags];
+    newFlags[index] = checked;
+    setForMeFlags(newFlags);
+
+    const newForms = [...formsData];
+    if (checked) {
+      newForms[index] = {
+        ...newForms[index],
+        firstName: leadDefaults.firstName,
+        lastName: leadDefaults.lastName,
+        jobTitle: leadDefaults.jobTitle,
+        company: leadDefaults.company,
+        workEmail: leadDefaults.workEmail,
+        phone: leadDefaults.phone,
+        gdprConsent: newForms[index].gdprConsent,
+      };
+    } else {
+      newForms[index] = {
+        ...newForms[index],
+        firstName: "",
+        lastName: "",
+        jobTitle: "",
+        company: leadDefaults.company,
+        workEmail: "",
+        phone: "",
+      };
+    }
+    setFormsData(newForms);
+  };
+
+  const updateFormData = <K extends keyof AttendeeFormData>(index: number, field: K, value: AttendeeFormData[K]) => {
+    const newFormsData = [...formsData];
+    newFormsData[index] = { ...newFormsData[index], [field]: value };
+    setFormsData(newFormsData);
+    if (field !== "gdprConsent") {
+      const newFlags = [...forMeFlags];
+      newFlags[index] = false;
+      setForMeFlags(newFlags);
+    }
+  };
+
   const handleContinue = async () => {
-    // Validate all forms manually
     let allValid = true;
-    const validatedForms = formsData.map((data, index) => {
-      const result = attendeeSchema.safeParse(data);
+    const newErrors: (Partial<Record<keyof AttendeeFormData, string>> | null)[] = Array(totalSeats).fill(null);
+
+    for (let i = 0; i < totalSeats; i++) {
+      const result = attendeeSchema.safeParse(formsData[i]);
       if (!result.success) {
         allValid = false;
-        setOpenItem(`attendee-${index}`);
+        const fieldErrors: Partial<Record<keyof AttendeeFormData, string>> = {};
+        for (const issue of result.error.issues) {
+          const field = issue.path[0] as keyof AttendeeFormData;
+          if (!fieldErrors[field]) fieldErrors[field] = issue.message;
+        }
+        newErrors[i] = fieldErrors;
+        if (allValid === false && i === 0) setOpenItem("attendee-0");
+        else if (!allValid) setOpenItem(`attendee-${i}`);
       }
-      return result;
-    });
+    }
 
+    setErrors(newErrors);
     if (!allValid) return;
 
     setIsSubmitting(true);
     try {
-      for (let i = 0; i < expectedAdditionalCount; i++) {
+      for (let i = 0; i < totalSeats; i++) {
         const data = formsData[i];
-        const existingId = data.id ?? autosaveIdsRef.current[i];
-        if (existingId) {
-          await updateAttendee.mutateAsync({
-            bookingId: booking.id,
-            attendeeId: existingId,
-            data: {
-              firstName: data.firstName,
-              lastName: data.lastName,
-              jobTitle: data.jobTitle,
-              company: data.company,
-              workEmail: data.workEmail,
-              phone: data.phone || null,
-              gdprConsent: data.gdprConsent,
-            }
-          });
+        if (i === 0) {
+          if (leadAttendee?.id) {
+            await updateAttendee.mutateAsync({
+              bookingId: booking.id,
+              attendeeId: leadAttendee.id,
+              data: {
+                firstName: data.firstName,
+                lastName: data.lastName,
+                jobTitle: data.jobTitle,
+                company: data.company,
+                workEmail: data.workEmail,
+                phone: data.phone || null,
+                gdprConsent: data.gdprConsent,
+              },
+            });
+          }
         } else {
-          await createAttendee.mutateAsync({
-            bookingId: booking.id,
-            data: {
-              isLead: false,
-              firstName: data.firstName,
-              lastName: data.lastName,
-              jobTitle: data.jobTitle,
-              company: data.company,
-              workEmail: data.workEmail,
-              phone: data.phone || null,
-              gdprConsent: data.gdprConsent,
-              seatIndex: i + 1
-            }
-          });
+          const existingId = data.id ?? autosaveIdsRef.current[i];
+          if (existingId) {
+            await updateAttendee.mutateAsync({
+              bookingId: booking.id,
+              attendeeId: existingId,
+              data: {
+                firstName: data.firstName,
+                lastName: data.lastName,
+                jobTitle: data.jobTitle,
+                company: data.company,
+                workEmail: data.workEmail,
+                phone: data.phone || null,
+                gdprConsent: data.gdprConsent,
+              },
+            });
+          } else {
+            await createAttendee.mutateAsync({
+              bookingId: booking.id,
+              data: {
+                isLead: false,
+                firstName: data.firstName,
+                lastName: data.lastName,
+                jobTitle: data.jobTitle,
+                company: data.company,
+                workEmail: data.workEmail,
+                phone: data.phone || null,
+                gdprConsent: data.gdprConsent,
+                seatIndex: i,
+              },
+            });
+          }
         }
       }
 
       await updateBooking.mutateAsync({
         id: booking.id,
-        data: { currentStep: 4 }
+        data: { currentStep: 4 },
       });
       queryClient.invalidateQueries({ queryKey: ["booking"] });
     } catch (e) {
@@ -182,121 +288,158 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
     }
   };
 
-  const updateFormData = <K extends keyof AttendeeFormData>(index: number, field: K, value: AttendeeFormData[K]) => {
-    const newFormsData = [...formsData];
-    newFormsData[index] = { ...newFormsData[index], [field]: value };
-    setFormsData(newFormsData);
-  };
-
-  if (expectedAdditionalCount === 0) {
-    // Just show a simple view and continue button
-    return (
-      <div className="max-w-2xl mx-auto space-y-8 text-center">
-        <div>
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">You're all set!</h1>
-          <p className="text-lg text-muted-foreground">Since you purchased a single pass, we already have your details.</p>
-        </div>
-        <div className="bg-white p-8 border border-border inline-block text-left w-full">
-          <h3 className="font-bold text-lg mb-2">Lead Attendee:</h3>
-          <p>{leadAttendee?.firstName} {leadAttendee?.lastName}</p>
-          <p className="text-muted-foreground">{leadAttendee?.jobTitle} at {leadAttendee?.company}</p>
-          <p className="text-muted-foreground">{leadAttendee?.workEmail}</p>
-        </div>
-        <div className="flex justify-between pt-4">
-          <Button variant="outline" size="lg" className="px-8 h-14 text-lg border-border" onClick={async () => {
-            await updateBooking.mutateAsync({ id: booking.id, data: { currentStep: 2 } });
-            queryClient.invalidateQueries({ queryKey: ["booking"] });
-          }}>Back</Button>
-          <Button size="lg" className="px-10 h-14 text-lg bg-primary hover:bg-primary/90 text-white border-none" onClick={() => {
-            updateBooking.mutateAsync({ id: booking.id, data: { currentStep: 4 } }).then(() => queryClient.invalidateQueries({ queryKey: ["booking"] }));
-          }}>Continue to Payment</Button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="max-w-3xl mx-auto space-y-8">
       <div>
         <h1 className="text-4xl md:text-5xl font-bold mb-4">Attendee Details</h1>
-        <p className="text-lg text-muted-foreground">Please provide details for the remaining {expectedAdditionalCount} attendee(s).</p>
+        <p className="text-lg text-muted-foreground">
+          {totalSeats === 1
+            ? "Please confirm who this ticket is for."
+            : `Please confirm who each of the ${totalSeats} tickets is for.`}
+        </p>
       </div>
 
       <Accordion type="single" value={openItem} onValueChange={setOpenItem} className="space-y-4">
-        {formsData.map((data, index) => (
-          <AccordionItem key={index} value={`attendee-${index}`} className="bg-white border border-border px-6">
-            <AccordionTrigger className="hover:no-underline py-6">
-              <div className="flex flex-col text-left">
-                <span className="font-bold text-xl">Attendee {index + 2}</span>
-                <span className="text-sm text-muted-foreground font-normal">
-                  {data.firstName && data.lastName ? `${data.firstName} ${data.lastName}` : "Pending details"}
-                </span>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pb-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-border">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">First Name *</label>
-                  <Input value={data.firstName} onChange={(e) => updateFormData(index, "firstName", e.target.value)} className="h-12 bg-white" />
+        {formsData.map((data, index) => {
+          const fieldErrors = errors[index];
+          const isForMe = forMeFlags[index];
+          const label = data.firstName && data.lastName
+            ? `${data.firstName} ${data.lastName}`
+            : "Pending details";
+
+          return (
+            <AccordionItem key={index} value={`attendee-${index}`} className="bg-white border border-border px-6">
+              <AccordionTrigger className="hover:no-underline py-6">
+                <div className="flex flex-col text-left">
+                  <span className="font-bold text-xl">Attendee {index + 1}</span>
+                  <span className="text-sm text-muted-foreground font-normal">{label}</span>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Last Name *</label>
-                  <Input value={data.lastName} onChange={(e) => updateFormData(index, "lastName", e.target.value)} className="h-12 bg-white" />
+              </AccordionTrigger>
+              <AccordionContent className="pb-6">
+                <div className="mb-5 pt-4 border-t border-border">
+                  <button
+                    type="button"
+                    onClick={() => handleForMeToggle(index, !isForMe)}
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                      isForMe
+                        ? "bg-primary text-white border-primary"
+                        : "bg-white text-foreground border-border hover:border-primary/50"
+                    }`}
+                  >
+                    <User className="w-4 h-4" />
+                    This ticket is for me
+                  </button>
+                  {isForMe && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Pre-filled from your profile. Edit any field to customise.
+                    </p>
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Work Email *</label>
-                  <Input type="email" value={data.workEmail} onChange={(e) => updateFormData(index, "workEmail", e.target.value)} className="h-12 bg-white" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Emergency Contact (optional)</label>
-                  <Input value={data.phone} onChange={(e) => updateFormData(index, "phone", e.target.value)} className="h-12 bg-white" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Job Title *</label>
-                  <Input value={data.jobTitle} onChange={(e) => updateFormData(index, "jobTitle", e.target.value)} className="h-12 bg-white" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Company *</label>
-                  <Input value={data.company} onChange={(e) => updateFormData(index, "company", e.target.value)} className="h-12 bg-white" />
-                </div>
-              </div>
-              <div className="pt-6 mt-6 border-t border-border">
-                <div className="flex items-start space-x-3">
-                  <Checkbox 
-                    checked={data.gdprConsent} 
-                    onCheckedChange={(val) => updateFormData(index, "gdprConsent", !!val)} 
-                    className="mt-1"
-                  />
-                  <div className="space-y-1 leading-none">
-                    <label className="font-normal text-base cursor-pointer">
-                      I understand how my data will be processed in accordance with{" "}
-                      <a href="https://peoplestrategyhub.com/your-data-gdpr" target="_blank" rel="noreferrer" className="underline text-primary hover:text-primary/80">GDPR</a>
-                      {" "}and{" "}
-                      <a href="https://www.hranalyticssummit.com/terms-and-conditions" target="_blank" rel="noreferrer" className="underline text-primary hover:text-primary/80">Conference T&Cs</a>
-                    </label>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">First Name *</label>
+                    <Input
+                      value={data.firstName}
+                      onChange={(e) => updateFormData(index, "firstName", e.target.value)}
+                      className={`h-12 bg-white ${fieldErrors?.firstName ? "border-destructive" : ""}`}
+                    />
+                    {fieldErrors?.firstName && <p className="text-xs text-destructive">{fieldErrors.firstName}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Last Name *</label>
+                    <Input
+                      value={data.lastName}
+                      onChange={(e) => updateFormData(index, "lastName", e.target.value)}
+                      className={`h-12 bg-white ${fieldErrors?.lastName ? "border-destructive" : ""}`}
+                    />
+                    {fieldErrors?.lastName && <p className="text-xs text-destructive">{fieldErrors.lastName}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Work Email *</label>
+                    <Input
+                      type="email"
+                      value={data.workEmail}
+                      onChange={(e) => updateFormData(index, "workEmail", e.target.value)}
+                      className={`h-12 bg-white ${fieldErrors?.workEmail ? "border-destructive" : ""}`}
+                    />
+                    {fieldErrors?.workEmail && <p className="text-xs text-destructive">{fieldErrors.workEmail}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Phone (optional)</label>
+                    <Input
+                      value={data.phone}
+                      onChange={(e) => updateFormData(index, "phone", e.target.value)}
+                      className="h-12 bg-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Job Title *</label>
+                    <Input
+                      value={data.jobTitle}
+                      onChange={(e) => updateFormData(index, "jobTitle", e.target.value)}
+                      className={`h-12 bg-white ${fieldErrors?.jobTitle ? "border-destructive" : ""}`}
+                    />
+                    {fieldErrors?.jobTitle && <p className="text-xs text-destructive">{fieldErrors.jobTitle}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Company *</label>
+                    <Input
+                      value={data.company}
+                      onChange={(e) => updateFormData(index, "company", e.target.value)}
+                      className={`h-12 bg-white ${fieldErrors?.company ? "border-destructive" : ""}`}
+                    />
+                    {fieldErrors?.company && <p className="text-xs text-destructive">{fieldErrors.company}</p>}
                   </div>
                 </div>
-              </div>
-              <div className="flex justify-end mt-6">
-                {index < expectedAdditionalCount - 1 && (
-                  <Button type="button" onClick={() => setOpenItem(`attendee-${index + 1}`)}>
-                    Next Attendee
-                  </Button>
+
+                <div className="pt-6 mt-6 border-t border-border">
+                  <div className="flex items-start space-x-3">
+                    <Checkbox
+                      checked={data.gdprConsent}
+                      onCheckedChange={(val) => updateFormData(index, "gdprConsent", !!val)}
+                      className="mt-1"
+                    />
+                    <div className="space-y-1 leading-none">
+                      <label className="font-normal text-base cursor-pointer">
+                        I understand how my data will be processed in accordance with{" "}
+                        <a href="https://peoplestrategyhub.com/your-data-gdpr" target="_blank" rel="noreferrer" className="underline text-primary hover:text-primary/80">GDPR</a>
+                        {" "}and{" "}
+                        <a href="https://www.hranalyticssummit.com/terms-and-conditions" target="_blank" rel="noreferrer" className="underline text-primary hover:text-primary/80">Conference T&Cs</a>
+                      </label>
+                      {fieldErrors?.gdprConsent && <p className="text-xs text-destructive">{fieldErrors.gdprConsent}</p>}
+                    </div>
+                  </div>
+                </div>
+
+                {index < totalSeats - 1 && (
+                  <div className="flex justify-end mt-6">
+                    <Button type="button" onClick={() => setOpenItem(`attendee-${index + 1}`)}>
+                      Next Attendee
+                    </Button>
+                  </div>
                 )}
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        ))}
+              </AccordionContent>
+            </AccordionItem>
+          );
+        })}
       </Accordion>
 
       <div className="flex justify-between pt-4">
-        <Button variant="outline" size="lg" className="px-8 h-14 text-lg border-border" onClick={async () => {
-          await updateBooking.mutateAsync({ id: booking.id, data: { currentStep: 2 } });
-          queryClient.invalidateQueries({ queryKey: ["booking"] });
-        }}>Back</Button>
-        <Button 
-          size="lg" 
-          className="px-10 h-14 text-lg bg-primary hover:bg-primary/90 text-white border-none" 
+        <Button
+          variant="outline"
+          size="lg"
+          className="px-8 h-14 text-lg border-border"
+          onClick={async () => {
+            await updateBooking.mutateAsync({ id: booking.id, data: { currentStep: 2 } });
+            queryClient.invalidateQueries({ queryKey: ["booking"] });
+          }}
+        >
+          Back
+        </Button>
+        <Button
+          size="lg"
+          className="px-10 h-14 text-lg bg-primary hover:bg-primary/90 text-white border-none"
           onClick={handleContinue}
           disabled={isSubmitting}
         >
