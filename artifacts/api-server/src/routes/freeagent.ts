@@ -268,6 +268,7 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
           contact: contactUrl,
           dated_on: new Date().toISOString().split("T")[0],
           due_on: dueDate.toISOString().split("T")[0],
+          payment_terms_in_days: 14,
           reference: orderRef,
           invoice_items: invoiceItems,
           status: "Sent",
