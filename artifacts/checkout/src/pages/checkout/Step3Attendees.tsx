@@ -28,6 +28,7 @@ interface AttendeeFormData {
   company: string;
   workEmail: string;
   phone: string;
+  dietaryAccessibility: string;
   gdprConsent: boolean;
   id?: number;
 }
@@ -53,6 +54,7 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
     company: leadAttendee?.company || "",
     workEmail: leadAttendee?.workEmail || "",
     phone: leadAttendee?.phone || "",
+    dietaryAccessibility: (leadAttendee as any)?.dietaryAccessibility || "",
     gdprConsent: leadAttendee?.gdprConsent || false,
     id: leadAttendee?.id,
   };
@@ -74,6 +76,7 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
           company: existing?.isTbc ? (leadAttendee?.company || "") : (existing?.company || leadAttendee?.company || ""),
           workEmail: existing?.isTbc ? "" : (existing?.workEmail || ""),
           phone: existing?.isTbc ? "" : (existing?.phone || ""),
+          dietaryAccessibility: existing?.isTbc ? "" : ((existing as any)?.dietaryAccessibility || ""),
           gdprConsent: existing?.isTbc ? false : (existing?.gdprConsent || false),
           id: existing?.id,
         });
@@ -122,6 +125,7 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
                   company: form.company,
                   workEmail: form.workEmail,
                   phone: form.phone || null,
+                  dietaryAccessibility: form.dietaryAccessibility || null,
                   gdprConsent: form.gdprConsent,
                 },
               });
@@ -144,6 +148,7 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
                       company: form.company,
                       workEmail: form.workEmail,
                       phone: form.phone || null,
+                      dietaryAccessibility: form.dietaryAccessibility || null,
                       gdprConsent: form.gdprConsent,
                     },
               });
@@ -167,6 +172,7 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
                       company: form.company,
                       workEmail: form.workEmail,
                       phone: form.phone || null,
+                      dietaryAccessibility: form.dietaryAccessibility || null,
                       gdprConsent: form.gdprConsent,
                       seatIndex: i,
                     },
@@ -195,6 +201,7 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
         company: leadDefaults.company,
         workEmail: leadDefaults.workEmail,
         phone: leadDefaults.phone,
+        dietaryAccessibility: leadDefaults.dietaryAccessibility,
         gdprConsent: newForms[index].gdprConsent,
       };
     } else {
@@ -206,6 +213,7 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
         company: leadDefaults.company,
         workEmail: "",
         phone: "",
+        dietaryAccessibility: "",
       };
     }
     setFormsData(newForms);
@@ -287,6 +295,7 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
                 company: data.company,
                 workEmail: data.workEmail,
                 phone: data.phone || null,
+                dietaryAccessibility: data.dietaryAccessibility || null,
                 gdprConsent: data.gdprConsent,
               },
             });
@@ -307,6 +316,7 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
                     company: data.company,
                     workEmail: data.workEmail,
                     phone: data.phone || null,
+                    dietaryAccessibility: data.dietaryAccessibility || null,
                     gdprConsent: data.gdprConsent,
                   },
             });
@@ -330,6 +340,7 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
                     company: data.company,
                     workEmail: data.workEmail,
                     phone: data.phone || null,
+                    dietaryAccessibility: data.dietaryAccessibility || null,
                     gdprConsent: data.gdprConsent,
                     seatIndex: i,
                   },
@@ -495,6 +506,17 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
                         />
                         {fieldErrors?.company && <p className="text-xs text-destructive">{fieldErrors.company}</p>}
                       </div>
+                    </div>
+
+                    <div className="mt-6 space-y-2">
+                      <label className="text-sm font-medium">Dietary requirements or accessibility needs (optional)</label>
+                      <textarea
+                        value={data.dietaryAccessibility}
+                        onChange={(e) => updateFormData(index, "dietaryAccessibility", e.target.value)}
+                        placeholder="e.g. vegetarian, gluten free, wheelchair access, hearing loop..."
+                        rows={3}
+                        className="w-full rounded-md border border-input bg-white px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+                      />
                     </div>
 
                     <div className="pt-6 mt-6 border-t border-border">

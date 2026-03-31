@@ -59,6 +59,7 @@ function ExpandedRegistrationDetail({ id }: { id: number }) {
                 <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">Company</th>
                 <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">Email</th>
                 <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">Phone</th>
+                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">Dietary / Access</th>
                 <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">GDPR</th>
               </tr>
             </thead>
@@ -87,6 +88,9 @@ function ExpandedRegistrationDetail({ id }: { id: number }) {
                     <td className="p-3 text-muted-foreground">{a.isTbc ? "—" : (a.company || "—")}</td>
                     <td className="p-3 text-muted-foreground">{a.isTbc ? "—" : (a.workEmail || "—")}</td>
                     <td className="p-3 text-muted-foreground">{a.isTbc ? "—" : (a.phone || "—")}</td>
+                    <td className="p-3 text-muted-foreground max-w-[200px]">
+                      {a.isTbc ? "—" : ((a as any).dietaryAccessibility || "—")}
+                    </td>
                     <td className="p-3">
                       {a.isTbc ? (
                         <span className="text-muted-foreground">—</span>
@@ -100,7 +104,7 @@ function ExpandedRegistrationDetail({ id }: { id: number }) {
                 ))}
               {(!data?.attendees || data.attendees.length === 0) && (
                 <tr>
-                  <td colSpan={7} className="p-6 text-center text-muted-foreground">No attendees recorded yet.</td>
+                  <td colSpan={8} className="p-6 text-center text-muted-foreground">No attendees recorded yet.</td>
                 </tr>
               )}
             </tbody>

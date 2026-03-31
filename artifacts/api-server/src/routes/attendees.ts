@@ -41,7 +41,7 @@ router.post("/bookings/:bookingId/attendees", async (req, res): Promise<void> =>
     }
   }
 
-  const { firstName, lastName, jobTitle, company, workEmail, phone, gdprConsent, isLead, seatIndex, isTbc } = req.body;
+  const { firstName, lastName, jobTitle, company, workEmail, phone, dietaryAccessibility, gdprConsent, isLead, seatIndex, isTbc } = req.body;
 
   if (!isTbc && (!firstName || !lastName || !jobTitle || !company || !workEmail)) {
     res.status(400).json({ error: "firstName, lastName, jobTitle, company, workEmail are required" });
@@ -60,6 +60,7 @@ router.post("/bookings/:bookingId/attendees", async (req, res): Promise<void> =>
     company: isTbc ? (company || "TBC") : company,
     workEmail: isTbc ? tbcEmail : workEmail,
     phone: phone || null,
+    dietaryAccessibility: isTbc ? null : (dietaryAccessibility || null),
     gdprConsent: isTbc ? false : !!gdprConsent,
     gdprConsentAt: (!isTbc && gdprConsent) ? new Date() : null,
     isLead: !!isLead,
@@ -121,7 +122,7 @@ router.patch("/bookings/:bookingId/attendees/:attendeeId", async (req, res): Pro
     return;
   }
 
-  const { firstName, lastName, jobTitle, company, workEmail, phone, gdprConsent, isTbc } = req.body;
+  const { firstName, lastName, jobTitle, company, workEmail, phone, dietaryAccessibility, gdprConsent, isTbc } = req.body;
 
   const updateData: Partial<typeof attendeesTable.$inferInsert> = {};
 
@@ -139,6 +140,7 @@ router.patch("/bookings/:bookingId/attendees/:attendeeId", async (req, res): Pro
       updateData.company = company || existing.company || "TBC";
       updateData.workEmail = `tbc-${bookingId}-${existing.seatIndex}@tbc.placeholder`;
       updateData.phone = null;
+      updateData.dietaryAccessibility = null;
       updateData.gdprConsent = false;
       updateData.gdprConsentAt = null;
     }
@@ -151,6 +153,7 @@ router.patch("/bookings/:bookingId/attendees/:attendeeId", async (req, res): Pro
     if (company !== undefined) updateData.company = company;
     if (workEmail !== undefined) updateData.workEmail = workEmail;
     if (phone !== undefined) updateData.phone = phone || null;
+    if (dietaryAccessibility !== undefined) updateData.dietaryAccessibility = dietaryAccessibility || null;
     if (gdprConsent !== undefined) {
       updateData.gdprConsent = !!gdprConsent;
       updateData.gdprConsentAt = gdprConsent ? new Date() : null;

@@ -16,6 +16,7 @@ export const attendeesTable = pgTable("attendees", {
   company: text("company").notNull(),
   workEmail: text("work_email").notNull(),
   phone: text("phone"),
+  dietaryAccessibility: text("dietary_accessibility"),
   isTbc: boolean("is_tbc").notNull().default(false),
   gdprConsent: boolean("gdpr_consent").notNull().default(false),
   gdprConsentAt: timestamp("gdpr_consent_at", { withTimezone: true }),
