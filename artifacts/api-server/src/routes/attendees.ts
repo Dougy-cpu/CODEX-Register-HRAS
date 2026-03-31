@@ -48,27 +48,47 @@ router.post("/bookings/:bookingId/attendees", async (req, res): Promise<void> =>
     return;
   }
 
-  const tbcEmail = `tbc-${bookingId}-${seatIndex ?? 0}@tbc.placeholder`;
+  const resolvedSeatIndex = seatIndex ?? 0;
+  const tbcEmail = `tbc-${bookingId}-${resolvedSeatIndex}@tbc.placeholder`;
 
-  const [attendee] = await db
-    .insert(attendeesTable)
-    .values({
-      bookingId,
-      isTbc: !!isTbc,
-      firstName: isTbc ? "TBC" : firstName,
-      lastName: isTbc ? "TBC" : lastName,
-      jobTitle: isTbc ? "TBC" : jobTitle,
-      company: isTbc ? (company || "TBC") : company,
-      workEmail: isTbc ? tbcEmail : workEmail,
-      phone: phone || null,
-      gdprConsent: isTbc ? false : !!gdprConsent,
-      gdprConsentAt: (!isTbc && gdprConsent) ? new Date() : null,
-      isLead: !!isLead,
-      seatIndex: seatIndex ?? 0,
-    })
-    .returning();
+  const values = {
+    bookingId,
+    isTbc: !!isTbc,
+    firstName: isTbc ? "TBC" : firstName,
+    lastName: isTbc ? "TBC" : lastName,
+    jobTitle: isTbc ? "TBC" : jobTitle,
+    company: isTbc ? (company || "TBC") : company,
+    workEmail: isTbc ? tbcEmail : workEmail,
+    phone: phone || null,
+    gdprConsent: isTbc ? false : !!gdprConsent,
+    gdprConsentAt: (!isTbc && gdprConsent) ? new Date() : null,
+    isLead: !!isLead,
+    seatIndex: resolvedSeatIndex,
+  };
 
-  res.status(201).json(formatAttendee(attendee));
+  // Upsert: check if an attendee already exists for this booking at this seatIndex
+  // (or as lead if isLead is true). Update instead of inserting to prevent duplicates.
+  const whereClause = !!isLead
+    ? and(eq(attendeesTable.bookingId, bookingId), eq(attendeesTable.isLead, true))
+    : and(eq(attendeesTable.bookingId, bookingId), eq(attendeesTable.seatIndex, resolvedSeatIndex));
+
+  const [existing] = await db.select().from(attendeesTable).where(whereClause);
+
+  let attendee;
+  if (existing) {
+    ([attendee] = await db
+      .update(attendeesTable)
+      .set(values)
+      .where(eq(attendeesTable.id, existing.id))
+      .returning());
+  } else {
+    ([attendee] = await db
+      .insert(attendeesTable)
+      .values(values)
+      .returning());
+  }
+
+  res.status(existing ? 200 : 201).json(formatAttendee(attendee));
 });
 
 router.patch("/bookings/:bookingId/attendees/:attendeeId", async (req, res): Promise<void> => {

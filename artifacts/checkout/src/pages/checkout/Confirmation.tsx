@@ -78,7 +78,9 @@ export default function Confirmation({ booking }: ConfirmationProps) {
           <div>
             <h3 className="text-sm text-muted-foreground font-bold uppercase tracking-wider mb-3">Attendees</h3>
             <div className="space-y-3">
-              {booking.attendees?.map((attendee, i) => (
+              {(booking.attendees?.filter((a, idx, arr) =>
+                arr.findIndex(b => b.seatIndex === a.seatIndex && b.isLead === a.isLead) === idx
+              ) ?? []).map((attendee, i) => (
                 <div key={i} className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-bold">
                     {attendee.firstName.charAt(0)}{attendee.lastName.charAt(0)}

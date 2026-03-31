@@ -1,9 +1,31 @@
 import nodemailer from "nodemailer";
 import { logger } from "./logger";
 import { db } from "@workspace/db";
-import { emailLogsTable, emailTemplatesTable, bookingsTable, attendeesTable, notificationEmailsTable } from "@workspace/db";
+import { emailLogsTable, emailTemplatesTable, bookingsTable, attendeesTable, notificationEmailsTable, eventSettingsTable } from "@workspace/db";
+import type { EventSettings } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { generatePdfReceipt } from "./pdf";
+
+const defaultSettings: Omit<EventSettings, "id" | "updatedAt"> = {
+  eventName: "HR Analytics Summit",
+  eventDate: "3 September 2026",
+  eventVenue: "155 Bishopsgate, London",
+  eventVenuePostcode: "EC2M 3TQ",
+  orgName: "People Strategy Hub Ltd",
+  orgAddress: "London, UK",
+  orgWebsite: "https://www.hranalyticssummit.com",
+  logoDataUrl: null,
+  fromName: "HR Analytics Summit",
+  fromEmail: "noreply@hranalyticssummit.com",
+};
+
+export async function getEventSettings(): Promise<EventSettings> {
+  const [settings] = await db.select().from(eventSettingsTable);
+  if (settings) return settings;
+  // Seed defaults if not present
+  const [inserted] = await db.insert(eventSettingsTable).values(defaultSettings).returning();
+  return inserted;
+}
 
 function createTransporter() {
   const host = process.env.SMTP_HOST;
@@ -47,11 +69,13 @@ async function logEmail(
   }
 }
 
-async function sendMail(options: {
+export async function sendMail(options: {
   to: string;
   subject: string;
   html: string;
   attachments?: Array<{ filename: string; content: Buffer; contentType: string }>;
+  fromName?: string;
+  fromEmail?: string;
 }): Promise<boolean> {
   const transporter = createTransporter();
   if (!transporter) {
@@ -59,9 +83,12 @@ async function sendMail(options: {
     return false;
   }
 
+  const fromName = options.fromName || FROM_NAME;
+  const fromEmail = options.fromEmail || FROM_EMAIL;
+
   try {
     await transporter.sendMail({
-      from: `"${FROM_NAME}" <${FROM_EMAIL}>`,
+      from: `"${fromName}" <${fromEmail}>`,
       to: options.to,
       subject: options.subject,
       html: options.html,
@@ -74,19 +101,44 @@ async function sendMail(options: {
   }
 }
 
-export function wrapInBrandedLayout(content: string, title = "HR Analytics Summit"): string {
+type BrandingSettings = {
+  eventName?: string;
+  eventDate?: string;
+  eventVenue?: string;
+  orgName?: string;
+  orgAddress?: string;
+  orgWebsite?: string;
+  logoDataUrl?: string | null;
+};
+
+export function wrapInBrandedLayout(content: string, settingsOrTitle?: BrandingSettings | string): string {
+  const settings: BrandingSettings = (typeof settingsOrTitle === "object" && settingsOrTitle !== null)
+    ? settingsOrTitle
+    : {};
+
+  const eventName = settings.eventName || "HR Analytics Summit";
+  const eventDate = settings.eventDate || "3 September 2026";
+  const eventVenue = settings.eventVenue || "155 Bishopsgate, London";
+  const orgName = settings.orgName || "People Strategy Hub Ltd";
+  const orgAddress = settings.orgAddress || "London, UK";
+  const orgWebsite = settings.orgWebsite || "https://www.hranalyticssummit.com";
+  const logoDataUrl = settings.logoDataUrl;
+
+  const headerContent = logoDataUrl
+    ? `<img src="${logoDataUrl}" alt="${eventName}" style="max-height:60px;max-width:200px;" />`
+    : `<strong style="font-size: 20px; color: #E74F3E;">${eventName}</strong>`;
+
   return `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${title}</title>
+  <title>${eventName}</title>
   <style>
     body { font-family: 'Figtree', Arial, sans-serif; background: #FCFBFA; margin: 0; padding: 0; color: #000; }
     .wrapper { max-width: 600px; margin: 0 auto; background: #fff; }
     .header { background: #FCFBFA; padding: 24px 32px; border-bottom: 2px solid #E74F3E; text-align: center; }
-    .header img { height: 48px; }
     .content { padding: 32px; }
     .footer { background: #1a1a1a; color: #ccc; padding: 24px 32px; text-align: center; font-size: 13px; }
     .footer a { color: #F48847; text-decoration: none; }
@@ -101,16 +153,16 @@ export function wrapInBrandedLayout(content: string, title = "HR Analytics Summi
 <body>
   <div class="wrapper">
     <div class="header">
-      <strong style="font-size: 20px; color: #E74F3E;">HR Analytics Summit</strong>
-      <div style="font-size: 13px; color: #666; margin-top: 4px;">3 September 2026 · 155 Bishopsgate, London</div>
+      ${headerContent}
+      <div style="font-size: 13px; color: #666; margin-top: 4px;">${eventDate} · ${eventVenue}</div>
     </div>
     <div class="content">
       ${content}
     </div>
     <div class="footer">
-      <p>&copy; 2026 HR Analytics Summit. All rights reserved.</p>
-      <p><a href="https://www.hranalyticssummit.com">www.hranalyticssummit.com</a></p>
-      <p style="font-size: 11px; color: #999;">People Strategy Hub Ltd · London, UK</p>
+      <p>&copy; 2026 ${eventName}. All rights reserved.</p>
+      <p><a href="${orgWebsite}">${orgWebsite.replace(/^https?:\/\//, "")}</a></p>
+      <p style="font-size: 11px; color: #999;">${orgName} · ${orgAddress}</p>
     </div>
   </div>
 </body>
@@ -127,6 +179,8 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
     logger.warn({ bookingId }, "Booking not found for email sending");
     return;
   }
+
+  const settings = await getEventSettings();
 
   const attendees = await db
     .select()
@@ -202,13 +256,13 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
 
     <div class="info-box" style="margin-top: 24px;">
       <strong>Event Details</strong><br>
-      <strong>Date:</strong> 3 September 2026<br>
-      <strong>Venue:</strong> 155 Bishopsgate, London, EC2M 3TQ
+      <strong>Date:</strong> ${settings.eventDate}<br>
+      <strong>Venue:</strong> ${settings.eventVenue}, ${settings.eventVenuePostcode}
     </div>
 
     <p>A PDF VAT receipt is attached to this email for your records.</p>
-    <p>We look forward to seeing you at the HR Analytics Summit!</p>
-  `);
+    <p>We look forward to seeing you at the ${settings.eventName}!</p>
+  `, settings);
 
   let pdfBuffer: Buffer | null = null;
   try {
@@ -229,9 +283,11 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
 
   const confirmSent = await sendMail({
     to: lead.workEmail,
-    subject: `Booking Confirmed — HR Analytics Summit 2026 (${booking.orderReference || `#${bookingId}`})`,
+    subject: `Booking Confirmed — ${settings.eventName} (${booking.orderReference || `#${bookingId}`})`,
     html: confirmationHtml,
     attachments,
+    fromName: settings.fromName,
+    fromEmail: settings.fromEmail,
   });
 
   await logEmail(
@@ -481,16 +537,20 @@ export async function sendWelcomeEmail(
       return;
     }
 
+    const settings = await getEventSettings();
+
     const personalised = template.htmlBody
       .replace(/\{\{firstName\}\}/g, firstName)
       .replace(/\{\{name\}\}/g, firstName);
 
-    const html = wrapInBrandedLayout(personalised);
+    const html = wrapInBrandedLayout(personalised, settings);
 
     const sent = await sendMail({
       to: toEmail,
       subject: template.subject,
       html,
+      fromName: settings.fromName,
+      fromEmail: settings.fromEmail,
     });
 
     await logEmail(

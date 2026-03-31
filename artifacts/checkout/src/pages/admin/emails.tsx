@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
-import { useListEmailLogs, useGetWelcomeEmailTemplate, useUpdateWelcomeEmailTemplate, useResendBookingEmails } from "@workspace/api-client-react";
+import { useListEmailLogs, useResendBookingEmails } from "@workspace/api-client-react";
 import AdminLayout from "@/components/layout/AdminLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -11,21 +10,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useQueryClient } from "@tanstack/react-query";
-import { RefreshCcw, Send, Bold, Italic, Heading2, List, ListOrdered, Link2, Code, RotateCcw, ImageIcon } from "lucide-react";
+import { RefreshCcw, Send, Bold, Italic, Heading2, List, ListOrdered, Link2, Code, RotateCcw, ImageIcon, Upload, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const API_BASE = `${import.meta.env.BASE_URL}api`;
+
+function getAdminToken() {
+  return localStorage.getItem("admin_token") || "";
+}
+
+// ─── TipTap Toolbar ───────────────────────────────────────────────────────────
 
 function TipTapToolbar({ editor, onImageUpload }: { editor: ReturnType<typeof useEditor>; onImageUpload: () => void }) {
   if (!editor) return null;
 
   const handleSetLink = () => {
     const url = window.prompt("Enter URL:");
-    if (url) {
-      editor.chain().focus().setLink({ href: url }).run();
-    } else {
-      editor.chain().focus().unsetLink().run();
-    }
+    if (url) editor.chain().focus().setLink({ href: url }).run();
+    else editor.chain().focus().unsetLink().run();
   };
 
   const btn = (active: boolean, onClick: () => void, title: string, children: React.ReactNode) => (
@@ -58,116 +60,119 @@ function TipTapToolbar({ editor, onImageUpload }: { editor: ReturnType<typeof us
   );
 }
 
-const BRANDED_PREVIEW_WRAPPER = (body: string) => `
-<!DOCTYPE html>
-<html><head><meta charset="UTF-8">
-<style>
-  body{margin:0;background:#FCFBFA;font-family:Figtree,Arial,sans-serif;font-size:15px;color:#000}
-  .wrapper{max-width:600px;margin:40px auto;background:#fff;border:1px solid #e5e5e5}
-  .header{background:#E74F3E;padding:24px 32px;text-align:center}
-  .header strong{font-size:20px;color:#fff;letter-spacing:.5px}
-  .header div{font-size:13px;color:rgba(255,255,255,.8);margin-top:4px}
-  .content{padding:32px}
-  .footer{border-top:1px solid #e5e5e5;padding:20px 32px;text-align:center;font-size:12px;color:#999}
-  .footer a{color:#E74F3E;text-decoration:none}
-</style></head>
-<body>
-<div class="wrapper">
-  <div class="header">
-    <strong>HR Analytics Summit</strong>
-    <div>3 September 2026 · 155 Bishopsgate, London</div>
-  </div>
-  <div class="content">${body}</div>
-  <div class="footer">
-    <p>&copy; 2026 HR Analytics Summit. All rights reserved.</p>
-    <p><a href="https://www.hranalyticssummit.com">www.hranalyticssummit.com</a></p>
-    <p style="font-size:11px;color:#999">People Strategy Hub Ltd · London, UK</p>
-  </div>
-</div>
-</body></html>`;
+// ─── Template Editor ──────────────────────────────────────────────────────────
 
-export default function AdminEmails() {
+type TemplateType = "welcome" | "confirmation";
+
+const TEMPLATE_LABELS: Record<TemplateType, string> = {
+  welcome: "Welcome Email",
+  confirmation: "Booking Confirmation",
+};
+
+const TEMPLATE_VARIABLES: Record<TemplateType, string[]> = {
+  welcome: ["{{firstName}}", "{{name}}"],
+  confirmation: ["{{firstName}}", "{{orderReference}}", "{{passType}}", "{{quantity}}", "{{total}}"],
+};
+
+const TEMPLATE_DESCRIPTIONS: Record<TemplateType, string> = {
+  welcome: "Sent as a personal follow-up after registration. Use this for a warm welcome message.",
+  confirmation: "Sent automatically after every successful booking (card or invoice). Contains the attendee's order details.",
+};
+
+function TemplateEditor({ type, settings }: { type: TemplateType; settings: EventSettingsData | null }) {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState("logs");
-  const [page, setPage] = useState(1);
   const imageInputRef = useRef<HTMLInputElement>(null);
-
-  const { data: logsData, isLoading: logsLoading } = useListEmailLogs(
-    { page, limit: 20 },
-    {
-      query: {
-        queryKey: ["emailLogs", page],
-      }
-    }
-  );
-
-  const { data: templateData, isLoading: templateLoading } = useGetWelcomeEmailTemplate({
-    query: {
-      queryKey: ["welcomeTemplate"],
-    }
-  });
-
-  const updateTemplate = useUpdateWelcomeEmailTemplate();
-  const resendEmails = useResendBookingEmails();
-
   const [subject, setSubject] = useState("");
   const [showPreview, setShowPreview] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [testEmail, setTestEmail] = useState("");
   const [testName, setTestName] = useState("");
   const [isSendingTest, setIsSendingTest] = useState(false);
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
-      Link.configure({ openOnClick: false }),
+      StarterKit.configure({ link: { openOnClick: false } }),
       Image.configure({ inline: false, allowBase64: true }),
     ],
     content: "",
     editorProps: {
-      attributes: {
-        class: "prose prose-sm max-w-none focus:outline-none min-h-[360px] px-4 py-3",
-      },
+      attributes: { class: "prose prose-sm max-w-none focus:outline-none min-h-[360px] px-4 py-3" },
     },
   });
 
-  const handleImageUpload = () => {
-    imageInputRef.current?.click();
-  };
-
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !editor) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const src = ev.target?.result as string;
-      if (src) {
-        editor.chain().focus().setImage({ src }).run();
-      }
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
-  };
-
   useEffect(() => {
-    if (templateData) {
-      setSubject(templateData.subject);
-      if (editor && templateData.htmlBody) {
-        editor.commands.setContent(templateData.htmlBody);
-      }
+    async function loadTemplate() {
+      setIsLoading(true);
+      try {
+        const resp = await fetch(`${API_BASE}/email-templates/${type}`, {
+          headers: { "x-admin-token": getAdminToken() },
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          setSubject(data.subject || "");
+          if (editor && data.htmlBody) editor.commands.setContent(data.htmlBody);
+        }
+      } catch { /* ignore */ }
+      setIsLoading(false);
     }
-  }, [templateData, editor]);
+    if (editor) loadTemplate();
+  }, [type, editor]);
 
-  const handleSaveTemplate = async () => {
-    const htmlBody = editor ? editor.getHTML() : "";
-    await updateTemplate.mutateAsync({
-      data: { subject, htmlBody }
-    });
-    toast({
-      title: "Template Saved",
-      description: "The welcome email template has been updated successfully."
-    });
-    queryClient.invalidateQueries({ queryKey: ["welcomeTemplate"] });
+  const previewHtml = useCallback(() => {
+    if (!settings || !editor) return "";
+    const logoDataUrl = settings.logoDataUrl;
+    const eventName = settings.eventName || "Your Event";
+    const eventDate = settings.eventDate || "";
+    const eventVenue = settings.eventVenue || "";
+    const orgName = settings.orgName || "";
+    const orgAddress = settings.orgAddress || "";
+    const orgWebsite = settings.orgWebsite || "";
+
+    const headerContent = logoDataUrl
+      ? `<img src="${logoDataUrl}" alt="${eventName}" style="max-height:60px;max-width:200px;" />`
+      : `<strong style="font-size:20px;color:#E74F3E;">${eventName}</strong>`;
+
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>
+  body{margin:0;background:#FCFBFA;font-family:Figtree,Arial,sans-serif;font-size:15px;color:#000}
+  .wrapper{max-width:600px;margin:40px auto;background:#fff;border:1px solid #e5e5e5}
+  .header{background:#FCFBFA;padding:24px 32px;border-bottom:2px solid #E74F3E;text-align:center}
+  .content{padding:32px}
+  .footer{background:#1a1a1a;color:#ccc;padding:24px 32px;text-align:center;font-size:12px}
+  .footer a{color:#F48847;text-decoration:none}
+  h2{color:#000}
+  .info-box{background:#FCFBFA;border:1px solid #DEDDDC;padding:16px 20px;border-radius:4px;margin:16px 0}
+</style></head>
+<body><div class="wrapper">
+  <div class="header">
+    ${headerContent}
+    <div style="font-size:13px;color:#666;margin-top:4px">${eventDate}${eventDate && eventVenue ? " · " : ""}${eventVenue}</div>
+  </div>
+  <div class="content">${editor.getHTML()}</div>
+  <div class="footer">
+    <p>&copy; 2026 ${eventName}. All rights reserved.</p>
+    <p><a href="${orgWebsite}">${orgWebsite.replace(/^https?:\/\//, "")}</a></p>
+    <p style="font-size:11px;color:#999">${orgName} · ${orgAddress}</p>
+  </div>
+</div></body></html>`;
+  }, [editor, settings]);
+
+  const handleSave = async () => {
+    if (!editor) return;
+    setIsSaving(true);
+    try {
+      const resp = await fetch(`${API_BASE}/email-templates/${type}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-admin-token": getAdminToken() },
+        body: JSON.stringify({ subject, htmlBody: editor.getHTML() }),
+      });
+      if (!resp.ok) throw new Error("Failed to save");
+      toast({ title: "Template Saved", description: `${TEMPLATE_LABELS[type]} template updated successfully.` });
+    } catch {
+      toast({ title: "Save Failed", description: "Could not save the template.", variant: "destructive" });
+    }
+    setIsSaving(false);
   };
 
   const handleTestSend = async () => {
@@ -177,56 +182,347 @@ export default function AdminEmails() {
     }
     setIsSendingTest(true);
     try {
-      const token = localStorage.getItem("admin_token") || "";
-      const resp = await fetch(`${API_BASE}/email-templates/welcome/test-send`, {
+      const resp = await fetch(`${API_BASE}/email-templates/${type}/test-send`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-token": token,
-        },
+        headers: { "Content-Type": "application/json", "x-admin-token": getAdminToken() },
         body: JSON.stringify({ toEmail: testEmail, toName: testName || "Test User" }),
       });
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({ error: "Unknown error" }));
-        throw new Error((err as { error?: string }).error || "Failed to send");
-      }
-      toast({ title: "Test Email Sent", description: `Test email dispatched to ${testEmail}.` });
-    } catch (e) {
-      toast({ title: "Send Failed", description: e instanceof Error ? e.message : "Failed to send test email.", variant: "destructive" });
-    } finally {
-      setIsSendingTest(false);
+      if (!resp.ok) throw new Error("Failed to send");
+      toast({ title: "Test Email Sent", description: `Test sent to ${testEmail}.` });
+    } catch {
+      toast({ title: "Send Failed", description: "Could not send test email.", variant: "destructive" });
     }
+    setIsSendingTest(false);
   };
+
+  const handleImageUpload = () => imageInputRef.current?.click();
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editor) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const src = ev.target?.result as string;
+      if (src) editor.chain().focus().setImage({ src }).run();
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-20">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white p-6 border border-border shadow-sm space-y-6">
+        <div>
+          <h3 className="text-lg font-bold mb-1">{TEMPLATE_LABELS[type]}</h3>
+          <p className="text-sm text-muted-foreground">{TEMPLATE_DESCRIPTIONS[type]}</p>
+        </div>
+
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-bold uppercase tracking-wider">Subject Line</label>
+            <Input value={subject} onChange={e => setSubject(e.target.value)} className="h-12" />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-bold uppercase tracking-wider">Email Body</label>
+              <Button variant="outline" size="sm" onClick={() => setShowPreview(p => !p)} className="text-xs">
+                {showPreview ? "Edit" : "Preview"}
+              </Button>
+            </div>
+            <div className="p-3 bg-muted/30 border border-border text-sm mb-2 font-mono text-muted-foreground flex flex-wrap gap-2">
+              <span className="font-sans font-semibold text-foreground">Variables:</span>
+              {TEMPLATE_VARIABLES[type].map(v => (
+                <code key={v} className="bg-muted px-1.5 py-0.5 rounded text-xs">{v}</code>
+              ))}
+            </div>
+            <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageFileChange} />
+            {showPreview ? (
+              <iframe
+                className="border border-border rounded w-full min-h-[500px]"
+                sandbox="allow-same-origin"
+                srcDoc={previewHtml()}
+                title="Email Preview"
+              />
+            ) : (
+              <div className="border border-border rounded overflow-hidden bg-white">
+                <TipTapToolbar editor={editor} onImageUpload={handleImageUpload} />
+                <EditorContent editor={editor} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-4 border-t border-border">
+          <Button onClick={handleSave} disabled={isSaving} size="lg" className="px-8">
+            {isSaving ? "Saving..." : "Save Template"}
+          </Button>
+        </div>
+      </div>
+
+      <div className="bg-white p-6 border border-border shadow-sm space-y-4">
+        <div>
+          <h3 className="text-base font-bold mb-1">Send Test Email</h3>
+          <p className="text-sm text-muted-foreground">Verify the current saved template before going live.</p>
+        </div>
+        <div className="flex gap-3 flex-wrap">
+          <Input type="text" placeholder="Recipient name (optional)" value={testName} onChange={e => setTestName(e.target.value)} className="h-10 w-56" />
+          <Input type="email" placeholder="test@example.com" value={testEmail} onChange={e => setTestEmail(e.target.value)} className="h-10 w-64" />
+          <Button onClick={handleTestSend} disabled={isSendingTest} className="h-10 px-6">
+            <Send className="w-4 h-4 mr-2" />
+            {isSendingTest ? "Sending..." : "Send Test"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Branding Settings ────────────────────────────────────────────────────────
+
+type EventSettingsData = {
+  id: number;
+  eventName: string;
+  eventDate: string;
+  eventVenue: string;
+  eventVenuePostcode: string;
+  orgName: string;
+  orgAddress: string;
+  orgWebsite: string;
+  logoDataUrl: string | null;
+  fromName: string;
+  fromEmail: string;
+};
+
+function BrandingSettings() {
+  const { toast } = useToast();
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [settings, setSettings] = useState<EventSettingsData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    async function load() {
+      setIsLoading(true);
+      try {
+        const resp = await fetch(`${API_BASE}/admin/event-settings`, {
+          headers: { "x-admin-token": getAdminToken() },
+        });
+        if (resp.ok) setSettings(await resp.json());
+      } catch { /* ignore */ }
+      setIsLoading(false);
+    }
+    load();
+  }, []);
+
+  const handleSave = async () => {
+    if (!settings) return;
+    setIsSaving(true);
+    try {
+      const resp = await fetch(`${API_BASE}/admin/event-settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-admin-token": getAdminToken() },
+        body: JSON.stringify(settings),
+      });
+      if (!resp.ok) throw new Error("Failed to save");
+      const updated = await resp.json();
+      setSettings(updated);
+      toast({ title: "Settings Saved", description: "Branding and event settings have been updated. All future emails will use the new settings." });
+    } catch {
+      toast({ title: "Save Failed", description: "Could not save settings.", variant: "destructive" });
+    }
+    setIsSaving(false);
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !settings) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const src = ev.target?.result as string;
+      if (src) setSettings(s => s ? { ...s, logoDataUrl: src } : s);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const set = (key: keyof EventSettingsData, value: string | null) => {
+    setSettings(s => s ? { ...s, [key]: value } : s);
+  };
+
+  if (isLoading || !settings) {
+    return (
+      <div className="flex justify-center py-20">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  const field = (label: string, key: keyof EventSettingsData, placeholder?: string, hint?: string) => (
+    <div className="space-y-1">
+      <label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">{label}</label>
+      <Input
+        value={(settings[key] as string) || ""}
+        onChange={e => set(key, e.target.value)}
+        placeholder={placeholder}
+        className="h-11"
+      />
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Logo */}
+      <div className="bg-white p-6 border border-border shadow-sm space-y-4">
+        <div>
+          <h3 className="text-lg font-bold mb-1">Logo</h3>
+          <p className="text-sm text-muted-foreground">Upload your logo — it will appear at the top of all outgoing emails in place of the text header.</p>
+        </div>
+        <div className="flex items-center gap-6">
+          {settings.logoDataUrl ? (
+            <div className="relative border border-border rounded p-3 bg-muted/20">
+              <img src={settings.logoDataUrl} alt="Logo preview" className="max-h-16 max-w-48 object-contain" />
+              <button
+                type="button"
+                onClick={() => set("logoDataUrl", null)}
+                className="absolute -top-2 -right-2 w-5 h-5 bg-destructive text-white rounded-full flex items-center justify-center text-xs"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ) : (
+            <div className="border-2 border-dashed border-border rounded p-6 text-center text-muted-foreground w-48">
+              <ImageIcon className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p className="text-xs">No logo uploaded</p>
+            </div>
+          )}
+          <div>
+            <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+            <Button variant="outline" onClick={() => logoInputRef.current?.click()} className="gap-2">
+              <Upload className="w-4 h-4" />
+              {settings.logoDataUrl ? "Replace Logo" : "Upload Logo"}
+            </Button>
+            <p className="text-xs text-muted-foreground mt-2">PNG, JPG or SVG recommended. Max 2MB.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Event Details */}
+      <div className="bg-white p-6 border border-border shadow-sm space-y-4">
+        <h3 className="text-lg font-bold">Event Details</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {field("Event Name", "eventName", "HR Analytics Summit", "Appears in email subject lines and body text.")}
+          {field("Event Date", "eventDate", "3 September 2026")}
+          {field("Venue", "eventVenue", "155 Bishopsgate, London")}
+          {field("Venue Postcode", "eventVenuePostcode", "EC2M 3TQ")}
+        </div>
+      </div>
+
+      {/* Organisation */}
+      <div className="bg-white p-6 border border-border shadow-sm space-y-4">
+        <h3 className="text-lg font-bold">Organisation</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {field("Organisation Name", "orgName", "People Strategy Hub Ltd", "Shown in email footers.")}
+          {field("Organisation Address", "orgAddress", "London, UK")}
+          {field("Website URL", "orgWebsite", "https://www.hranalyticssummit.com")}
+        </div>
+      </div>
+
+      {/* Sender Details */}
+      <div className="bg-white p-6 border border-border shadow-sm space-y-4">
+        <div>
+          <h3 className="text-lg font-bold mb-1">Sender Details</h3>
+          <p className="text-sm text-muted-foreground">The display name and address that appears in recipients' inboxes. Note: the SMTP server must be configured to allow this sender address.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {field("Sender Name", "fromName", "HR Analytics Summit", 'Shown as the "From" name in email clients.')}
+          {field("Sender Email", "fromEmail", "noreply@hranalyticssummit.com", "Must match your SMTP authentication.")}
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <Button onClick={handleSave} disabled={isSaving} size="lg" className="px-10">
+          {isSaving ? "Saving..." : "Save All Settings"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
+export default function AdminEmails() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState("branding");
+  const [page, setPage] = useState(1);
+  const [eventSettings, setEventSettings] = useState<EventSettingsData | null>(null);
+
+  const { data: logsData, isLoading: logsLoading } = useListEmailLogs(
+    { page, limit: 20 },
+    { query: { queryKey: ["emailLogs", page] } }
+  );
+
+  const resendEmails = useResendBookingEmails();
+
+  // Load event settings for template preview
+  useEffect(() => {
+    async function load() {
+      try {
+        const resp = await fetch(`${API_BASE}/admin/event-settings`, {
+          headers: { "x-admin-token": getAdminToken() },
+        });
+        if (resp.ok) setEventSettings(await resp.json());
+      } catch { /* ignore */ }
+    }
+    load();
+  }, []);
 
   const handleResend = async (bookingId: number) => {
     try {
       await resendEmails.mutateAsync({ bookingId });
-      toast({
-        title: "Emails Resent",
-        description: `Emails for booking #${bookingId} have been queued for resending.`
-      });
+      toast({ title: "Emails Resent", description: `Confirmation emails for booking #${bookingId} resent.` });
     } catch {
-      toast({
-        title: "Error",
-        description: "Failed to resend emails.",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Failed to resend emails.", variant: "destructive" });
     }
   };
 
   return (
-    <AdminLayout title="Email Management">
+    <AdminLayout title="Email Communications">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="bg-white border border-border h-12 w-full justify-start rounded-none mb-6">
-          <TabsTrigger value="logs" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-8 rounded-none">Email Logs</TabsTrigger>
-          <TabsTrigger value="template" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-8 rounded-none">Welcome Template</TabsTrigger>
+        <TabsList className="bg-white border border-border h-12 w-full justify-start rounded-none mb-6 overflow-x-auto">
+          <TabsTrigger value="branding" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-6 rounded-none whitespace-nowrap">Branding & Settings</TabsTrigger>
+          <TabsTrigger value="welcome" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-6 rounded-none whitespace-nowrap">Welcome Email</TabsTrigger>
+          <TabsTrigger value="confirmation" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-6 rounded-none whitespace-nowrap">Booking Confirmation</TabsTrigger>
+          <TabsTrigger value="logs" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-6 rounded-none whitespace-nowrap">Email Logs</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="branding">
+          <BrandingSettings />
+        </TabsContent>
+
+        <TabsContent value="welcome">
+          <TemplateEditor type="welcome" settings={eventSettings} />
+        </TabsContent>
+
+        <TabsContent value="confirmation">
+          <TemplateEditor type="confirmation" settings={eventSettings} />
+        </TabsContent>
 
         <TabsContent value="logs">
           <div className="bg-white border border-border shadow-sm">
             {logsLoading ? (
               <div className="flex justify-center py-20">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
               </div>
             ) : (
               <>
@@ -236,7 +532,7 @@ export default function AdminEmails() {
                       <TableHead>Date</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Recipient</TableHead>
-                      <TableHead>Booking Ref</TableHead>
+                      <TableHead>Booking #</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -249,13 +545,16 @@ export default function AdminEmails() {
                         <TableCell>{log.recipient}</TableCell>
                         <TableCell>{log.bookingId || "-"}</TableCell>
                         <TableCell>
-                          <Badge variant={log.status === 'sent' ? 'default' : log.status === 'failed' ? 'destructive' : 'secondary'} className="uppercase text-[10px]">
+                          <Badge
+                            variant={log.status === "sent" ? "default" : log.status === "failed" ? "destructive" : "secondary"}
+                            className="uppercase text-[10px]"
+                          >
                             {log.status}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           {log.bookingId && (
-                            <Button variant="ghost" size="sm" onClick={() => handleResend(log.bookingId!)} className="h-8 px-2" title="Resend all emails for this booking">
+                            <Button variant="ghost" size="sm" onClick={() => handleResend(log.bookingId!)} className="h-8 px-2">
                               <RefreshCcw className="w-4 h-4 mr-2" /> Resend
                             </Button>
                           )}
@@ -275,7 +574,7 @@ export default function AdminEmails() {
                 {logsData && logsData.total > 0 && (
                   <div className="p-4 border-t border-border flex justify-between items-center bg-muted/20">
                     <p className="text-sm text-muted-foreground">
-                      Showing {(page - 1) * logsData.limit + 1} to {Math.min(page * logsData.limit, logsData.total)} of {logsData.total}
+                      Showing {(page - 1) * logsData.limit + 1}–{Math.min(page * logsData.limit, logsData.total)} of {logsData.total}
                     </p>
                     <div className="flex gap-2">
                       <Button variant="outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Previous</Button>
@@ -286,99 +585,6 @@ export default function AdminEmails() {
               </>
             )}
           </div>
-        </TabsContent>
-
-        <TabsContent value="template">
-          {templateLoading ? (
-            <div className="flex justify-center py-20">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="bg-white p-6 border border-border shadow-sm space-y-6">
-                <div>
-                  <h3 className="text-lg font-bold mb-1">Welcome Email Template</h3>
-                  <p className="text-sm text-muted-foreground">Sent to all attendees upon successful registration. Edit the content below then save.</p>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold uppercase tracking-wider">Subject Line</label>
-                    <Input
-                      value={subject}
-                      onChange={e => setSubject(e.target.value)}
-                      className="h-12"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm font-bold uppercase tracking-wider">Email Body</label>
-                      <Button variant="outline" size="sm" onClick={() => setShowPreview(p => !p)} className="text-xs">
-                        {showPreview ? "Edit" : "Preview HTML"}
-                      </Button>
-                    </div>
-                    <div className="p-3 bg-muted/30 border border-border text-sm mb-2 font-mono text-muted-foreground">
-                      Variables: {`{{firstName}}`}, {`{{lastName}}`}, {`{{passType}}`}, {`{{orderReference}}`}
-                    </div>
-                    <input
-                      ref={imageInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleImageFileChange}
-                    />
-                    {showPreview ? (
-                      <iframe
-                        className="border border-border rounded w-full min-h-[500px]"
-                        sandbox="allow-same-origin"
-                        srcDoc={BRANDED_PREVIEW_WRAPPER(editor ? editor.getHTML() : "")}
-                        title="Email Preview"
-                      />
-                    ) : (
-                      <div className="border border-border rounded overflow-hidden bg-white">
-                        <TipTapToolbar editor={editor} onImageUpload={handleImageUpload} />
-                        <EditorContent editor={editor} />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex justify-end pt-4 border-t border-border">
-                  <Button onClick={handleSaveTemplate} disabled={updateTemplate.isPending} size="lg" className="px-8">
-                    {updateTemplate.isPending ? "Saving..." : "Save Template"}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="bg-white p-6 border border-border shadow-sm space-y-4">
-                <div>
-                  <h3 className="text-base font-bold mb-1">Send Test Email</h3>
-                  <p className="text-sm text-muted-foreground">Send the current saved template to a test address to verify formatting before going live.</p>
-                </div>
-                <div className="flex gap-3 flex-wrap">
-                  <Input
-                    type="text"
-                    placeholder="Recipient name (optional)"
-                    value={testName}
-                    onChange={e => setTestName(e.target.value)}
-                    className="h-10 w-56"
-                  />
-                  <Input
-                    type="email"
-                    placeholder="test@example.com"
-                    value={testEmail}
-                    onChange={e => setTestEmail(e.target.value)}
-                    className="h-10 w-64"
-                  />
-                  <Button onClick={handleTestSend} disabled={isSendingTest} className="h-10 px-6">
-                    <Send className="w-4 h-4 mr-2" />
-                    {isSendingTest ? "Sending..." : "Send Test"}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
         </TabsContent>
       </Tabs>
     </AdminLayout>

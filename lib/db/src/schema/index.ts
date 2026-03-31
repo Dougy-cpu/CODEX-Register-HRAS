@@ -6,3 +6,4 @@ export * from "./email-templates";
 export * from "./email-logs";
 export * from "./notification-emails";
 export * from "./pass-inventory";
+export * from "./event-settings";

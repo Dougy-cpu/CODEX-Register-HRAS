@@ -1,8 +1,8 @@
 import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { emailTemplatesTable, emailLogsTable } from "@workspace/db";
-import { sendWelcomeEmail, wrapInBrandedLayout } from "../lib/email";
+import { emailTemplatesTable, emailLogsTable, eventSettingsTable } from "@workspace/db";
+import { sendWelcomeEmail, wrapInBrandedLayout, getEventSettings } from "../lib/email";
 import { adminAuth } from "../middleware/admin-auth";
 
 const router: IRouter = Router();
@@ -21,21 +21,113 @@ function formatLog(l: typeof emailLogsTable.$inferSelect) {
   };
 }
 
-router.get("/email-templates/welcome", async (_req, res): Promise<void> => {
-  const [template] = await db
+// ─── Event Settings ───────────────────────────────────────────────────────────
+
+router.get("/admin/event-settings", adminAuth, async (_req, res): Promise<void> => {
+  const settings = await getEventSettings();
+  res.json({
+    ...settings,
+    updatedAt: settings.updatedAt.toISOString(),
+  });
+});
+
+router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> => {
+  const {
+    eventName, eventDate, eventVenue, eventVenuePostcode,
+    orgName, orgAddress, orgWebsite, logoDataUrl,
+    fromName, fromEmail,
+  } = req.body;
+
+  const existing = await db.select().from(eventSettingsTable);
+
+  let updated;
+  if (existing.length > 0) {
+    ([updated] = await db
+      .update(eventSettingsTable)
+      .set({
+        ...(eventName !== undefined && { eventName }),
+        ...(eventDate !== undefined && { eventDate }),
+        ...(eventVenue !== undefined && { eventVenue }),
+        ...(eventVenuePostcode !== undefined && { eventVenuePostcode }),
+        ...(orgName !== undefined && { orgName }),
+        ...(orgAddress !== undefined && { orgAddress }),
+        ...(orgWebsite !== undefined && { orgWebsite }),
+        ...(logoDataUrl !== undefined && { logoDataUrl }),
+        ...(fromName !== undefined && { fromName }),
+        ...(fromEmail !== undefined && { fromEmail }),
+      })
+      .where(eq(eventSettingsTable.id, existing[0].id))
+      .returning());
+  } else {
+    ([updated] = await db
+      .insert(eventSettingsTable)
+      .values({
+        eventName: eventName || "HR Analytics Summit",
+        eventDate: eventDate || "3 September 2026",
+        eventVenue: eventVenue || "155 Bishopsgate, London",
+        eventVenuePostcode: eventVenuePostcode || "EC2M 3TQ",
+        orgName: orgName || "People Strategy Hub Ltd",
+        orgAddress: orgAddress || "London, UK",
+        orgWebsite: orgWebsite || "https://www.hranalyticssummit.com",
+        logoDataUrl: logoDataUrl || null,
+        fromName: fromName || "HR Analytics Summit",
+        fromEmail: fromEmail || "noreply@hranalyticssummit.com",
+      })
+      .returning());
+  }
+
+  res.json({
+    ...updated,
+    updatedAt: updated.updatedAt.toISOString(),
+  });
+});
+
+// ─── Generic Template Routes ──────────────────────────────────────────────────
+
+router.get("/email-templates/:type", async (req, res): Promise<void> => {
+  const type = req.params.type as "welcome" | "confirmation";
+  if (!["welcome", "confirmation"].includes(type)) {
+    res.status(400).json({ error: "Invalid template type" });
+    return;
+  }
+
+  let [template] = await db
     .select()
     .from(emailTemplatesTable)
-    .where(eq(emailTemplatesTable.type, "welcome"));
+    .where(eq(emailTemplatesTable.type, type));
 
   if (!template) {
-    res.status(404).json({ error: "Welcome email template not found" });
-    return;
+    const defaults: Record<string, { subject: string; htmlBody: string }> = {
+      welcome: {
+        subject: "Welcome to HR Analytics Summit 2026!",
+        htmlBody: "<h2>Welcome, {{firstName}}!</h2><p>We're thrilled to have you join us at the HR Analytics Summit 2026. Your booking is confirmed and we can't wait to see you there.</p><p>If you have any questions in the meantime, don't hesitate to reach out.</p><p>See you on 3 September!</p>",
+      },
+      confirmation: {
+        subject: "Booking Confirmed — HR Analytics Summit 2026",
+        htmlBody: "<h2>Booking Confirmed, {{firstName}}!</h2><p>Thank you for registering. Your order reference is <strong>{{orderReference}}</strong>.</p><p>You have booked <strong>{{quantity}}</strong> {{passType}} pass(es). A full VAT receipt is attached to this email.</p><p>We look forward to seeing you at the HR Analytics Summit!</p>",
+      },
+    };
+    const def = defaults[type];
+    if (!def) {
+      res.status(404).json({ error: `${type} email template not found` });
+      return;
+    }
+    [template] = await db
+      .insert(emailTemplatesTable)
+      .values({ type: type as "welcome" | "confirmation", subject: def.subject, htmlBody: def.htmlBody })
+      .returning();
   }
 
   res.json(formatTemplate(template));
 });
 
-router.put("/email-templates/welcome", adminAuth, async (req, res): Promise<void> => {
+router.put("/email-templates/:type", adminAuth, async (req, res): Promise<void> => {
+  const type = req.params.type as "welcome" | "confirmation";
+  if (!["welcome", "confirmation"].includes(type)) {
+    res.status(400).json({ error: "Invalid template type" });
+    return;
+  }
+
   const { subject, htmlBody } = req.body;
 
   if (!subject || !htmlBody) {
@@ -46,26 +138,27 @@ router.put("/email-templates/welcome", adminAuth, async (req, res): Promise<void
   const existing = await db
     .select()
     .from(emailTemplatesTable)
-    .where(eq(emailTemplatesTable.type, "welcome"));
+    .where(eq(emailTemplatesTable.type, type));
 
   let updated;
   if (existing.length > 0) {
-    [updated] = await db
+    ([updated] = await db
       .update(emailTemplatesTable)
       .set({ subject, htmlBody })
-      .where(eq(emailTemplatesTable.type, "welcome"))
-      .returning();
+      .where(eq(emailTemplatesTable.type, type))
+      .returning());
   } else {
-    [updated] = await db
+    ([updated] = await db
       .insert(emailTemplatesTable)
-      .values({ type: "welcome", subject, htmlBody })
-      .returning();
+      .values({ type, subject, htmlBody })
+      .returning());
   }
 
   res.json(formatTemplate(updated));
 });
 
-router.post("/email-templates/welcome/test-send", adminAuth, async (req, res): Promise<void> => {
+router.post("/email-templates/:type/test-send", adminAuth, async (req, res): Promise<void> => {
+  const type = req.params.type as "welcome" | "confirmation";
   const { toEmail, toName } = req.body;
 
   if (!toEmail) {
@@ -73,10 +166,37 @@ router.post("/email-templates/welcome/test-send", adminAuth, async (req, res): P
     return;
   }
 
-  await sendWelcomeEmail(null, toName || "Test User", toEmail);
+  if (type === "welcome") {
+    await sendWelcomeEmail(null, toName || "Test User", toEmail);
+  } else {
+    // For other types, fetch template and send preview
+    const [template] = await db
+      .select()
+      .from(emailTemplatesTable)
+      .where(eq(emailTemplatesTable.type, type));
+
+    if (!template) {
+      res.status(404).json({ error: `No ${type} template found` });
+      return;
+    }
+
+    const { sendMail } = await import("../lib/email");
+    const personalised = template.htmlBody
+      .replace(/\{\{firstName\}\}/g, toName || "Test User")
+      .replace(/\{\{name\}\}/g, toName || "Test User")
+      .replace(/\{\{orderReference\}\}/g, "HRS-2026-TEST")
+      .replace(/\{\{passType\}\}/g, "Single Pass")
+      .replace(/\{\{quantity\}\}/g, "1")
+      .replace(/\{\{total\}\}/g, "£238.80");
+
+    const html = wrapInBrandedLayout(personalised);
+    await sendMail({ to: toEmail, subject: `[TEST] ${template.subject}`, html });
+  }
 
   res.json({ success: true, message: `Test email sent to ${toEmail}` });
 });
+
+// ─── Email Logs ───────────────────────────────────────────────────────────────
 
 router.get("/admin/email-logs", adminAuth, async (req, res): Promise<void> => {
   const page = parseInt(req.query.page as string || "1", 10);
