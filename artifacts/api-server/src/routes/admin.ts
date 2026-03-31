@@ -7,6 +7,7 @@ import {
   promoCodesTable,
   discountTiersTable,
   notificationEmailsTable,
+  passInventoryTable,
 } from "@workspace/db";
 import { adminAuth, deriveAdminToken, getAdminPassword } from "../middleware/admin-auth";
 
@@ -347,6 +348,34 @@ router.put("/admin/discount-tiers", adminAuth, async (req, res): Promise<void> =
     .returning();
 
   res.json(inserted.map(formatTier));
+});
+
+router.get("/admin/passes/inventory", adminAuth, async (_req, res): Promise<void> => {
+  const rows = await db.select().from(passInventoryTable);
+  res.json(rows);
+});
+
+router.put("/admin/passes/inventory/:passType", adminAuth, async (req, res): Promise<void> => {
+  const passType = req.params.passType;
+  if (!["single", "business"].includes(passType)) {
+    res.status(400).json({ error: "Invalid pass type" });
+    return;
+  }
+  const { remaining } = req.body;
+  const val = remaining === null || remaining === "" ? null : parseInt(remaining, 10);
+  if (val !== null && (isNaN(val) || val < 0)) {
+    res.status(400).json({ error: "remaining must be a non-negative integer or null" });
+    return;
+  }
+  await db
+    .insert(passInventoryTable)
+    .values({ passType, remaining: val, updatedAt: new Date() })
+    .onConflictDoUpdate({
+      target: passInventoryTable.passType,
+      set: { remaining: val, updatedAt: new Date() },
+    });
+  const [row] = await db.select().from(passInventoryTable).where(eq(passInventoryTable.passType, passType));
+  res.json(row);
 });
 
 router.get("/admin/notification-emails", adminAuth, async (_req, res): Promise<void> => {

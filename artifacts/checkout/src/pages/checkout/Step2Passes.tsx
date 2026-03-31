@@ -1,11 +1,9 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
 import { useUpdateBooking, useCalculatePricing, type PricingRequestPassType } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Check, Minus, Plus, Users } from "lucide-react";
+import { Check, Minus, Plus, Users, Flame, AlertCircle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { BookingWithAttendees } from "@/types/booking";
 
@@ -25,12 +23,55 @@ const SINGLE_BENEFITS = [
   "Post-Event Content",
 ];
 
-function getDiscountLabel(qty: number): string | null {
+const BUSINESS_EXTRA_BENEFITS = [
+  "Exclusive Attendee Report",
+  "Company Branding at the Summit",
+];
+
+function getHRDiscountLabel(qty: number): string | null {
   if (qty >= 12) return "20% off";
   if (qty >= 8) return "15% off";
   if (qty >= 4) return "10% off";
   if (qty === 3) return "Most Popular";
   return null;
+}
+
+function getBusinessDiscountLabel(qty: number): string | null {
+  if (qty >= 5) return "15% off";
+  if (qty >= 2) return "10% off";
+  return null;
+}
+
+interface InventoryBadgeProps {
+  remaining: number | null;
+  className?: string;
+}
+
+function InventoryBadge({ remaining, className = "" }: InventoryBadgeProps) {
+  if (remaining === null) return null;
+
+  if (remaining <= 5) {
+    return (
+      <div className={`flex items-center gap-1.5 text-xs font-bold text-red-700 bg-red-50 border border-red-200 px-2.5 py-1 rounded-sm ${className}`}>
+        <Flame className="w-3.5 h-3.5" />
+        Only {remaining} {remaining === 1 ? "spot" : "spots"} left!
+      </div>
+    );
+  }
+  if (remaining <= 20) {
+    return (
+      <div className={`flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-sm ${className}`}>
+        <AlertCircle className="w-3.5 h-3.5" />
+        {remaining} spots remaining — selling fast
+      </div>
+    );
+  }
+  return (
+    <div className={`flex items-center gap-1.5 text-xs font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-sm ${className}`}>
+      <AlertCircle className="w-3.5 h-3.5" />
+      {remaining} spots remaining
+    </div>
+  );
 }
 
 export default function Step2Passes({ booking }: Step2PassesProps) {
@@ -41,19 +82,23 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
   const resolveInitialPass = (): PricingRequestPassType => {
     const stored = booking.passType as PricingRequestPassType;
     if (isVendor) return "business";
-    // HR no longer has team pass — map it back to single
     if (isHR && (stored === "business" || stored === "team")) return "single";
     return stored || "single";
   };
 
   const [selectedPass] = useState<PricingRequestPassType>(resolveInitialPass);
-  const [quantity, setQuantity] = useState<number>(() => {
-    // If they previously had team pass (qty 3), preserve 3; else use stored
-    return booking.quantity || 1;
-  });
+  const [quantity, setQuantity] = useState<number>(() => booking.quantity || 1);
+  const [inventory, setInventory] = useState<Record<string, number | null>>({ single: null, business: null });
 
   const calculatePricingMutation = useCalculatePricing();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    fetch("/api/passes/inventory")
+      .then(res => res.ok ? res.json() : {})
+      .then(data => setInventory(data))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     calculatePricingMutation.mutate({
@@ -71,7 +116,9 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
     queryClient.invalidateQueries({ queryKey: ["booking"] });
   };
 
-  const discountLabel = getDiscountLabel(quantity);
+  const hrDiscountLabel = getHRDiscountLabel(quantity);
+  const businessDiscountLabel = getBusinessDiscountLabel(quantity);
+  const currentInventory = inventory[isHR ? "single" : "business"];
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -86,194 +133,217 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
 
       {/* HR: Single pass with quantity picker */}
       {isHR && (
-        <div className="space-y-6">
-          {/* Pass card — always selected for HR */}
-          <Card className="relative p-6 border-2 border-primary bg-primary/5">
-            <div className="flex flex-col md:flex-row md:items-start gap-6">
-              <div className="flex-1">
-                <h3 className="text-2xl font-bold mb-2">HR Professional Pass</h3>
-                <div className="flex items-baseline gap-2 mb-1">
-                  <span className="text-3xl font-bold">£199</span>
-                  <span className="text-sm text-muted-foreground line-through">£429</span>
-                  <span className="text-sm font-bold text-primary">54% off</span>
-                </div>
-                <p className="text-sm text-muted-foreground mb-4">Per ticket, ex VAT</p>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {SINGLE_BENEFITS.map((b) => (
-                    <div key={b} className="flex items-start gap-2 text-sm">
-                      <Check className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                      <span>{b}</span>
-                    </div>
-                  ))}
-                </div>
+        <Card className="relative p-6 border-2 border-primary bg-primary/5">
+          <div className="flex flex-col md:flex-row md:items-start gap-6">
+            {/* Pass details */}
+            <div className="flex-1">
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <h3 className="text-2xl font-bold">HR Professional Pass</h3>
+                <InventoryBadge remaining={inventory.single} />
               </div>
+              <div className="flex items-baseline gap-2 mb-1">
+                <span className="text-3xl font-bold">£199</span>
+                <span className="text-sm text-muted-foreground line-through">£429</span>
+                <span className="text-sm font-bold text-primary">54% off</span>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">Per ticket, ex VAT</p>
 
-              {/* Quantity picker */}
-              <div className="md:w-64 shrink-0">
-                <p className="text-sm font-semibold mb-3 text-foreground">How many tickets?</p>
-
-                {/* Most popular shortcut */}
-                <button
-                  type="button"
-                  onClick={() => setQuantity(3)}
-                  className={`w-full flex items-center justify-between gap-2 px-4 py-3 rounded-sm border-2 mb-3 text-sm font-semibold transition-all ${
-                    quantity === 3
-                      ? "border-primary bg-primary text-white"
-                      : "border-primary/40 bg-primary/5 text-primary hover:border-primary hover:bg-primary/10"
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <Users className="w-4 h-4" />
-                    3 tickets — Most Popular
-                  </span>
-                  {quantity === 3 && <Check className="w-4 h-4" />}
-                </button>
-
-                {/* Quantity stepper */}
-                <div className="flex items-center border border-border bg-white rounded-sm overflow-hidden mb-3">
-                  <button
-                    type="button"
-                    className="flex-none w-11 h-11 flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors disabled:opacity-30"
-                    onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                    disabled={quantity <= 1}
-                  >
-                    <Minus className="w-4 h-4" />
-                  </button>
-                  <div className="flex-1 text-center font-bold text-lg leading-none py-3">
-                    {quantity}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {SINGLE_BENEFITS.map((b) => (
+                  <div key={b} className="flex items-start gap-2 text-sm">
+                    <Check className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                    <span>{b}</span>
                   </div>
-                  <button
-                    type="button"
-                    className="flex-none w-11 h-11 flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
-                    onClick={() => setQuantity(q => Math.min(20, q + 1))}
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {/* Discount tiers callout */}
-                <div className="space-y-1.5 text-xs">
-                  {[
-                    { label: "1–2 tickets", note: "£199/ticket" },
-                    { label: "3 tickets", note: "Most Popular", highlight: true },
-                    { label: "4–7 tickets", note: "10% off per ticket" },
-                    { label: "8–11 tickets", note: "15% off per ticket" },
-                    { label: "12+ tickets", note: "20% off per ticket" },
-                  ].map(({ label, note, highlight }) => {
-                    const active =
-                      (label === "1–2 tickets" && quantity <= 2) ||
-                      (label === "3 tickets" && quantity === 3) ||
-                      (label === "4–7 tickets" && quantity >= 4 && quantity <= 7) ||
-                      (label === "8–11 tickets" && quantity >= 8 && quantity <= 11) ||
-                      (label === "12+ tickets" && quantity >= 12);
-                    return (
-                      <div
-                        key={label}
-                        className={`flex justify-between px-2 py-1 rounded-sm transition-colors ${
-                          active
-                            ? highlight
-                              ? "bg-accent/60 text-foreground font-semibold"
-                              : "bg-muted text-foreground font-semibold"
-                            : "text-muted-foreground"
-                        }`}
-                      >
-                        <span>{label}</span>
-                        <span className={highlight && active ? "text-primary font-bold" : ""}>{note}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+                ))}
               </div>
             </div>
-          </Card>
-        </div>
+
+            {/* Quantity picker */}
+            <div className="md:w-64 shrink-0">
+              <p className="text-sm font-semibold mb-3">How many tickets?</p>
+
+              {/* 3 tickets shortcut */}
+              <button
+                type="button"
+                onClick={() => setQuantity(3)}
+                className={`w-full flex items-center justify-between gap-2 px-4 py-3 rounded-sm border-2 mb-3 text-sm font-semibold transition-all ${
+                  quantity === 3
+                    ? "border-primary bg-primary text-white"
+                    : "border-primary/40 bg-primary/5 text-primary hover:border-primary hover:bg-primary/10"
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  3 tickets — Most Popular
+                </span>
+                {quantity === 3 && <Check className="w-4 h-4" />}
+              </button>
+
+              {/* Stepper */}
+              <div className="flex items-center border border-border bg-white rounded-sm overflow-hidden mb-3">
+                <button
+                  type="button"
+                  className="flex-none w-11 h-11 flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors disabled:opacity-30"
+                  onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                  disabled={quantity <= 1}
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <div className="flex-1 text-center font-bold text-lg py-3">
+                  {quantity}
+                </div>
+                <button
+                  type="button"
+                  className="flex-none w-11 h-11 flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
+                  onClick={() => setQuantity(q => Math.min(20, q + 1))}
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Tier table */}
+              <div className="space-y-1 text-xs">
+                {[
+                  { label: "1–2 tickets", note: "£199/ticket", test: (q: number) => q <= 2 },
+                  { label: "3 tickets", note: "Most Popular", highlight: true, test: (q: number) => q === 3 },
+                  { label: "4–7 tickets", note: "10% off", test: (q: number) => q >= 4 && q <= 7 },
+                  { label: "8–11 tickets", note: "15% off", test: (q: number) => q >= 8 && q <= 11 },
+                  { label: "12+ tickets", note: "20% off", test: (q: number) => q >= 12 },
+                ].map(({ label, note, highlight, test }) => {
+                  const active = test(quantity);
+                  return (
+                    <div
+                      key={label}
+                      className={`flex justify-between px-2 py-1 rounded-sm transition-colors ${
+                        active
+                          ? highlight
+                            ? "bg-accent/60 text-foreground font-semibold"
+                            : "bg-muted text-foreground font-semibold"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      <span>{label}</span>
+                      <span className={highlight && active ? "text-primary font-bold" : ""}>{note}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </Card>
       )}
 
-      {/* Vendor: Business Pass only */}
+      {/* Vendor: Business Pass with quantity + discounts */}
       {isVendor && (
-        <div className="flex justify-center">
-          <Card className="relative p-6 border-2 border-primary bg-primary/5 max-w-md w-full">
-            <div className="mt-2 mb-4">
-              <h3 className="text-2xl font-bold mb-1">Business Pass</h3>
-              <p className="text-sm text-muted-foreground mb-3">For Consultants &amp; Vendors</p>
-              <div className="flex items-baseline gap-2">
+        <Card className="relative p-6 border-2 border-primary bg-primary/5">
+          <div className="flex flex-col md:flex-row md:items-start gap-6">
+            {/* Pass details */}
+            <div className="flex-1">
+              <div className="flex items-start justify-between gap-3 mb-1">
+                <h3 className="text-2xl font-bold">Business Pass</h3>
+                <InventoryBadge remaining={inventory.business} />
+              </div>
+              <p className="text-sm text-muted-foreground mb-2">For Consultants &amp; Vendors</p>
+              <div className="flex items-baseline gap-2 mb-1">
                 <span className="text-3xl font-bold">£599</span>
                 <span className="text-sm text-muted-foreground line-through">£999</span>
                 <span className="text-sm font-bold text-primary">40% off</span>
               </div>
-              <p className="text-sm text-muted-foreground mt-1">Per ticket, ex VAT</p>
+              <p className="text-sm text-muted-foreground mb-4">Per pass, ex VAT — group discounts apply for multiple</p>
+
+              <div className="space-y-2">
+                {SINGLE_BENEFITS.map((b) => (
+                  <div key={b} className="flex items-start gap-2 text-sm">
+                    <Check className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                    <span>{b}</span>
+                  </div>
+                ))}
+                {BUSINESS_EXTRA_BENEFITS.map((b) => (
+                  <div key={b} className="flex items-start gap-2 text-sm font-bold text-primary">
+                    <Check className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                    <span>{b}</span>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <div className="space-y-3">
-              {SINGLE_BENEFITS.map((b) => (
-                <div key={b} className="flex items-start gap-2 text-sm">
-                  <Check className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                  <span>{b}</span>
+            {/* Quantity picker */}
+            <div className="md:w-64 shrink-0">
+              <p className="text-sm font-semibold mb-3">How many passes?</p>
+
+              {/* Stepper */}
+              <div className="flex items-center border border-border bg-white rounded-sm overflow-hidden mb-3">
+                <button
+                  type="button"
+                  className="flex-none w-11 h-11 flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors disabled:opacity-30"
+                  onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                  disabled={quantity <= 1}
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <div className="flex-1 text-center font-bold text-lg py-3">
+                  {quantity}
                 </div>
-              ))}
-              <div className="flex items-start gap-2 text-sm font-bold text-primary">
-                <Check className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                <span>Exclusive Attendee Report</span>
+                <button
+                  type="button"
+                  className="flex-none w-11 h-11 flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors disabled:opacity-30"
+                  onClick={() => setQuantity(q => Math.min(10, q + 1))}
+                  disabled={quantity >= 10}
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
               </div>
-              <div className="flex items-start gap-2 text-sm font-bold text-primary">
-                <Check className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                <span>Company Branding at the Summit</span>
+
+              {/* Business discount tiers */}
+              <div className="space-y-1 text-xs mb-3">
+                {[
+                  { label: "1 pass", note: "£599/pass", test: (q: number) => q === 1 },
+                  { label: "2–4 passes", note: "10% off", test: (q: number) => q >= 2 && q <= 4 },
+                  { label: "5–10 passes", note: "15% off", test: (q: number) => q >= 5 },
+                ].map(({ label, note, test }) => {
+                  const active = test(quantity);
+                  return (
+                    <div
+                      key={label}
+                      className={`flex justify-between px-2 py-1 rounded-sm transition-colors ${
+                        active ? "bg-muted text-foreground font-semibold" : "text-muted-foreground"
+                      }`}
+                    >
+                      <span>{label}</span>
+                      <span>{note}</span>
+                    </div>
+                  );
+                })}
               </div>
+
+              {businessDiscountLabel && (
+                <div className="bg-primary/10 border border-primary/20 rounded-sm px-3 py-2 text-sm font-semibold text-primary">
+                  {businessDiscountLabel} group discount applied
+                </div>
+              )}
             </div>
-          </Card>
-        </div>
+          </div>
+        </Card>
       )}
 
-      {/* Order Summary + Vendor quantity */}
+      {/* Order Summary */}
       <div className="bg-white p-6 md:p-8 border border-border flex flex-col md:flex-row md:items-start justify-between gap-8">
-        <div className="space-y-4">
-          {isVendor && (
-            <>
-              <h2 className="text-xl font-bold">How many Business Passes?</h2>
-              <p className="text-sm text-muted-foreground">
-                Each Business Pass covers 1 attendee with enhanced access and company branding.
-              </p>
-              <div className="w-56">
-                <Select
-                  value={quantity.toString()}
-                  onValueChange={(val) => setQuantity(parseInt(val, 10))}
-                >
-                  <SelectTrigger className="h-12 bg-white">
-                    <SelectValue placeholder="Select quantity" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 10 }, (_, i) => i + 1).map((num) => (
-                      <SelectItem key={num} value={num.toString()}>
-                        {num} pass{num > 1 ? "es" : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </>
+        <div className="space-y-1">
+          <h2 className="text-xl font-bold">
+            {quantity} {isHR ? `ticket${quantity !== 1 ? "s" : ""}` : `pass${quantity !== 1 ? "es" : ""}`} selected
+          </h2>
+          {isHR && hrDiscountLabel && hrDiscountLabel !== "Most Popular" && (
+            <p className="text-sm font-semibold text-primary">{hrDiscountLabel} group discount applied</p>
           )}
-
-          {isHR && (
-            <div className="space-y-1">
-              <h2 className="text-xl font-bold">
-                {quantity} ticket{quantity !== 1 ? "s" : ""} selected
-              </h2>
-              {discountLabel && discountLabel !== "Most Popular" && (
-                <p className="text-sm font-semibold text-primary">
-                  {discountLabel} group discount applied
-                </p>
-              )}
-              {quantity === 3 && (
-                <p className="text-sm font-semibold text-primary">
-                  Most popular choice for teams
-                </p>
-              )}
-              <p className="text-sm text-muted-foreground">
-                You'll add attendee details in the next step.
-              </p>
-            </div>
+          {isHR && quantity === 3 && (
+            <p className="text-sm font-semibold text-primary">Most popular choice for teams</p>
           )}
+          {isVendor && businessDiscountLabel && (
+            <p className="text-sm font-semibold text-primary">{businessDiscountLabel} group discount applied</p>
+          )}
+          <p className="text-sm text-muted-foreground pt-1">
+            You'll add attendee details in the next step.
+          </p>
         </div>
 
         <div className="bg-muted p-6 min-w-[280px]">
@@ -312,9 +382,9 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
             </div>
           ) : (
             <div className="animate-pulse space-y-3">
-              <div className="h-4 bg-border w-full rounded"></div>
-              <div className="h-4 bg-border w-2/3 rounded"></div>
-              <div className="h-4 bg-border w-full rounded"></div>
+              <div className="h-4 bg-border w-full rounded" />
+              <div className="h-4 bg-border w-2/3 rounded" />
+              <div className="h-4 bg-border w-full rounded" />
             </div>
           )}
         </div>
