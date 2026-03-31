@@ -330,6 +330,8 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
     return;
   }
 
+  const settings = await getEventSettings();
+
   const attendees = await db
     .select()
     .from(attendeesTable)
@@ -372,7 +374,7 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
   const confirmationHtml = wrapInBrandedLayout(`
     <h2>Booking Confirmed!</h2>
     <p>Dear ${lead.firstName},</p>
-    <p>Thank you for registering for the <strong>HR Analytics Summit 2026</strong>. Your booking is confirmed.</p>
+    <p>Thank you for registering for the <strong>${settings.eventName}</strong>. Your booking is confirmed.</p>
     <div class="info-box">
       <strong>Order Reference:</strong> ${booking.orderReference || `#${bookingId}`}<br>
       <strong>Pass Type:</strong> ${passLabel}<br>
@@ -397,12 +399,12 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
     <div class="price-total"><span>Total</span><span>${formatCurrency(total)}</span></div>
     <div class="info-box" style="margin-top: 24px;">
       <strong>Event Details</strong><br>
-      <strong>Date:</strong> 3 September 2026<br>
-      <strong>Venue:</strong> 155 Bishopsgate, London, EC2M 3TQ
+      <strong>Date:</strong> ${settings.eventDate}<br>
+      <strong>Venue:</strong> ${settings.eventVenue}, ${settings.eventVenuePostcode}
     </div>
     <p>A PDF VAT receipt is attached to this email for your records.</p>
-    <p>We look forward to seeing you at the HR Analytics Summit!</p>
-  `);
+    <p>We look forward to seeing you at the ${settings.eventName}!</p>
+  `, settings);
 
   // Prefer FreeAgent invoice PDF when available; fall back to custom receipt
   let pdfBuffer: Buffer | null = null;
@@ -431,9 +433,11 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
 
   const sent = await sendMail({
     to: lead.workEmail,
-    subject: `Booking Confirmed — HR Analytics Summit 2026 (${booking.orderReference || `#${bookingId}`})`,
+    subject: `Booking Confirmed — ${settings.eventName} (${booking.orderReference || `#${bookingId}`})`,
     html: confirmationHtml,
     attachments,
+    fromName: settings.fromName,
+    fromEmail: settings.fromEmail,
   });
 
   await logEmail(bookingId, lead.workEmail, "confirmation", sent ? "sent" : "failed",

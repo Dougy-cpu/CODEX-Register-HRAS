@@ -39,6 +39,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
   const [promoCode, setPromoCode] = useState(booking.promoCode || "");
   const [promoError, setPromoError] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   const calculatePricingMutation = useCalculatePricing();
 
@@ -90,6 +91,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
 
   const onSubmit = async (data?: z.infer<typeof invoiceSchema>) => {
     setIsProcessing(true);
+    setPaymentError(null);
     try {
       await updateBooking.mutateAsync({
         id: booking.id,
@@ -113,15 +115,22 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
             cancelUrl: `${currentUrl}/?step=4`
           }
         });
-        window.location.href = session.url;
+        if (session?.url) {
+          window.location.href = session.url;
+        } else {
+          setPaymentError("No redirect URL received from payment provider. Please try again or contact us.");
+          setIsProcessing(false);
+        }
       } else {
         await createInvoice.mutateAsync({
           data: { bookingId: booking.id }
         });
         queryClient.invalidateQueries({ queryKey: ["booking"] });
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      const message = e?.data?.error || e?.message || "Something went wrong. Please try again or contact us.";
+      setPaymentError(message);
       setIsProcessing(false);
     }
   };
@@ -215,6 +224,14 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                 />
               </form>
             </Form>
+          </div>
+        )}
+
+        {paymentError && (
+          <div className="bg-red-50 border border-red-200 rounded p-4 text-sm text-red-800">
+            <p className="font-semibold mb-1">Payment error</p>
+            <p>{paymentError}</p>
+            <p className="mt-2 text-red-700">If this continues, please email us at <a href="mailto:info@hranalyticssummit.com" className="underline">info@hranalyticssummit.com</a> to complete your registration.</p>
           </div>
         )}
 

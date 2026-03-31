@@ -180,6 +180,8 @@ router.post("/email-templates/:type/test-send", adminAuth, async (req, res): Pro
       return;
     }
 
+    const settings = await getEventSettings();
+
     const { sendMail } = await import("../lib/email");
     const personalised = template.htmlBody
       .replace(/\{\{firstName\}\}/g, toName || "Test User")
@@ -189,8 +191,14 @@ router.post("/email-templates/:type/test-send", adminAuth, async (req, res): Pro
       .replace(/\{\{quantity\}\}/g, "1")
       .replace(/\{\{total\}\}/g, "£238.80");
 
-    const html = wrapInBrandedLayout(personalised);
-    await sendMail({ to: toEmail, subject: `[TEST] ${template.subject}`, html });
+    const html = wrapInBrandedLayout(personalised, settings);
+    await sendMail({
+      to: toEmail,
+      subject: `[TEST] ${template.subject}`,
+      html,
+      fromName: settings.fromName,
+      fromEmail: settings.fromEmail,
+    });
   }
 
   res.json({ success: true, message: `Test email sent to ${toEmail}` });

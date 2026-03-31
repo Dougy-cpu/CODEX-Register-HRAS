@@ -79,17 +79,25 @@ router.post("/stripe/create-checkout-session", async (req, res): Promise<void> =
     },
   ];
 
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    payment_method_types: ["card"],
-    line_items: lineItems,
-    success_url: successUrl,
-    cancel_url: cancelUrl,
-    metadata: {
-      bookingId: String(bookingId),
-    },
-    customer_email: booking.billingEmail || undefined,
-  });
+  let session: import("stripe").Stripe.Checkout.Session;
+  try {
+    session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["card"],
+      line_items: lineItems,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      metadata: {
+        bookingId: String(bookingId),
+      },
+      customer_email: booking.billingEmail || undefined,
+    });
+  } catch (err: any) {
+    const stripeMessage = err?.raw?.message || err?.message || "Stripe error";
+    logger.error({ err, bookingId }, "Stripe checkout session creation failed");
+    res.status(502).json({ error: `Payment provider error: ${stripeMessage}` });
+    return;
+  }
 
   await db
     .update(bookingsTable)
