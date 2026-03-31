@@ -2,103 +2,21 @@ import { Router, type IRouter } from "express";
 import axios from "axios";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { bookingsTable, attendeesTable, promoCodesTable, eventSettingsTable } from "@workspace/db";
+import { bookingsTable, attendeesTable, promoCodesTable } from "@workspace/db";
 import { sendBookingEmails, sendOrganiserNotification } from "../lib/email";
 import { syncBookingToSheets } from "../lib/google-sheets";
 import { logger } from "../lib/logger";
+import { getFreeAgentToken } from "../lib/freeagent-client";
 
 const router: IRouter = Router();
 
 const FREEAGENT_BASE = "https://api.freeagent.com/v2";
 
-interface FreeAgentTokenResponse {
-  access_token: string;
-  refresh_token?: string;
-  expires_in?: number;
-}
-
 /**
- * Get a valid FreeAgent access token.
- *
- * Strategy:
- *  1. Check the DB for a cached access token that hasn't expired yet → return it.
- *  2. Otherwise, read the refresh token from the DB (falls back to the env var on
- *     first run).  Exchange it for a new access + refresh token pair.
- *  3. Persist both tokens back to the DB so token rotation is never lost between
- *     server restarts.
+ * Find an existing FreeAgent contact by email, or create a new one.
+ * If an existing contact is found, update its company/name so it always
+ * reflects the current billing details.
  */
-async function getFreeAgentToken(): Promise<string | null> {
-  const clientId = process.env.FREEAGENT_CLIENT_ID;
-  const clientSecret = process.env.FREEAGENT_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    logger.warn("FreeAgent client credentials not configured");
-    return null;
-  }
-
-  // ── 1. Try cached access token ────────────────────────────────────────────
-  const [settings] = await db.select().from(eventSettingsTable);
-  if (settings?.freeagentAccessToken && settings.freeagentTokenExpiresAt) {
-    const expiresAt = new Date(settings.freeagentTokenExpiresAt).getTime();
-    // Use cached token if it still has more than 5 minutes left
-    if (expiresAt - Date.now() > 5 * 60 * 1000) {
-      return settings.freeagentAccessToken;
-    }
-  }
-
-  // ── 2. Determine which refresh token to use ───────────────────────────────
-  const refreshToken =
-    settings?.freeagentRefreshToken ||
-    process.env.FREEAGENT_REFRESH_TOKEN;
-
-  if (!refreshToken) {
-    logger.warn("No FreeAgent refresh token available");
-    return null;
-  }
-
-  // ── 3. Exchange for a new access token ────────────────────────────────────
-  try {
-    const response = await axios.post<FreeAgentTokenResponse>(
-      "https://api.freeagent.com/v2/token_endpoint",
-      new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: refreshToken,
-        client_id: clientId,
-        client_secret: clientSecret,
-      }),
-      {
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        auth: { username: clientId, password: clientSecret },
-      }
-    );
-
-    const { access_token, refresh_token: newRefreshToken, expires_in = 3600 } = response.data;
-
-    // ── 4. Persist both tokens to DB ─────────────────────────────────────────
-    const expiresAt = new Date(Date.now() + expires_in * 1000);
-
-    if (settings) {
-      await db.update(eventSettingsTable).set({
-        freeagentAccessToken: access_token,
-        freeagentRefreshToken: newRefreshToken || refreshToken,
-        freeagentTokenExpiresAt: expiresAt,
-      });
-    } else {
-      await db.insert(eventSettingsTable).values({
-        freeagentAccessToken: access_token,
-        freeagentRefreshToken: newRefreshToken || refreshToken,
-        freeagentTokenExpiresAt: expiresAt,
-      });
-    }
-
-    logger.info("FreeAgent access token refreshed and cached in DB");
-    return access_token;
-  } catch (err) {
-    logger.error({ err }, "Failed to get FreeAgent token");
-    return null;
-  }
-}
-
 async function findOrCreateFreeAgentContact(
   token: string,
   email: string,
@@ -113,8 +31,28 @@ async function findOrCreateFreeAgentContact(
     });
 
     const contacts = (searchResp.data?.contacts as Array<{ url: string }>) || [];
+
     if (contacts.length > 0) {
-      return contacts[0].url;
+      const existingUrl = contacts[0].url;
+      // Update the existing contact with the current billing details so the
+      // invoice always shows the right company name.
+      try {
+        await axios.put(
+          existingUrl,
+          {
+            contact: {
+              first_name: firstName,
+              last_name: lastName,
+              organisation_name: company,
+              email,
+            },
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      } catch (updateErr) {
+        logger.warn({ updateErr }, "Could not update existing FreeAgent contact details — continuing with existing data");
+      }
+      return existingUrl;
     }
 
     const createResp = await axios.post(
@@ -160,14 +98,12 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
     return;
   }
 
-  // Idempotency guard: if booking is already fully invoiced with a real FreeAgent invoice,
-  // or is paid, return the existing data without creating a duplicate.
-  // Exception: if booking was marked "invoiced" but has no FA invoice ID, allow retry.
   const alreadyHasFAInvoice = !!booking.freeagentInvoiceId;
   if (booking.status === "paid" || (booking.status === "invoiced" && alreadyHasFAInvoice)) {
     res.json({
       invoiceId: booking.freeagentInvoiceId || `manual-${booking.orderReference}`,
       invoiceUrl: booking.freeagentInvoiceUrl || null,
+      paymentUrl: (booking as any).freeagentPaymentUrl || null,
       invoiceReference: booking.orderReference || "",
       alreadyProcessed: true,
     });
@@ -194,11 +130,10 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
 
   const prefix = "HRS";
   const num = Math.floor(10000 + Math.random() * 90000);
-  // Reuse existing order reference if this booking already has one (retry scenario)
   const orderRef = booking.orderReference || `${prefix}-2026-${num}`;
 
-  // booking.subtotalAmount is subtotalAfterDiscounts (post-discount).
-  // Reconstruct the pre-discount base so we can show accurate line-item breakdown.
+  // subtotalAmount is net-after-discounts (excl. VAT).
+  // Reconstruct pre-discount base for the top line item.
   const subtotalAfterDiscounts = parseFloat(booking.subtotalAmount?.toString() || "0");
   const vat = parseFloat(booking.vatAmount?.toString() || "0");
   const groupDiscount = parseFloat(booking.groupDiscountAmount?.toString() || "0");
@@ -223,29 +158,11 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
         .where(eq(promoCodesTable.code, booking.promoCode));
     }
 
-    try {
-      await sendBookingEmails(id);
-    } catch (err) {
-      logger.error({ err }, "Failed to send booking emails after invoice");
-    }
+    try { await sendBookingEmails(id); } catch (err) { logger.error({ err }, "Failed to send booking emails"); }
+    try { await sendOrganiserNotification(id); } catch (err) { logger.error({ err }, "Failed to send organiser notification"); }
+    try { await syncBookingToSheets(id); } catch (err) { logger.error({ err }, "Failed to sync to Sheets"); }
 
-    try {
-      await sendOrganiserNotification(id);
-    } catch (err) {
-      logger.error({ err }, "Failed to send organiser notification after invoice");
-    }
-
-    try {
-      await syncBookingToSheets(id);
-    } catch (err) {
-      logger.error({ err }, "Failed to sync booking to Google Sheets");
-    }
-
-    res.json({
-      invoiceId: `manual-${orderRef}`,
-      invoiceUrl: null,
-      invoiceReference: orderRef,
-    });
+    res.json({ invoiceId: `manual-${orderRef}`, invoiceUrl: null, paymentUrl: null, invoiceReference: orderRef });
     return;
   }
 
@@ -268,9 +185,9 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
   }
 
   // Build invoice line items.
-  // Main line = pre-discount pass price so the invoice clearly shows the gross amount.
-  // Discount lines reduce it to the agreed subtotal.
-  // VAT is calculated on subtotalAfterDiscounts and shown as a separate line.
+  // Use sales_tax_rate: "20.0" on all lines so FreeAgent calculates VAT correctly.
+  // The price fields are NET amounts (excl. VAT) — FreeAgent adds 20% on top automatically.
+  // Do NOT add a manual VAT line item — FreeAgent handles it natively.
   const invoiceItems: Array<{
     description: string;
     quantity: string;
@@ -283,7 +200,7 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
       quantity: "1.0",
       price: baseAmount.toFixed(2),
       item_type: "Products",
-      sales_tax_rate: "0.0",
+      sales_tax_rate: "20.0",
     },
   ];
 
@@ -293,7 +210,7 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
       quantity: "1.0",
       price: (-groupDiscount).toFixed(2),
       item_type: "Products",
-      sales_tax_rate: "0.0",
+      sales_tax_rate: "20.0",
     });
   }
 
@@ -303,17 +220,9 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
       quantity: "1.0",
       price: (-promoDiscount).toFixed(2),
       item_type: "Products",
-      sales_tax_rate: "0.0",
+      sales_tax_rate: "20.0",
     });
   }
-
-  invoiceItems.push({
-    description: "VAT (20%)",
-    quantity: "1.0",
-    price: vat.toFixed(2),
-    item_type: "Products",
-    sales_tax_rate: "0.0",
-  });
 
   const dueDate = new Date();
   dueDate.setDate(dueDate.getDate() + 14);
@@ -329,14 +238,34 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
           payment_terms_in_days: 14,
           reference: orderRef,
           invoice_items: invoiceItems,
-          status: "Sent",
         },
       },
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
-    const invoiceUrl = (invoiceResp.data?.invoice?.url as string) || null;
+    const invoiceData = invoiceResp.data?.invoice || {};
+    const invoiceUrl = (invoiceData.url as string) || null;
     const invoiceId = invoiceUrl?.split("/").pop() || orderRef;
+    let paymentUrl: string | null = (invoiceData.payment_url as string) || null;
+
+    // Mark the invoice as Sent via a separate PUT call
+    // (FreeAgent ignores status on creation in some configurations)
+    if (invoiceUrl) {
+      try {
+        const sentResp = await axios.put(
+          invoiceUrl,
+          { invoice: { status: "Sent" } },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        // Re-read payment_url from the updated invoice in case it's only available post-send
+        if (!paymentUrl) {
+          paymentUrl = (sentResp.data?.invoice?.payment_url as string) || null;
+        }
+        logger.info({ invoiceId }, "FreeAgent invoice marked as Sent");
+      } catch (sentErr) {
+        logger.warn({ sentErr }, "Could not mark FreeAgent invoice as Sent — it may remain as Draft");
+      }
+    }
 
     await db.update(bookingsTable).set({
       status: "invoiced",
@@ -345,7 +274,8 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
       paymentMethod: "invoice",
       freeagentInvoiceId: invoiceId,
       freeagentInvoiceUrl: invoiceUrl,
-    }).where(eq(bookingsTable.id, id));
+      freeagentPaymentUrl: paymentUrl,
+    } as any).where(eq(bookingsTable.id, id));
 
     if (booking.promoCode) {
       await db.update(promoCodesTable)
@@ -353,25 +283,11 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
         .where(eq(promoCodesTable.code, booking.promoCode));
     }
 
-    try {
-      await sendBookingEmails(id);
-    } catch (err) {
-      logger.error({ err }, "Failed to send booking emails after FreeAgent invoice");
-    }
+    try { await sendBookingEmails(id); } catch (err) { logger.error({ err }, "Failed to send booking emails after FreeAgent invoice"); }
+    try { await sendOrganiserNotification(id); } catch (err) { logger.error({ err }, "Failed to send organiser notification after FreeAgent invoice"); }
+    try { await syncBookingToSheets(id); } catch (err) { logger.error({ err }, "Failed to sync booking to Google Sheets"); }
 
-    try {
-      await sendOrganiserNotification(id);
-    } catch (err) {
-      logger.error({ err }, "Failed to send organiser notification after FreeAgent invoice");
-    }
-
-    try {
-      await syncBookingToSheets(id);
-    } catch (err) {
-      logger.error({ err }, "Failed to sync booking to Google Sheets");
-    }
-
-    res.json({ invoiceId, invoiceUrl, invoiceReference: orderRef });
+    res.json({ invoiceId, invoiceUrl, paymentUrl, invoiceReference: orderRef });
   } catch (err) {
     logger.error({ err }, "Failed to create FreeAgent invoice");
     res.status(500).json({ error: "Failed to create invoice in FreeAgent" });

@@ -37,6 +37,7 @@ export const bookingsTable = pgTable("bookings", {
   stripePaymentIntentId: text("stripe_payment_intent_id"),
   freeagentInvoiceId: text("freeagent_invoice_id"),
   freeagentInvoiceUrl: text("freeagent_invoice_url"),
+  freeagentPaymentUrl: text("freeagent_payment_url"),
   orderReference: text("order_reference"),
   currentStep: integer("current_step").notNull().default(1),
   billingName: text("billing_name"),

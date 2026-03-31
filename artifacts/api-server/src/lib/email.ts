@@ -5,6 +5,7 @@ import { emailLogsTable, emailTemplatesTable, bookingsTable, attendeesTable, not
 import type { EventSettings } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { generatePdfReceipt } from "./pdf";
+import { getFreeAgentToken, downloadFreeAgentInvoicePdf } from "./freeagent-client";
 
 const defaultSettings: Omit<EventSettings, "id" | "updatedAt"> = {
   eventName: "HR Analytics Summit",
@@ -264,21 +265,34 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
     <p>We look forward to seeing you at the ${settings.eventName}!</p>
   `, settings);
 
+  // Prefer the FreeAgent invoice PDF when available; fall back to our custom receipt
   let pdfBuffer: Buffer | null = null;
-  try {
-    pdfBuffer = await generatePdfReceipt(booking, attendees);
-  } catch (err) {
-    logger.error({ err }, "Failed to generate PDF receipt");
+  let pdfFilename = `receipt-${booking.orderReference || bookingId}.pdf`;
+  const faInvoiceUrl = (booking as any).freeagentInvoiceUrl as string | null;
+  if (faInvoiceUrl) {
+    try {
+      const faToken = await getFreeAgentToken();
+      if (faToken) {
+        pdfBuffer = await downloadFreeAgentInvoicePdf(faInvoiceUrl, faToken);
+        if (pdfBuffer) {
+          pdfFilename = `invoice-${booking.orderReference || bookingId}.pdf`;
+          logger.info({ bookingId }, "Using FreeAgent invoice PDF for email attachment");
+        }
+      }
+    } catch (err) {
+      logger.warn({ err }, "Could not download FreeAgent PDF — falling back to custom receipt");
+    }
+  }
+  if (!pdfBuffer) {
+    try {
+      pdfBuffer = await generatePdfReceipt(booking, attendees);
+    } catch (err) {
+      logger.error({ err }, "Failed to generate PDF receipt");
+    }
   }
 
   const attachments = pdfBuffer
-    ? [
-        {
-          filename: `receipt-${booking.orderReference || bookingId}.pdf`,
-          content: pdfBuffer,
-          contentType: "application/pdf",
-        },
-      ]
+    ? [{ filename: pdfFilename, content: pdfBuffer, contentType: "application/pdf" }]
     : [];
 
   const confirmSent = await sendMail({
@@ -390,15 +404,29 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
     <p>We look forward to seeing you at the HR Analytics Summit!</p>
   `);
 
+  // Prefer FreeAgent invoice PDF when available; fall back to custom receipt
   let pdfBuffer: Buffer | null = null;
-  try {
-    pdfBuffer = await generatePdfReceipt(booking, attendees);
-  } catch (err) {
-    logger.error({ err }, "Failed to generate PDF for resend");
+  let pdfFilename = `receipt-${booking.orderReference || bookingId}.pdf`;
+  const faInvoiceUrlResend = (booking as any).freeagentInvoiceUrl as string | null;
+  if (faInvoiceUrlResend) {
+    try {
+      const faToken = await getFreeAgentToken();
+      if (faToken) {
+        pdfBuffer = await downloadFreeAgentInvoicePdf(faInvoiceUrlResend, faToken);
+        if (pdfBuffer) pdfFilename = `invoice-${booking.orderReference || bookingId}.pdf`;
+      }
+    } catch { /* fall through */ }
+  }
+  if (!pdfBuffer) {
+    try {
+      pdfBuffer = await generatePdfReceipt(booking, attendees);
+    } catch (err) {
+      logger.error({ err }, "Failed to generate PDF for resend");
+    }
   }
 
   const attachments = pdfBuffer
-    ? [{ filename: `receipt-${booking.orderReference || bookingId}.pdf`, content: pdfBuffer, contentType: "application/pdf" }]
+    ? [{ filename: pdfFilename, content: pdfBuffer, contentType: "application/pdf" }]
     : [];
 
   const sent = await sendMail({
