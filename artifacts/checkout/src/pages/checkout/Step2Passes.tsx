@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { useUpdateBooking, useCalculatePricing, type PricingRequestPassType } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -375,9 +376,9 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
             </div>
           ) : (
             <div className="animate-pulse space-y-3">
-              <div className="h-4 bg-border w-full rounded" />
-              <div className="h-4 bg-border w-2/3 rounded" />
-              <div className="h-4 bg-border w-full rounded" />
+              <div className="h-4 bg-border w-full rounded"></div>
+              <div className="h-4 bg-border w-2/3 rounded"></div>
+              <div className="h-4 bg-border w-full rounded"></div>
             </div>
           )}
         </div>
