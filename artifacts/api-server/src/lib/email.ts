@@ -1,11 +1,35 @@
 import nodemailer from "nodemailer";
 import { logger } from "./logger";
+import { readFileSync, existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { db } from "@workspace/db";
 import { emailLogsTable, emailTemplatesTable, bookingsTable, attendeesTable, notificationEmailsTable, eventSettingsTable } from "@workspace/db";
 import type { EventSettings } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { generatePdfReceipt } from "./pdf";
 import { getFreeAgentToken, downloadFreeAgentInvoicePdf } from "./freeagent-client";
+
+// Company info PDF attachment (attached to every confirmation email)
+let _companyInfoPdf: Buffer | null | undefined = undefined;
+function getCompanyInfoPdf(): Buffer | null {
+  if (_companyInfoPdf !== undefined) return _companyInfoPdf;
+  try {
+    const _dir = dirname(fileURLToPath(import.meta.url));
+    const assetPath = join(_dir, "assets", "company-info.pdf");
+    if (existsSync(assetPath)) {
+      _companyInfoPdf = readFileSync(assetPath);
+      logger.info({ sizeBytes: _companyInfoPdf.length }, "Company info PDF loaded for email attachments");
+    } else {
+      logger.warn({ assetPath }, "Company info PDF not found — will not be attached to emails");
+      _companyInfoPdf = null;
+    }
+  } catch (err) {
+    logger.warn({ err }, "Failed to load company info PDF");
+    _companyInfoPdf = null;
+  }
+  return _companyInfoPdf;
+}
 
 const defaultSettings: Omit<EventSettings, "id" | "updatedAt"> = {
   eventName: "HR Analytics Summit",
