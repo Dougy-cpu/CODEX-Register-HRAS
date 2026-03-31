@@ -276,7 +276,9 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
         pdfBuffer = await downloadFreeAgentInvoicePdf(faInvoiceUrl, faToken);
         if (pdfBuffer) {
           pdfFilename = `invoice-${booking.orderReference || bookingId}.pdf`;
-          logger.info({ bookingId }, "Using FreeAgent invoice PDF for email attachment");
+          logger.info({ bookingId, sizeBytes: pdfBuffer.length }, "Using FreeAgent invoice PDF for email attachment");
+        } else {
+          logger.warn({ bookingId }, "FreeAgent PDF not available — falling back to custom receipt");
         }
       }
     } catch (err) {
@@ -286,6 +288,7 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
   if (!pdfBuffer) {
     try {
       pdfBuffer = await generatePdfReceipt(booking, attendees);
+      if (pdfBuffer) logger.info({ bookingId, sizeBytes: pdfBuffer.length }, "Using custom PDF receipt for email attachment");
     } catch (err) {
       logger.error({ err }, "Failed to generate PDF receipt");
     }
@@ -415,13 +418,21 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
       const faToken = await getFreeAgentToken();
       if (faToken) {
         pdfBuffer = await downloadFreeAgentInvoicePdf(faInvoiceUrlResend, faToken);
-        if (pdfBuffer) pdfFilename = `invoice-${booking.orderReference || bookingId}.pdf`;
+        if (pdfBuffer) {
+          pdfFilename = `invoice-${booking.orderReference || bookingId}.pdf`;
+          logger.info({ bookingId, sizeBytes: pdfBuffer.length }, "Using FreeAgent invoice PDF for resend");
+        } else {
+          logger.warn({ bookingId }, "FreeAgent PDF not available for resend — falling back to custom receipt");
+        }
       }
-    } catch { /* fall through */ }
+    } catch (err) {
+      logger.warn({ err }, "Could not download FreeAgent PDF for resend — falling back to custom receipt");
+    }
   }
   if (!pdfBuffer) {
     try {
       pdfBuffer = await generatePdfReceipt(booking, attendees);
+      if (pdfBuffer) logger.info({ bookingId, sizeBytes: pdfBuffer.length }, "Using custom PDF receipt for resend");
     } catch (err) {
       logger.error({ err }, "Failed to generate PDF for resend");
     }

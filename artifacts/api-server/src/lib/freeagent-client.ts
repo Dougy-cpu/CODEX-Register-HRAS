@@ -73,23 +73,51 @@ export async function getFreeAgentToken(): Promise<string | null> {
   }
 }
 
+const PDF_MAGIC = Buffer.from([0x25, 0x50, 0x44, 0x46]); // %PDF
+
+function isValidPdf(buf: Buffer): boolean {
+  return buf.length > 1024 && buf.slice(0, 4).equals(PDF_MAGIC);
+}
+
 /**
  * Download a FreeAgent invoice as a PDF buffer.
+ * Retries once with a 3-second delay if the first attempt returns an invalid PDF
+ * (FreeAgent sometimes needs a moment after marking an invoice as Sent).
  * @param invoiceApiUrl e.g. "https://api.freeagent.com/v2/invoices/12345"
  */
 export async function downloadFreeAgentInvoicePdf(
   invoiceApiUrl: string,
   token: string
 ): Promise<Buffer | null> {
-  try {
-    const pdfUrl = invoiceApiUrl.replace(/\/?$/, "") + ".pdf";
-    const resp = await axios.get<ArrayBuffer>(pdfUrl, {
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/pdf" },
-      responseType: "arraybuffer",
-    });
-    return Buffer.from(resp.data);
-  } catch (err) {
-    logger.error({ err }, "Failed to download FreeAgent invoice PDF");
-    return null;
+  const baseUrl = invoiceApiUrl.replace(/\/?$/, "");
+
+  async function attempt(): Promise<Buffer | null> {
+    try {
+      // FreeAgent supports content negotiation: request the invoice URL
+      // with Accept: application/pdf to get the PDF directly.
+      const resp = await axios.get<ArrayBuffer>(baseUrl, {
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/pdf" },
+        responseType: "arraybuffer",
+        maxRedirects: 5,
+      });
+      const buf = Buffer.from(resp.data);
+      if (!isValidPdf(buf)) {
+        logger.warn({ url: baseUrl, size: buf.length }, "FreeAgent PDF response does not look like a valid PDF");
+        return null;
+      }
+      return buf;
+    } catch (err) {
+      logger.error({ err }, "Failed to download FreeAgent invoice PDF");
+      return null;
+    }
   }
+
+  // First attempt
+  const first = await attempt();
+  if (first) return first;
+
+  // Retry after a short delay — FreeAgent may need time to generate the PDF
+  logger.info("Retrying FreeAgent PDF download after 3s delay…");
+  await new Promise(r => setTimeout(r, 3000));
+  return attempt();
 }
