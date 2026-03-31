@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { attendeesTable, bookingsTable } from "@workspace/db";
-import { deriveAdminToken } from "../middleware/admin-auth";
+import { deriveAdminToken, getAdminPassword } from "../middleware/admin-auth";
 
 const router: IRouter = Router();
 
@@ -18,7 +18,7 @@ function formatAttendee(a: typeof attendeesTable.$inferSelect) {
 function isAdminRequest(req: import("express").Request): boolean {
   const token = req.headers["x-admin-token"] as string | undefined;
   if (!token) return false;
-  const password = process.env.ADMIN_PASSWORD;
+  const password = getAdminPassword();
   if (!password) return false;
   return token === deriveAdminToken(password);
 }

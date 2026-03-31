@@ -4,12 +4,12 @@ import { db } from "@workspace/db";
 import { bookingsTable, attendeesTable } from "@workspace/db";
 import { calculatePricing } from "../lib/pricing";
 import { v4 as uuidv4 } from "uuid";
-import { deriveAdminToken } from "../middleware/admin-auth";
+import { deriveAdminToken, getAdminPassword } from "../middleware/admin-auth";
 
 function isAdminRequest(req: import("express").Request): boolean {
   const token = req.headers["x-admin-token"] as string | undefined;
   if (!token) return false;
-  const password = process.env.ADMIN_PASSWORD;
+  const password = getAdminPassword();
   if (!password) return false;
   return token === deriveAdminToken(password);
 }
@@ -186,7 +186,9 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
 
   const newPassType = passType ?? existing.passType;
   const newQuantity = quantity ?? existing.quantity;
-  const newPromoCode = promoCode !== undefined ? promoCode : existing.promoCode;
+  const newPromoCode = promoCode !== undefined
+    ? (promoCode ? promoCode.toUpperCase() : null)
+    : existing.promoCode;
 
   const pricing = await calculatePricing(newPassType, newQuantity, newPromoCode);
 
@@ -201,7 +203,7 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
   if (passType !== undefined) updateData.passType = passType;
   if (attendeeType !== undefined) updateData.attendeeType = attendeeType;
   if (quantity !== undefined) updateData.quantity = quantity;
-  if (promoCode !== undefined) updateData.promoCode = promoCode || null;
+  if (promoCode !== undefined) updateData.promoCode = promoCode ? promoCode.toUpperCase() : null;
   if (paymentMethod !== undefined) updateData.paymentMethod = paymentMethod;
   if (currentStep !== undefined) updateData.currentStep = currentStep;
   if (billingName !== undefined) updateData.billingName = billingName;

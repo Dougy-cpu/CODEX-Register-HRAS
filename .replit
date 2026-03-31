@@ -28,4 +28,3 @@ timeoutMs = 20000
 [userenv]
 
 [userenv.development]
-ADMIN_PASSWORD = "admin123"

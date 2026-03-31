@@ -7,7 +7,7 @@ import {
   promoCodesTable,
   discountTiersTable,
 } from "@workspace/db";
-import { adminAuth, deriveAdminToken } from "../middleware/admin-auth";
+import { adminAuth, deriveAdminToken, getAdminPassword } from "../middleware/admin-auth";
 
 const router: IRouter = Router();
 
@@ -52,10 +52,10 @@ function formatTier(t: typeof discountTiersTable.$inferSelect) {
 
 router.post("/admin/login", async (req, res): Promise<void> => {
   const { password } = req.body;
-  const adminPassword = process.env.ADMIN_PASSWORD;
+  const adminPassword = getAdminPassword();
 
   if (!adminPassword) {
-    res.status(503).json({ error: "Admin authentication not configured — set ADMIN_PASSWORD" });
+    res.status(503).json({ error: "Admin authentication not configured — set a secure ADMIN_PASSWORD" });
     return;
   }
 
