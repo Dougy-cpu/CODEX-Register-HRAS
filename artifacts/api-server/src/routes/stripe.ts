@@ -425,7 +425,6 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
         { name: "Company Number", value: "12252258" },
         { name: "VAT Number", value: "336124621" },
         { name: "Contact", value: "douglas@dynamicbusinessleaders.co.uk" },
-        { name: "Goods", value: "Conference" },
       ],
       metadata: { bookingId: String(id), orderRef },
       auto_advance: false,
