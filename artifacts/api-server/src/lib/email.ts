@@ -921,8 +921,8 @@ export async function sendInvoicePaymentFailedEmail(
   const orderRef = booking.orderReference || `HRAS26-${6541 + bookingId}`;
   const paymentUrl = booking.stripeInvoicePaymentUrl;
 
-  const attemptNote = attemptCount && attemptCount > 1
-    ? `<p style="color:#666;font-size:14px;">This is payment attempt <strong>${attemptCount}</strong>.</p>`
+  const attemptNote = attemptCount
+    ? `<p style="color:#666;font-size:14px;">Payment attempt: <strong>${attemptCount}</strong>.</p>`
     : "";
 
   const declineNote = declineReason
