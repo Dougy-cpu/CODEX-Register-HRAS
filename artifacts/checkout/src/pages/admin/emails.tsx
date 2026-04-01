@@ -473,8 +473,8 @@ export default function AdminEmails() {
   );
 
   const resendEmails = useResendBookingEmails();
-  const [sendingIds, setSendingIds] = useState<Set<number>>(new Set());
-  const [sentIds, setSentIds] = useState<Set<number>>(new Set());
+  const [sendingLogIds, setSendingLogIds] = useState<Set<number>>(new Set());
+  const [sentLogIds, setSentLogIds] = useState<Set<number>>(new Set());
 
   // Load event settings for template preview
   useEffect(() => {
@@ -489,19 +489,19 @@ export default function AdminEmails() {
     load();
   }, []);
 
-  const handleResend = async (bookingId: number) => {
-    if (sendingIds.has(bookingId)) return;
-    setSendingIds(prev => new Set(prev).add(bookingId));
-    setSentIds(prev => { const s = new Set(prev); s.delete(bookingId); return s; });
+  const handleResend = async (logId: number, bookingId: number) => {
+    if (sendingLogIds.has(logId)) return;
+    setSendingLogIds(prev => new Set(prev).add(logId));
+    setSentLogIds(prev => { const s = new Set(prev); s.delete(logId); return s; });
     try {
       await resendEmails.mutateAsync({ bookingId });
-      setSentIds(prev => new Set(prev).add(bookingId));
+      setSentLogIds(prev => new Set(prev).add(logId));
       toast({ title: "Emails resent", description: `Confirmation emails for booking #${bookingId} have been resent.` });
-      setTimeout(() => setSentIds(prev => { const s = new Set(prev); s.delete(bookingId); return s; }), 3000);
+      setTimeout(() => setSentLogIds(prev => { const s = new Set(prev); s.delete(logId); return s; }), 3000);
     } catch {
       toast({ title: "Failed to resend", description: "Something went wrong. Please try again.", variant: "destructive" });
     } finally {
-      setSendingIds(prev => { const s = new Set(prev); s.delete(bookingId); return s; });
+      setSendingLogIds(prev => { const s = new Set(prev); s.delete(logId); return s; });
     }
   };
 
@@ -564,15 +564,15 @@ export default function AdminEmails() {
                         <TableCell className="text-right">
                           {log.bookingId && (
                             <Button
-                              variant={sentIds.has(log.bookingId) ? "default" : "outline"}
+                              variant={sentLogIds.has(log.id) ? "default" : "outline"}
                               size="sm"
-                              onClick={() => handleResend(log.bookingId!)}
-                              disabled={sendingIds.has(log.bookingId)}
-                              className={`h-8 px-3 min-w-[100px] transition-all ${sentIds.has(log.bookingId) ? "bg-green-600 hover:bg-green-700 text-white border-green-600" : ""}`}
+                              onClick={() => handleResend(log.id, log.bookingId!)}
+                              disabled={sendingLogIds.has(log.id)}
+                              className={`h-8 px-3 min-w-[100px] transition-all ${sentLogIds.has(log.id) ? "bg-green-600 hover:bg-green-700 text-white border-green-600" : ""}`}
                             >
-                              {sendingIds.has(log.bookingId) ? (
+                              {sendingLogIds.has(log.id) ? (
                                 <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Sending…</>
-                              ) : sentIds.has(log.bookingId) ? (
+                              ) : sentLogIds.has(log.id) ? (
                                 <><CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Sent</>
                               ) : (
                                 <><RefreshCcw className="w-3.5 h-3.5 mr-1.5" /> Resend</>
