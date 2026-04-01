@@ -459,6 +459,37 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /stripe/confirm-card-payment:
+    post:
+      operationId: confirmCardPayment
+      tags: [stripe]
+      summary: Confirm a card payment after Stripe Checkout redirect and trigger fulfillment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmCardPaymentBody"
+      responses:
+        "200":
+          description: Payment confirmed or already processed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfirmCardPaymentResponse"
+        "400":
+          description: Payment not completed or missing params
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden — invalid booking session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /stripe/webhook:
     post:
       operationId: stripeWebhook
@@ -1077,6 +1108,8 @@ components:
           type: string
         phone:
           type: ["string", "null"]
+        dietaryAccessibility:
+          type: ["string", "null"]
         gdprConsent:
           type: boolean
         seatIndex:
@@ -1100,6 +1133,8 @@ components:
         workEmail:
           type: string
         phone:
+          type: ["string", "null"]
+        dietaryAccessibility:
           type: ["string", "null"]
         gdprConsent:
           type: boolean
@@ -1359,6 +1394,28 @@ components:
       required:
         - sessionId
         - url
+
+    ConfirmCardPaymentBody:
+      type: object
+      properties:
+        bookingId:
+          type: integer
+        sessionId:
+          type: string
+      required:
+        - bookingId
+        - sessionId
+
+    ConfirmCardPaymentResponse:
+      type: object
+      properties:
+        alreadyProcessed:
+          type: boolean
+        orderReference:
+          type: string
+      required:
+        - alreadyProcessed
+        - orderReference
 
     # ==================== FREEAGENT SCHEMAS ====================
     CreateInvoiceBody:

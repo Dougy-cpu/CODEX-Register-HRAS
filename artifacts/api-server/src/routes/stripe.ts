@@ -158,9 +158,7 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
         return;
       }
 
-      const prefix = "HRS";
-      const num = Math.floor(10000 + Math.random() * 90000);
-      const orderRef = existing.orderReference || `${prefix}-2026-${num}`;
+      const orderRef = existing.orderReference || `HRAS26-${6541 + bookingId}`;
 
       await db
         .update(bookingsTable)
@@ -200,6 +198,77 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
   }
 
   res.json({ received: true });
+});
+
+router.post("/stripe/confirm-card-payment", async (req, res): Promise<void> => {
+  const stripe = getStripe();
+  if (!stripe) {
+    res.status(500).json({ error: "Stripe is not configured." });
+    return;
+  }
+
+  const { bookingId, sessionId } = req.body;
+  if (!bookingId || !sessionId) {
+    res.status(400).json({ error: "bookingId and sessionId are required" });
+    return;
+  }
+
+  const id = parseInt(bookingId, 10);
+  const [existing] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, id));
+
+  if (!existing) {
+    res.status(404).json({ error: "Booking not found" });
+    return;
+  }
+
+  const sessionHeader = req.headers["x-booking-session"] as string | undefined;
+  const ownsBooking = sessionHeader && existing.sessionToken && sessionHeader === existing.sessionToken;
+  if (!ownsBooking) {
+    res.status(403).json({ error: "Forbidden — invalid booking session" });
+    return;
+  }
+
+  if (existing.status === "paid" || existing.status === "invoiced") {
+    logger.info({ bookingId: id, status: existing.status }, "confirm-card-payment: already processed");
+    res.json({ alreadyProcessed: true, orderReference: existing.orderReference || "" });
+    return;
+  }
+
+  try {
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+    if (session.payment_status !== "paid") {
+      res.status(400).json({ error: "Payment not yet completed" });
+      return;
+    }
+
+    const orderRef = existing.orderReference || `HRAS26-${6541 + id}`;
+
+    await db.update(bookingsTable).set({
+      status: "paid",
+      currentStep: 5,
+      stripePaymentIntentId: session.payment_intent as string | null,
+      orderReference: orderRef,
+      paymentMethod: "card",
+    }).where(eq(bookingsTable.id, id));
+
+    if (existing.promoCode) {
+      await db.update(promoCodesTable)
+        .set({ usedCount: sql`${promoCodesTable.usedCount} + 1` })
+        .where(eq(promoCodesTable.code, existing.promoCode));
+    }
+
+    try { await sendBookingEmails(id); } catch (err) { logger.error({ err, bookingId: id }, "Failed to send booking emails after confirm-card-payment"); }
+    try { await sendOrganiserNotification(id); } catch (err) { logger.error({ err, bookingId: id }, "Failed to send organiser notification after confirm"); }
+    try { await syncBookingToSheets(id); } catch (err) { logger.error({ err, bookingId: id }, "Failed to sync to Google Sheets after confirm"); }
+
+    logger.info({ bookingId: id, orderRef }, "confirm-card-payment: booking confirmed and emails sent");
+    res.json({ alreadyProcessed: false, orderReference: orderRef });
+  } catch (err: any) {
+    const msg = err?.raw?.message || err?.message || "Stripe error";
+    logger.error({ err, bookingId: id }, "confirm-card-payment: failed to retrieve session");
+    res.status(502).json({ error: `Failed to verify payment: ${msg}` });
+  }
 });
 
 async function getOrCreateVatRate(stripe: Stripe): Promise<string | null> {
@@ -282,9 +351,7 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
     business: "Business Pass — HR Analytics Summit 2026",
   };
 
-  const prefix = "HRS";
-  const num = Math.floor(10000 + Math.random() * 90000);
-  const orderRef = booking.orderReference || `${prefix}-2026-${num}`;
+  const orderRef = booking.orderReference || `HRAS26-${6541 + id}`;
 
   const subtotalAfterDiscounts = parseFloat(booking.subtotalAmount?.toString() || "0");
   const groupDiscount = parseFloat(booking.groupDiscountAmount?.toString() || "0");
@@ -328,7 +395,13 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
       collection_method: "send_invoice",
       days_until_due: 14,
       description: `HR Analytics Summit 2026 — ${orderRef}`,
-      footer: "Sort code: 04-06-05 | Account: 16963209 | IBAN: GB65CLRB04060516963209 | VAT No: 336124621",
+      footer: "Issued by Dynamic Business Leaders Limited · Co. No. 12252258 · VAT No. 336124621 · Registered: 45 Lemsford Village, Welwyn Garden City, Hertfordshire AL8 7TR · Bank: Tide (ClearBank) · Sort: 04-06-05 · AC: 16963209 · IBAN (GBP): GB65CLRB04060516963209 · SWIFT: CLRBGB22 · IBAN (EUR): GB45TCCL00997990500906 · BIC: TCCLGB31",
+      custom_fields: [
+        { name: "Company Number", value: "12252258" },
+        { name: "VAT Number", value: "336124621" },
+        { name: "Contact", value: "douglas@dynamicbusinessleaders.co.uk" },
+        { name: "Goods", value: "Conference" },
+      ],
       metadata: { bookingId: String(id), orderRef },
       auto_advance: false,
     });

@@ -15,5 +15,7 @@ export interface UpdateAttendeeBody {
   workEmail?: string;
   /** @nullable */
   phone?: string | null;
+  /** @nullable */
+  dietaryAccessibility?: string | null;
   gdprConsent?: boolean;
 }

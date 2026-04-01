@@ -23,6 +23,8 @@ import type {
   Attendee,
   Booking,
   BookingWithAttendees,
+  ConfirmCardPaymentBody,
+  ConfirmCardPaymentResponse,
   CreateAttendeeBody,
   CreateBookingBody,
   CreateInvoiceBody,
@@ -1544,6 +1546,92 @@ export const useCreateStripeCheckoutSession = <
   TContext
 > => {
   return useMutation(getCreateStripeCheckoutSessionMutationOptions(options));
+};
+
+/**
+ * @summary Confirm a card payment after Stripe Checkout redirect and trigger fulfillment
+ */
+export const getConfirmCardPaymentUrl = () => {
+  return `/api/stripe/confirm-card-payment`;
+};
+
+export const confirmCardPayment = async (
+  confirmCardPaymentBody: ConfirmCardPaymentBody,
+  options?: RequestInit,
+): Promise<ConfirmCardPaymentResponse> => {
+  return customFetch<ConfirmCardPaymentResponse>(getConfirmCardPaymentUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(confirmCardPaymentBody),
+  });
+};
+
+export const getConfirmCardPaymentMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof confirmCardPayment>>,
+    TError,
+    { data: BodyType<ConfirmCardPaymentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof confirmCardPayment>>,
+  TError,
+  { data: BodyType<ConfirmCardPaymentBody> },
+  TContext
+> => {
+  const mutationKey = ["confirmCardPayment"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof confirmCardPayment>>,
+    { data: BodyType<ConfirmCardPaymentBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return confirmCardPayment(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ConfirmCardPaymentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof confirmCardPayment>>
+>;
+export type ConfirmCardPaymentMutationBody = BodyType<ConfirmCardPaymentBody>;
+export type ConfirmCardPaymentMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Confirm a card payment after Stripe Checkout redirect and trigger fulfillment
+ */
+export const useConfirmCardPayment = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof confirmCardPayment>>,
+    TError,
+    { data: BodyType<ConfirmCardPaymentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof confirmCardPayment>>,
+  TError,
+  { data: BodyType<ConfirmCardPaymentBody> },
+  TContext
+> => {
+  return useMutation(getConfirmCardPaymentMutationOptions(options));
 };
 
 /**

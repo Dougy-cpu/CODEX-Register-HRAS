@@ -306,6 +306,7 @@ export const CreateAttendeeBody = zod.object({
   company: zod.string().optional(),
   workEmail: zod.string().optional(),
   phone: zod.string().nullish(),
+  dietaryAccessibility: zod.string().nullish(),
   gdprConsent: zod.boolean(),
   seatIndex: zod.number().optional(),
 });
@@ -326,6 +327,7 @@ export const UpdateAttendeeBody = zod.object({
   company: zod.string().optional(),
   workEmail: zod.string().optional(),
   phone: zod.string().nullish(),
+  dietaryAccessibility: zod.string().nullish(),
   gdprConsent: zod.boolean().optional(),
 });
 
@@ -512,6 +514,19 @@ export const CreateStripeCheckoutSessionBody = zod.object({
 export const CreateStripeCheckoutSessionResponse = zod.object({
   sessionId: zod.string(),
   url: zod.string(),
+});
+
+/**
+ * @summary Confirm a card payment after Stripe Checkout redirect and trigger fulfillment
+ */
+export const ConfirmCardPaymentBody = zod.object({
+  bookingId: zod.number(),
+  sessionId: zod.string(),
+});
+
+export const ConfirmCardPaymentResponse = zod.object({
+  alreadyProcessed: zod.boolean(),
+  orderReference: zod.string(),
 });
 
 /**

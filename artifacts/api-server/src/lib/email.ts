@@ -309,7 +309,7 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
     </div>
 
     <p>A PDF VAT receipt is attached to this email for your records.</p>
-    ${booking.stripeInvoicePaymentUrl || booking.freeagentPaymentUrl ? `<p style="margin-top:16px;"><a href="${booking.stripeInvoicePaymentUrl || booking.freeagentPaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;">Pay Invoice Online →</a></p>` : ""}
+    ${booking.stripeInvoicePaymentUrl || booking.freeagentPaymentUrl ? `<p style="margin-top:16px;"><a href="${booking.stripeInvoicePaymentUrl || booking.freeagentPaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;">Download Invoice/Pay Online →</a></p>` : ""}
     <p>We look forward to seeing you at the ${settings.eventName}!</p>
   `, settings);
 
@@ -473,7 +473,7 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
       <strong>Venue:</strong> ${settings.eventVenue}, ${settings.eventVenuePostcode}
     </div>
     <p>A PDF VAT receipt is attached to this email for your records.</p>
-    ${booking.stripeInvoicePaymentUrl || booking.freeagentPaymentUrl ? `<p style="margin-top:16px;"><a href="${booking.stripeInvoicePaymentUrl || booking.freeagentPaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;">Pay Invoice Online →</a></p>` : ""}
+    ${booking.stripeInvoicePaymentUrl || booking.freeagentPaymentUrl ? `<p style="margin-top:16px;"><a href="${booking.stripeInvoicePaymentUrl || booking.freeagentPaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;">Download Invoice/Pay Online →</a></p>` : ""}
     <p>We look forward to seeing you at the ${settings.eventName}!</p>
   `, settings);
 

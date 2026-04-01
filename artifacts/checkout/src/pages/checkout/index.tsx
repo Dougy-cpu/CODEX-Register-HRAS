@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useGetBookingBySession, useCreateBooking, useUpdateBooking } from "@workspace/api-client-react";
+import { useGetBookingBySession, useCreateBooking, useUpdateBooking, customFetch } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { v4 as uuidv4 } from "uuid";
 
@@ -54,7 +54,26 @@ export default function CheckoutFlow() {
   useEffect(() => {
     if (!pollingForPayment || !sessionToken) return;
 
+    const stripeSessionId = new URLSearchParams(window.location.search).get(STRIPE_RETURN_PARAM);
+
     pollStartRef.current = Date.now();
+
+    const tryConfirmCardPayment = async () => {
+      if (stripeSessionId && booking?.id && booking.status !== "paid" && booking.status !== "invoiced") {
+        try {
+          await customFetch("/api/stripe/confirm-card-payment", {
+            method: "POST",
+            body: JSON.stringify({ bookingId: booking.id, sessionId: stripeSessionId }),
+          });
+        } catch {
+          // Fallback to polling if confirm fails
+        }
+      }
+    };
+
+    tryConfirmCardPayment().then(() => {
+      queryClient.invalidateQueries({ queryKey: ["booking", sessionToken] });
+    });
 
     pollIntervalRef.current = setInterval(async () => {
       const elapsed = Date.now() - (pollStartRef.current ?? 0);
@@ -76,7 +95,8 @@ export default function CheckoutFlow() {
     return () => {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     };
-  }, [pollingForPayment, sessionToken]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pollingForPayment, sessionToken, booking?.id]);
 
   useEffect(() => {
     if (pollingForPayment && (booking?.status === "paid" || booking?.status === "invoiced")) {

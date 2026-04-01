@@ -232,7 +232,7 @@ export function generatePdfReceipt(
 
     doc.fontSize(10).fillColor("#555");
     doc.text(
-      "This document serves as a VAT receipt. VAT Registration: Please contact us for VAT details.",
+      "This document serves as a VAT receipt. VAT Reg No: 336124621",
       50,
       rowY
     );
@@ -246,15 +246,21 @@ export function generatePdfReceipt(
       .stroke();
 
     rowY += 20;
-    doc.fontSize(10).fillColor("#888");
-    doc.text("HR Analytics Summit · People Strategy Hub Ltd", 50, rowY, { align: "center" });
-    rowY += 14;
-    doc.text(
-      "155 Bishopsgate, London EC2M 3TQ · info@hranalyticssummit.com · www.hranalyticssummit.com",
-      50,
-      rowY,
-      { align: "center" }
-    );
+    doc.fontSize(9).fillColor("#555");
+    doc.text("Issued by: Dynamic Business Leaders Limited  |  Company No. 12252258  |  VAT No. 336124621", 50, rowY, { align: "center" });
+    rowY += 13;
+    doc.text("Registered Address: 45 Lemsford Village, Welwyn Garden City, Hertfordshire AL8 7TR", 50, rowY, { align: "center" });
+    rowY += 13;
+    doc.text("Contact: douglas@dynamicbusinessleaders.co.uk  |  07763618052", 50, rowY, { align: "center" });
+    rowY += 18;
+    doc.text("Bank: Tide (ClearBank)  |  Sort Code: 04-06-05  |  Account: 16963209", 50, rowY, { align: "center" });
+    rowY += 13;
+    doc.text("IBAN (GBP): GB65CLRB04060516963209  |  SWIFT: CLRBGB22", 50, rowY, { align: "center" });
+    rowY += 13;
+    doc.text("IBAN (EUR): GB45TCCL00997990500906  |  BIC: TCCLGB31", 50, rowY, { align: "center" });
+    rowY += 18;
+    doc.fillColor("#888");
+    doc.text("HR Analytics Summit · 155 Bishopsgate, London EC2M 3TQ · hranalyticssummit.com", 50, rowY, { align: "center" });
 
     doc.end();
   });

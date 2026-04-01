@@ -16,10 +16,11 @@ function isAdminRequest(req: import("express").Request): boolean {
 
 const router: IRouter = Router();
 
-function generateOrderRef(): string {
-  const prefix = "HRS";
-  const num = Math.floor(10000 + Math.random() * 90000);
-  return `${prefix}-2026-${num}`;
+function generateOrderRef(bookingId?: number): string {
+  if (bookingId) {
+    return `HRAS26-${6541 + bookingId}`;
+  }
+  return `HRAS26-${6541 + Math.floor(10000 + Math.random() * 90000)}`;
 }
 
 function formatBooking(b: typeof bookingsTable.$inferSelect) {
@@ -227,7 +228,7 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
   if (admin && status !== undefined) {
     updateData.status = status;
     if ((status === "paid" || status === "invoiced") && !existing.orderReference) {
-      updateData.orderReference = generateOrderRef();
+      updateData.orderReference = generateOrderRef(id);
     }
   }
 

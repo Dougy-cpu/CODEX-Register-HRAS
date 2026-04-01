@@ -261,6 +261,8 @@ export interface CreateAttendeeBody {
   workEmail?: string;
   /** @nullable */
   phone?: string | null;
+  /** @nullable */
+  dietaryAccessibility?: string | null;
   gdprConsent: boolean;
   seatIndex?: number;
 }
@@ -274,6 +276,8 @@ export interface UpdateAttendeeBody {
   workEmail?: string;
   /** @nullable */
   phone?: string | null;
+  /** @nullable */
+  dietaryAccessibility?: string | null;
   gdprConsent?: boolean;
 }
 
@@ -454,6 +458,16 @@ export interface CreateStripeSessionBody {
 export interface StripeSessionResponse {
   sessionId: string;
   url: string;
+}
+
+export interface ConfirmCardPaymentBody {
+  bookingId: number;
+  sessionId: string;
+}
+
+export interface ConfirmCardPaymentResponse {
+  alreadyProcessed: boolean;
+  orderReference: string;
 }
 
 export interface CreateInvoiceBody {

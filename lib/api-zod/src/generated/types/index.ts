@@ -18,6 +18,8 @@ export * from "./bookingPassType";
 export * from "./bookingPaymentMethod";
 export * from "./bookingStatus";
 export * from "./bookingWithAttendees";
+export * from "./confirmCardPaymentBody";
+export * from "./confirmCardPaymentResponse";
 export * from "./createAttendeeBody";
 export * from "./createBookingBody";
 export * from "./createBookingBodyAttendeeType";
