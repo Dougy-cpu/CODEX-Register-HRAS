@@ -16,6 +16,12 @@ interface BookingForPdf {
   billingCompany: string | null;
   billingEmail: string | null;
   billingAddress: string | null;
+  billingAddressLine1?: string | null;
+  billingAddressLine2?: string | null;
+  billingTown?: string | null;
+  billingRegion?: string | null;
+  billingPostcode?: string | null;
+  billingCountry?: string | null;
   createdAt: Date;
 }
 
@@ -115,7 +121,14 @@ export function generatePdfReceipt(
     if (booking.billingEmail || lead?.workEmail) {
       doc.text(booking.billingEmail || lead?.workEmail || "");
     }
-    if (booking.billingAddress) {
+    if (booking.billingAddressLine1) {
+      doc.text(booking.billingAddressLine1);
+      if (booking.billingAddressLine2) doc.text(booking.billingAddressLine2);
+      const cityLine = [booking.billingTown, booking.billingRegion].filter(Boolean).join(", ");
+      if (cityLine) doc.text(cityLine);
+      if (booking.billingPostcode) doc.text(booking.billingPostcode);
+      if (booking.billingCountry) doc.text(booking.billingCountry);
+    } else if (booking.billingAddress) {
       doc.text(booking.billingAddress);
     }
 

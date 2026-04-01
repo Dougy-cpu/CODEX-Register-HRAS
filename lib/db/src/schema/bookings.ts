@@ -44,6 +44,12 @@ export const bookingsTable = pgTable("bookings", {
   billingCompany: text("billing_company"),
   billingEmail: text("billing_email"),
   billingAddress: text("billing_address"),
+  billingAddressLine1: text("billing_address_line1"),
+  billingAddressLine2: text("billing_address_line2"),
+  billingTown: text("billing_town"),
+  billingRegion: text("billing_region"),
+  billingPostcode: text("billing_postcode"),
+  billingCountry: text("billing_country"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

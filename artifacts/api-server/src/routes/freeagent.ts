@@ -17,13 +17,31 @@ const FREEAGENT_BASE = "https://api.freeagent.com/v2";
  * If an existing contact is found, update its company/name so it always
  * reflects the current billing details.
  */
+interface ContactAddress {
+  address1?: string | null;
+  address2?: string | null;
+  town?: string | null;
+  region?: string | null;
+  postcode?: string | null;
+  country?: string | null;
+}
+
 async function findOrCreateFreeAgentContact(
   token: string,
   email: string,
   firstName: string,
   lastName: string,
-  company: string
+  company: string,
+  address?: ContactAddress
 ): Promise<string | null> {
+  const addressFields: Record<string, string> = {};
+  if (address?.address1) addressFields.address1 = address.address1;
+  if (address?.address2) addressFields.address2 = address.address2;
+  if (address?.town) addressFields.town = address.town;
+  if (address?.region) addressFields.region = address.region;
+  if (address?.postcode) addressFields.postcode = address.postcode;
+  if (address?.country) addressFields.country = address.country;
+
   try {
     const searchResp = await axios.get(`${FREEAGENT_BASE}/contacts`, {
       params: { email },
@@ -35,7 +53,7 @@ async function findOrCreateFreeAgentContact(
     if (contacts.length > 0) {
       const existingUrl = contacts[0].url;
       // Update the existing contact with the current billing details so the
-      // invoice always shows the right company name.
+      // invoice always shows the right company name and address.
       try {
         await axios.put(
           existingUrl,
@@ -45,6 +63,7 @@ async function findOrCreateFreeAgentContact(
               last_name: lastName,
               organisation_name: company,
               email,
+              ...addressFields,
             },
           },
           { headers: { Authorization: `Bearer ${token}` } }
@@ -63,6 +82,7 @@ async function findOrCreateFreeAgentContact(
           last_name: lastName,
           organisation_name: company,
           email,
+          ...addressFields,
         },
       },
       { headers: { Authorization: `Bearer ${token}` } }
@@ -176,7 +196,15 @@ router.post("/freeagent/create-invoice", async (req, res): Promise<void> => {
     contactEmail,
     contactFirstName,
     contactLastName,
-    contactCompany
+    contactCompany,
+    {
+      address1: booking.billingAddressLine1,
+      address2: booking.billingAddressLine2,
+      town: booking.billingTown,
+      region: booking.billingRegion,
+      postcode: booking.billingPostcode,
+      country: booking.billingCountry,
+    }
   );
 
   if (!contactUrl) {

@@ -94,6 +94,18 @@ export interface Booking {
   billingEmail?: string | null;
   /** @nullable */
   billingAddress?: string | null;
+  /** @nullable */
+  billingAddressLine1?: string | null;
+  /** @nullable */
+  billingAddressLine2?: string | null;
+  /** @nullable */
+  billingTown?: string | null;
+  /** @nullable */
+  billingRegion?: string | null;
+  /** @nullable */
+  billingPostcode?: string | null;
+  /** @nullable */
+  billingCountry?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -204,6 +216,18 @@ export interface UpdateBookingBody {
   billingEmail?: string | null;
   /** @nullable */
   billingAddress?: string | null;
+  /** @nullable */
+  billingAddressLine1?: string | null;
+  /** @nullable */
+  billingAddressLine2?: string | null;
+  /** @nullable */
+  billingTown?: string | null;
+  /** @nullable */
+  billingRegion?: string | null;
+  /** @nullable */
+  billingPostcode?: string | null;
+  /** @nullable */
+  billingCountry?: string | null;
   status?: UpdateBookingBodyStatus;
 }
 

@@ -855,6 +855,18 @@ components:
           type: ["string", "null"]
         billingAddress:
           type: ["string", "null"]
+        billingAddressLine1:
+          type: ["string", "null"]
+        billingAddressLine2:
+          type: ["string", "null"]
+        billingTown:
+          type: ["string", "null"]
+        billingRegion:
+          type: ["string", "null"]
+        billingPostcode:
+          type: ["string", "null"]
+        billingCountry:
+          type: ["string", "null"]
         createdAt:
           type: string
           format: date-time
@@ -933,6 +945,18 @@ components:
         billingEmail:
           type: ["string", "null"]
         billingAddress:
+          type: ["string", "null"]
+        billingAddressLine1:
+          type: ["string", "null"]
+        billingAddressLine2:
+          type: ["string", "null"]
+        billingTown:
+          type: ["string", "null"]
+        billingRegion:
+          type: ["string", "null"]
+        billingPostcode:
+          type: ["string", "null"]
+        billingCountry:
           type: ["string", "null"]
         status:
           type: string

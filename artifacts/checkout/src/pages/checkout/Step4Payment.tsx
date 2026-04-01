@@ -21,7 +21,12 @@ const invoiceSchema = z.object({
   billingName: z.string().min(1, "Billing name is required"),
   billingCompany: z.string().min(1, "Company is required"),
   billingEmail: z.string().email("Valid email is required"),
-  billingAddress: z.string().min(1, "Address is required"),
+  billingAddressLine1: z.string().min(1, "Address line 1 is required"),
+  billingAddressLine2: z.string().optional(),
+  billingTown: z.string().min(1, "Town / City is required"),
+  billingRegion: z.string().optional(),
+  billingPostcode: z.string().min(1, "Postcode is required"),
+  billingCountry: z.string().min(1, "Country is required"),
 });
 
 interface Step4PaymentProps {
@@ -85,7 +90,12 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
       billingName: booking.billingName || booking.attendees?.[0]?.firstName + " " + booking.attendees?.[0]?.lastName || "",
       billingCompany: booking.billingCompany || booking.attendees?.[0]?.company || "",
       billingEmail: booking.billingEmail || booking.attendees?.[0]?.workEmail || "",
-      billingAddress: booking.billingAddress || "",
+      billingAddressLine1: booking.billingAddressLine1 || "",
+      billingAddressLine2: booking.billingAddressLine2 || "",
+      billingTown: booking.billingTown || "",
+      billingRegion: booking.billingRegion || "",
+      billingPostcode: booking.billingPostcode || "",
+      billingCountry: booking.billingCountry || "United Kingdom",
     }
   });
 
@@ -101,7 +111,12 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
             billingName: data.billingName,
             billingCompany: data.billingCompany,
             billingEmail: data.billingEmail,
-            billingAddress: data.billingAddress,
+            billingAddressLine1: data.billingAddressLine1,
+            billingAddressLine2: data.billingAddressLine2 || null,
+            billingTown: data.billingTown,
+            billingRegion: data.billingRegion || null,
+            billingPostcode: data.billingPostcode,
+            billingCountry: data.billingCountry,
           } : {})
         }
       });
@@ -211,17 +226,86 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                 />
                 <FormField
                   control={form.control}
-                  name="billingAddress"
+                  name="billingAddressLine1"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Full Billing Address *</FormLabel>
+                      <FormLabel>Address Line 1 *</FormLabel>
                       <FormControl>
-                        <textarea {...field} className="w-full min-h-[100px] p-3 border border-border bg-white resize-y rounded-none" />
+                        <Input {...field} className="h-12 bg-white" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="billingAddressLine2"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Address Line 2 <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
+                      <FormControl>
+                        <Input {...field} className="h-12 bg-white" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="billingTown"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Town / City *</FormLabel>
+                        <FormControl>
+                          <Input {...field} className="h-12 bg-white" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="billingRegion"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Region / County <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
+                        <FormControl>
+                          <Input {...field} className="h-12 bg-white" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="billingPostcode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Postcode *</FormLabel>
+                        <FormControl>
+                          <Input {...field} className="h-12 bg-white" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="billingCountry"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Country *</FormLabel>
+                        <FormControl>
+                          <Input {...field} className="h-12 bg-white" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </form>
             </Form>
           </div>

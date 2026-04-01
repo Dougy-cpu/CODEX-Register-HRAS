@@ -573,7 +573,13 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
       <tr><td style="padding:7px 0;color:#666;width:180px;border-bottom:1px solid #f0f0f0">Billing Contact</td><td style="border-bottom:1px solid #f0f0f0">${booking.billingName}</td></tr>
       <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Company</td><td style="border-bottom:1px solid #f0f0f0">${booking.billingCompany || "—"}</td></tr>
       <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Invoice Email</td><td style="border-bottom:1px solid #f0f0f0">${booking.billingEmail || "—"}</td></tr>
-      <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Address</td><td style="border-bottom:1px solid #f0f0f0">${(booking.billingAddress || "—").replace(/\n/g, "<br>")}</td></tr>
+      <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Address</td><td style="border-bottom:1px solid #f0f0f0">${(() => {
+        if (booking.billingAddressLine1) {
+          const cityRegion = booking.billingTown && booking.billingRegion ? `${booking.billingTown}, ${booking.billingRegion}` : (booking.billingTown || booking.billingRegion);
+          return [booking.billingAddressLine1, booking.billingAddressLine2, cityRegion, booking.billingPostcode, booking.billingCountry].filter(Boolean).join("<br>");
+        }
+        return (booking.billingAddress || "—").replace(/\n/g, "<br>");
+      })()}</td></tr>
     </table>
     ` : ""}
 
