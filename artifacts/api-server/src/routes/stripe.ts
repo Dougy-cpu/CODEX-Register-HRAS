@@ -197,6 +197,53 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
     }
   }
 
+  // When someone pays a Stripe invoice (e.g. via the hosted payment link), automatically
+  // flip the booking status from "invoiced" → "paid". Confirmation emails were already
+  // sent at invoice creation so we don't resend them here.
+  if (event.type === "invoice.paid") {
+    const invoice = event.data.object as Stripe.Invoice;
+    const invoiceId = invoice.id;
+
+    const [booking] = await db
+      .select()
+      .from(bookingsTable)
+      .where(eq(bookingsTable.stripeInvoiceId, invoiceId));
+
+    if (!booking) {
+      // Could be an invoice unrelated to this system — ignore silently
+      logger.info({ invoiceId }, "invoice.paid: no matching booking found, skipping");
+      res.json({ received: true });
+      return;
+    }
+
+    if (booking.status === "paid") {
+      logger.info({ bookingId: booking.id, invoiceId }, "invoice.paid: already marked paid, skipping");
+      res.json({ received: true });
+      return;
+    }
+
+    await db
+      .update(bookingsTable)
+      .set({ status: "paid", updatedAt: new Date() })
+      .where(eq(bookingsTable.id, booking.id));
+
+    logger.info({ bookingId: booking.id, invoiceId, orderRef: booking.orderReference }, "invoice.paid: booking marked as paid");
+
+    // Re-sync to Google Sheets so the status column reflects "paid"
+    try {
+      await syncBookingToSheets(booking.id);
+    } catch (err) {
+      logger.error({ err, bookingId: booking.id }, "invoice.paid: failed to re-sync to Google Sheets");
+    }
+
+    // Notify the organiser that the invoice has been settled
+    try {
+      await sendOrganiserNotification(booking.id);
+    } catch (err) {
+      logger.error({ err, bookingId: booking.id }, "invoice.paid: failed to send organiser notification");
+    }
+  }
+
   res.json({ received: true });
 });
 
