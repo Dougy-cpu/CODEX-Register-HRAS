@@ -8,6 +8,7 @@
 
 export type ListRegistrationsParams = {
   status?: string;
+  passType?: string;
   search?: string;
   page?: number;
   limit?: number;

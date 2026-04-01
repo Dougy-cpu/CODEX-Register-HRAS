@@ -656,6 +656,7 @@ export const AdminLoginResponse = zod.object({
  */
 export const ListRegistrationsQueryParams = zod.object({
   status: zod.coerce.string().optional(),
+  passType: zod.coerce.string().optional(),
   search: zod.coerce.string().optional(),
   page: zod.coerce.number().optional(),
   limit: zod.coerce.number().optional(),

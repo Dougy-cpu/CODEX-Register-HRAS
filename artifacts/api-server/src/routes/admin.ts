@@ -134,6 +134,7 @@ router.get("/admin/registrations", adminAuth, async (req, res): Promise<void> =>
   const limit = parseInt(req.query.limit as string || "25", 10);
   const offset = (page - 1) * limit;
   const statusFilter = req.query.status as string | undefined;
+  const passTypeFilter = req.query.passType as string | undefined;
   const search = req.query.search as string | undefined;
 
   const allBookings = await db.select().from(bookingsTable).orderBy(desc(bookingsTable.createdAt));
@@ -142,6 +143,9 @@ router.get("/admin/registrations", adminAuth, async (req, res): Promise<void> =>
   let filtered = allBookings;
   if (statusFilter) {
     filtered = filtered.filter((b) => b.status === statusFilter);
+  }
+  if (passTypeFilter) {
+    filtered = filtered.filter((b) => b.passType === passTypeFilter);
   }
 
   if (search) {
@@ -334,6 +338,54 @@ router.get("/admin/registrations/:id", adminAuth, async (req, res): Promise<void
     ...formatBooking(booking),
     attendees: attendees.map(formatAttendee),
   });
+});
+
+router.patch("/admin/registrations/:id/status", adminAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+  const { status } = req.body as { status: string };
+
+  const allowed = ["paid", "invoiced", "partial", "pending_payment", "cancelled"];
+  if (!status || !allowed.includes(status)) {
+    res.status(400).json({ error: `status must be one of: ${allowed.join(", ")}` });
+    return;
+  }
+
+  const [existing] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, id));
+  if (!existing) {
+    res.status(404).json({ error: "Booking not found" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(bookingsTable)
+    .set({ status, updatedAt: new Date() })
+    .where(eq(bookingsTable.id, id))
+    .returning();
+
+  res.json(formatBooking(updated));
+});
+
+router.delete("/admin/registrations", adminAuth, async (req, res): Promise<void> => {
+  const { ids } = req.body as { ids: number[] };
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    res.status(400).json({ error: "ids must be a non-empty array of booking IDs" });
+    return;
+  }
+
+  const numericIds = ids.map(Number).filter((n) => !isNaN(n) && n > 0);
+  if (numericIds.length === 0) {
+    res.status(400).json({ error: "No valid IDs provided" });
+    return;
+  }
+
+  for (const bookingId of numericIds) {
+    await db.delete(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
+    await db.delete(bookingsTable).where(eq(bookingsTable.id, bookingId));
+  }
+
+  res.json({ deleted: numericIds.length });
 });
 
 router.get("/admin/promo-codes", adminAuth, async (_req, res): Promise<void> => {

@@ -1,16 +1,60 @@
 import { useState, Fragment } from "react";
 import { useListRegistrations, useGetRegistration } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import AdminLayout from "@/components/layout/AdminLayout";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, Search, Download } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ChevronDown, ChevronRight, Search, Download, Trash2, AlertTriangle } from "lucide-react";
 
-function ExpandedRegistrationDetail({ id }: { id: number }) {
-  const { data, isLoading } = useGetRegistration(id, {
+const STATUS_OPTIONS = [
+  { value: "paid", label: "Paid" },
+  { value: "invoiced", label: "Invoiced" },
+  { value: "pending_payment", label: "Pending Payment" },
+  { value: "partial", label: "Partial (in progress)" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
+const statusBadge = (status: string) => {
+  const cls =
+    status === "paid" ? "bg-green-100 text-green-800" :
+    status === "invoiced" ? "bg-blue-100 text-blue-800" :
+    status === "cancelled" ? "bg-red-100 text-red-800" :
+    "bg-yellow-100 text-yellow-800";
+  return (
+    <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${cls}`}>
+      {STATUS_OPTIONS.find(s => s.value === status)?.label ?? status}
+    </span>
+  );
+};
+
+function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onStatusChanged: () => void }) {
+  const { data, isLoading, refetch } = useGetRegistration(id, {
     query: { queryKey: ["registration", id] }
   });
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (newStatus === data?.status) return;
+    setUpdatingStatus(true);
+    try {
+      const token = localStorage.getItem("admin_token") || "";
+      const res = await fetch(`/api/admin/registrations/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-admin-token": token },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) throw new Error("Status update failed");
+      await refetch();
+      onStatusChanged();
+    } catch {
+      alert("Failed to update status. Please try again.");
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -42,6 +86,29 @@ function ExpandedRegistrationDetail({ id }: { id: number }) {
           <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">Promo Code</p>
           <p className="font-medium">{data?.promoCode || "—"}</p>
         </div>
+      </div>
+
+      {/* Manual status override */}
+      <div className="flex items-center gap-4 py-3 px-4 bg-slate-50 border border-border">
+        <span className="text-sm font-bold uppercase tracking-wider text-muted-foreground shrink-0">
+          Override Status
+        </span>
+        <Select value={data?.status ?? ""} onValueChange={handleStatusChange} disabled={updatingStatus}>
+          <SelectTrigger className="w-52 h-9 bg-white text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {STATUS_OPTIONS.map(opt => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {updatingStatus && (
+          <span className="text-xs text-muted-foreground animate-pulse">Saving…</span>
+        )}
+        <span className="text-xs text-muted-foreground ml-2">
+          Use this to mark invoice payments received directly to Tide, or to cancel a booking.
+        </span>
       </div>
 
       {/* Invoice details — shown when payment method is invoice */}
@@ -208,23 +275,54 @@ function ExpandedRegistrationDetail({ id }: { id: number }) {
 export default function AdminRegistrations() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("all");
+  const [passType, setPassType] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const queryClient = useQueryClient();
+
+  const queryKey = ["registrations", search, status, passType, page];
 
   const { data, isLoading } = useListRegistrations(
     {
       search: search.trim() || undefined,
       status: status !== "all" ? status : undefined,
+      passType: passType !== "all" ? passType : undefined,
       page,
       limit: 20,
     },
     {
-      query: {
-        queryKey: ["registrations", search, status, page],
-      }
+      query: { queryKey }
     }
   );
+
+  const registrations = data?.registrations ?? [];
+  const pageIds = registrations.map(r => r.id);
+  const allPageSelected = pageIds.length > 0 && pageIds.every(id => selected.has(id));
+  const somePageSelected = pageIds.some(id => selected.has(id));
+
+  const toggleAll = () => {
+    if (allPageSelected) {
+      const next = new Set(selected);
+      pageIds.forEach(id => next.delete(id));
+      setSelected(next);
+    } else {
+      const next = new Set(selected);
+      pageIds.forEach(id => next.add(id));
+      setSelected(next);
+    }
+  };
+
+  const toggleOne = (id: number) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelected(next);
+  };
 
   const handleExport = async () => {
     setExporting(true);
@@ -232,6 +330,7 @@ export default function AdminRegistrations() {
       const token = localStorage.getItem("admin_token") || "";
       const params = new URLSearchParams();
       if (status !== "all") params.set("status", status);
+      if (passType !== "all") params.set("passType", passType);
       const res = await fetch(`/api/admin/registrations/export?${params.toString()}`, {
         headers: { "x-admin-token": token },
       });
@@ -251,9 +350,59 @@ export default function AdminRegistrations() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    setDeleting(true);
+    try {
+      const token = localStorage.getItem("admin_token") || "";
+      const res = await fetch("/api/admin/registrations", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", "x-admin-token": token },
+        body: JSON.stringify({ ids: Array.from(selected) }),
+      });
+      if (!res.ok) throw new Error("Delete failed");
+      setSelected(new Set());
+      setConfirmDelete(false);
+      if (expandedId && selected.has(expandedId)) setExpandedId(null);
+      await queryClient.invalidateQueries({ queryKey: ["registrations"] });
+    } catch {
+      alert("Delete failed. Please try again.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <AdminLayout title="Registrations">
-      <div className="bg-white p-6 border border-border shadow-sm mb-6 flex flex-col md:flex-row gap-4 items-end">
+
+      {/* Confirm delete modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-border shadow-xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-6 h-6 text-red-600 shrink-0" />
+              <h2 className="text-lg font-bold">Delete {selected.size} registration{selected.size !== 1 ? "s" : ""}?</h2>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              This will permanently delete the selected booking{selected.size !== 1 ? "s" : ""} and all associated attendee records. This action cannot be undone.
+            </p>
+            <div className="flex gap-3 pt-2 justify-end">
+              <Button variant="outline" onClick={() => setConfirmDelete(false)} disabled={deleting}>
+                Cancel
+              </Button>
+              <Button
+                className="bg-red-600 hover:bg-red-700 text-white"
+                onClick={handleBulkDelete}
+                disabled={deleting}
+              >
+                {deleting ? "Deleting…" : `Delete ${selected.size} record${selected.size !== 1 ? "s" : ""}`}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Filters bar */}
+      <div className="bg-white p-6 border border-border shadow-sm mb-4 flex flex-col md:flex-row gap-4 items-end">
         <div className="flex-1 w-full">
           <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">Search</label>
           <div className="relative">
@@ -261,14 +410,14 @@ export default function AdminRegistrations() {
             <Input
               placeholder="Search by name, email or reference..."
               value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); setSelected(new Set()); }}
               className="pl-10 h-12"
             />
           </div>
         </div>
-        <div className="w-full md:w-48">
+        <div className="w-full md:w-44">
           <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">Status</label>
-          <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
+          <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); setSelected(new Set()); }}>
             <SelectTrigger className="h-12 bg-white">
               <SelectValue placeholder="All Statuses" />
             </SelectTrigger>
@@ -279,6 +428,19 @@ export default function AdminRegistrations() {
               <SelectItem value="partial">Partial (in progress)</SelectItem>
               <SelectItem value="pending_payment">Pending Payment</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="w-full md:w-44">
+          <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">Pass Type</label>
+          <Select value={passType} onValueChange={(v) => { setPassType(v); setPage(1); setSelected(new Set()); }}>
+            <SelectTrigger className="h-12 bg-white">
+              <SelectValue placeholder="All Passes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Passes</SelectItem>
+              <SelectItem value="single">Standard Pass (HR)</SelectItem>
+              <SelectItem value="business">Business Pass (Vendor)</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -293,6 +455,27 @@ export default function AdminRegistrations() {
         </Button>
       </div>
 
+      {/* Bulk action bar */}
+      {selected.size > 0 && (
+        <div className="mb-4 flex items-center gap-4 px-4 py-3 bg-slate-900 text-white border border-slate-700">
+          <span className="text-sm font-semibold">{selected.size} selected</span>
+          <Button
+            size="sm"
+            className="bg-red-600 hover:bg-red-700 text-white gap-2 h-8"
+            onClick={() => setConfirmDelete(true)}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Delete selected
+          </Button>
+          <button
+            className="text-xs text-slate-400 hover:text-white ml-auto"
+            onClick={() => setSelected(new Set())}
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
+
       <div className="bg-white border border-border shadow-sm">
         {isLoading ? (
           <div className="flex justify-center py-20">
@@ -302,7 +485,15 @@ export default function AdminRegistrations() {
           <Table>
             <TableHeader className="bg-muted/50">
               <TableRow>
-                <TableHead className="w-10"></TableHead>
+                <TableHead className="w-10 pl-4">
+                  <Checkbox
+                    checked={allPageSelected}
+                    onCheckedChange={toggleAll}
+                    aria-label="Select all on this page"
+                    className={somePageSelected && !allPageSelected ? "opacity-50" : ""}
+                  />
+                </TableHead>
+                <TableHead className="w-8"></TableHead>
                 <TableHead>Ref</TableHead>
                 <TableHead>Lead Attendee</TableHead>
                 <TableHead>Pass Type</TableHead>
@@ -314,12 +505,19 @@ export default function AdminRegistrations() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data?.registrations?.map((reg) => (
+              {registrations.map((reg) => (
                 <Fragment key={reg.id}>
                   <TableRow
-                    className="cursor-pointer hover:bg-muted/30"
+                    className={`cursor-pointer hover:bg-muted/30 ${selected.has(reg.id) ? "bg-primary/5" : ""}`}
                     onClick={() => setExpandedId(expandedId === reg.id ? null : reg.id)}
                   >
+                    <TableCell className="pl-4" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selected.has(reg.id)}
+                        onCheckedChange={() => toggleOne(reg.id)}
+                        aria-label={`Select booking ${reg.orderReference}`}
+                      />
+                    </TableCell>
                     <TableCell>
                       {expandedId === reg.id ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                     </TableCell>
@@ -328,18 +526,14 @@ export default function AdminRegistrations() {
                       <p className="font-bold">{reg.leadName || "Unknown"}</p>
                       <p className="text-xs text-muted-foreground">{reg.leadEmail}</p>
                     </TableCell>
-                    <TableCell className="capitalize">{reg.passType}</TableCell>
-                    <TableCell>{reg.quantity}</TableCell>
-                    <TableCell className="font-medium">£{reg.totalAmount}</TableCell>
                     <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${
-                        reg.status === 'paid' ? 'bg-green-100 text-green-800' :
-                        reg.status === 'invoiced' ? 'bg-blue-100 text-blue-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {reg.status}
+                      <span className={`text-xs font-bold px-2 py-0.5 uppercase rounded ${reg.passType === "business" ? "bg-violet-100 text-violet-800" : "bg-slate-100 text-slate-700"}`}>
+                        {reg.passType === "business" ? "Business" : "Standard"}
                       </span>
                     </TableCell>
+                    <TableCell>{reg.quantity}</TableCell>
+                    <TableCell className="font-medium">£{reg.totalAmount}</TableCell>
+                    <TableCell>{statusBadge(reg.status)}</TableCell>
                     <TableCell className="text-sm">{new Date(reg.createdAt).toLocaleDateString()}</TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       {(reg.stripeInvoicePaymentUrl || reg.freeagentPaymentUrl) && (
@@ -356,16 +550,19 @@ export default function AdminRegistrations() {
                   </TableRow>
                   {expandedId === reg.id && (
                     <TableRow className="bg-muted/10">
-                      <TableCell colSpan={9} className="p-6">
-                        <ExpandedRegistrationDetail id={reg.id} />
+                      <TableCell colSpan={10} className="p-6">
+                        <ExpandedRegistrationDetail
+                          id={reg.id}
+                          onStatusChanged={() => queryClient.invalidateQueries({ queryKey: ["registrations"] })}
+                        />
                       </TableCell>
                     </TableRow>
                   )}
                 </Fragment>
               ))}
-              {data?.registrations?.length === 0 && (
+              {registrations.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
+                  <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
                     No registrations found.
                   </TableCell>
                 </TableRow>
