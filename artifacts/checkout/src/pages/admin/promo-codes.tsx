@@ -202,7 +202,7 @@ export default function AdminPromoCodes() {
                 />
 
                 <div className="border rounded-md p-4 space-y-3">
-                  <FormLabel className="text-base">Applies To</FormLabel>
+                  <p className="text-sm font-medium leading-none">Applies To</p>
                   <p className="text-xs text-muted-foreground">Select which pass types this code can be used with.</p>
                   <FormField
                     control={form.control}
