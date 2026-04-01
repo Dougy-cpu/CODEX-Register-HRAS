@@ -40,6 +40,7 @@ SMTP_PASS = "vmoy uean sqxl acoa"
 FROM_EMAIL = "douglas@peoplestrategyhub.com"
 FROM_NAME = "HR Analytics Summit"
 STRIPE_SECRET_KEY = "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"
+STRIPE_WEBHOOK_SECRET = "whsec_YyLH1qLOy9Tvqkudd3LrAwtntU3MArZE"
 
 [nix]
 channel = "stable-25_05"
