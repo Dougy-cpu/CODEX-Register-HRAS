@@ -3,6 +3,8 @@ import { eq, and } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { attendeesTable, bookingsTable } from "@workspace/db";
 import { deriveAdminToken, getAdminPassword } from "../middleware/admin-auth";
+import { sendIncompleteFormNotification } from "../lib/email";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -90,6 +92,21 @@ router.post("/bookings/:bookingId/attendees", async (req, res): Promise<void> =>
   }
 
   res.status(existing ? 200 : 201).json(formatAttendee(attendee));
+
+  // Fire incomplete-form notification when the lead attendee is saved for the first time
+  // on a still-partial booking. Only send once (partialNotificationSent guards duplicates).
+  if (isLead && booking.status === "partial" && !booking.partialNotificationSent) {
+    try {
+      await sendIncompleteFormNotification(bookingId);
+      await db
+        .update(bookingsTable)
+        .set({ partialNotificationSent: true })
+        .where(eq(bookingsTable.id, bookingId));
+    } catch (err) {
+      // Non-fatal — log but don't affect the response
+      logger.error({ err, bookingId }, "Failed to send incomplete form notification");
+    }
+  }
 });
 
 router.patch("/bookings/:bookingId/attendees/:attendeeId", async (req, res): Promise<void> => {

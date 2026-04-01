@@ -655,6 +655,127 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
   logger.info({ bookingId, sentCount, total: recipients.length }, "Organiser notifications sent");
 }
 
+export async function sendIncompleteFormNotification(bookingId: number): Promise<void> {
+  const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
+  if (!booking) return;
+
+  const storedEmails = await db
+    .select()
+    .from(notificationEmailsTable)
+    .orderBy(notificationEmailsTable.createdAt);
+
+  const recipients: string[] = storedEmails.map((e) => e.email);
+  if (process.env.ORGANISER_EMAIL && !recipients.includes(process.env.ORGANISER_EMAIL.toLowerCase())) {
+    recipients.push(process.env.ORGANISER_EMAIL);
+  }
+
+  if (recipients.length === 0) {
+    logger.info({ bookingId }, "No notification recipients configured — skipping incomplete form notification");
+    return;
+  }
+
+  const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
+  const lead = attendees.find((a) => a.isLead) || attendees[0];
+  if (!lead) return;
+
+  const passLabels: Record<string, string> = {
+    single: "Single Pass (HR Professional)",
+    team: "Team Pass (3 seats)",
+    business: "Business Pass (Vendor/Consultant)",
+  };
+
+  const submittedAt = booking.updatedAt || booking.createdAt;
+  const submittedAtStr = submittedAt
+    ? new Date(submittedAt).toLocaleString("en-GB", { timeZone: "Europe/London", weekday: "short", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZoneName: "short" })
+    : "Unknown";
+
+  const dataRows = [
+    ["First Name", lead.firstName],
+    ["Last Name", lead.lastName],
+    ["Email", lead.workEmail],
+    ["Company", lead.company || "—"],
+    ["Job Title", lead.jobTitle || "—"],
+    ["Pass Type", passLabels[booking.passType] || booking.passType],
+    ["Quantity", String(booking.quantity)],
+    ["Submitted At", submittedAtStr],
+  ];
+
+  const tableRows = dataRows.map(([label, value], i) => `
+    <tr style="background:${i % 2 === 0 ? "#1e293b" : "#263548"}">
+      <td style="padding:11px 16px;font-weight:bold;color:#94a3b8;font-size:13px;width:160px;border-bottom:1px solid #334155">${label}</td>
+      <td style="padding:11px 16px;color:#f1f5f9;font-size:13px;border-bottom:1px solid #334155">${value}</td>
+    </tr>
+  `).join("");
+
+  const subject = `Incomplete Registration: ${lead.firstName} ${lead.lastName} — HR Analytics Summit`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Helvetica Neue',Arial,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
+
+          <!-- Header -->
+          <tr>
+            <td style="background:#1e293b;padding:32px 32px 24px;border-radius:4px 4px 0 0">
+              <h1 style="margin:0 0 8px;font-size:24px;font-weight:700;color:#f8fafc;letter-spacing:-0.02em">
+                Incomplete HR Analytics Summit Registration
+              </h1>
+              <p style="margin:0;font-size:14px;color:#64748b">
+                HR Analytics Summit &mdash; 3 Sep 2026, 155 Bishopsgate, London
+              </p>
+            </td>
+          </tr>
+
+          <!-- Warning banner -->
+          <tr>
+            <td style="background:#854d0e;padding:12px 32px">
+              <p style="margin:0;font-size:14px;color:#fef9c3">
+                This person submitted their details but has <strong style="color:#fef08a">not yet completed payment</strong>.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Data table -->
+          <tr>
+            <td style="background:#1e293b;padding:0">
+              <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
+                ${tableRows}
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background:#0f172a;padding:20px 32px;border-top:1px solid #1e293b;border-radius:0 0 4px 4px">
+              <p style="margin:0;font-size:12px;color:#475569">
+                HR Analytics Summit &bull; Dynamic Business Leaders Limited &bull; This is an internal organiser notification.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  let sentCount = 0;
+  for (const to of recipients) {
+    try {
+      await sendMail({ to, subject, html });
+      sentCount++;
+    } catch (err) {
+      logger.error({ err, bookingId, to }, "Failed to send incomplete form notification");
+    }
+  }
+  logger.info({ bookingId, sentCount, total: recipients.length }, "Incomplete form notifications sent");
+}
+
 export async function sendWelcomeEmail(
   bookingId: number | null,
   firstName: string,

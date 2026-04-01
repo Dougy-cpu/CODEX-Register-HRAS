@@ -83,17 +83,23 @@ export default function AdminNotifications() {
       <div className="max-w-2xl">
         <div className="mb-8">
           <p className="text-muted-foreground">
-            Add staff email addresses to receive an order notification whenever a registration is completed.
+            Add staff email addresses to receive notifications when someone registers or starts the checkout process.
             Each notification includes full attendee details, ticket counts, pricing, and payment information.
           </p>
         </div>
 
         <div className="bg-blue-50 border border-blue-200 rounded-sm p-4 flex gap-3 mb-8">
           <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-          <p className="text-sm text-blue-800">
-            Notifications are sent for both card payments (on successful charge) and invoice requests.
-            You can add as many staff email addresses as needed — each will receive a separate copy of the notification.
-          </p>
+          <div className="text-sm text-blue-800 space-y-1.5">
+            <p>
+              <strong>Completed bookings</strong> — Notifications are sent when a card payment is confirmed or an invoice request is submitted.
+              Includes full attendee details, pricing, and payment method.
+            </p>
+            <p>
+              <strong>Incomplete forms</strong> — A separate dark-styled notification is sent when someone fills in their attendee details but has not yet completed payment.
+              Sent once per checkout session so you can follow up with them.
+            </p>
+          </div>
         </div>
 
         <div className="bg-white border border-border p-6 mb-6">

@@ -15,7 +15,18 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
     const token = localStorage.getItem("admin_token");
     if (!token) {
       setLocation("/admin/login");
+      return;
     }
+
+    const handleUnauthorized = () => {
+      localStorage.removeItem("admin_token");
+      setLocation("/admin/login");
+    };
+
+    window.addEventListener("api:unauthorized", handleUnauthorized);
+    return () => {
+      window.removeEventListener("api:unauthorized", handleUnauthorized);
+    };
   }, [setLocation]);
 
   const navItems = [
