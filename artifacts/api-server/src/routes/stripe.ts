@@ -349,8 +349,7 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
       customer: customer.id,
       invoice: invoiceObj.id,
       description: `${passLabels[booking.passType] || booking.passType} × ${booking.quantity}`,
-      quantity: 1,
-      unit_amount: Math.round(baseAmount * 100),
+      amount: Math.round(baseAmount * 100),
       currency: "gbp",
       ...vatParams,
     });
@@ -360,8 +359,7 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
         customer: customer.id,
         invoice: invoiceObj.id,
         description: "Group Discount",
-        quantity: 1,
-        unit_amount: -Math.round(groupDiscount * 100),
+        amount: -Math.round(groupDiscount * 100),
         currency: "gbp",
         ...vatParams,
       });
@@ -372,8 +370,7 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
         customer: customer.id,
         invoice: invoiceObj.id,
         description: `Promo Code: ${booking.promoCode}`,
-        quantity: 1,
-        unit_amount: -Math.round(promoDiscount * 100),
+        amount: -Math.round(promoDiscount * 100),
         currency: "gbp",
         ...vatParams,
       });

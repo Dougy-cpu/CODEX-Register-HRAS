@@ -55,6 +55,9 @@ const defaultSettings: Omit<EventSettings, "id" | "updatedAt"> = {
   logoDataUrl: null,
   fromName: "HR Analytics Summit",
   fromEmail: "noreply@hranalyticssummit.com",
+  freeagentRefreshToken: null,
+  freeagentAccessToken: null,
+  freeagentTokenExpiresAt: null,
 };
 
 export async function getEventSettings(): Promise<EventSettings> {
@@ -306,14 +309,14 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
     </div>
 
     <p>A PDF VAT receipt is attached to this email for your records.</p>
-    ${(booking as any).stripeInvoicePaymentUrl || (booking as any).freeagentPaymentUrl ? `<p style="margin-top:16px;"><a href="${(booking as any).stripeInvoicePaymentUrl || (booking as any).freeagentPaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;">Pay Invoice Online →</a></p>` : ""}
+    ${booking.stripeInvoicePaymentUrl || booking.freeagentPaymentUrl ? `<p style="margin-top:16px;"><a href="${booking.stripeInvoicePaymentUrl || booking.freeagentPaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;">Pay Invoice Online →</a></p>` : ""}
     <p>We look forward to seeing you at the ${settings.eventName}!</p>
   `, settings);
 
   // Prefer Stripe invoice PDF, then FreeAgent PDF, then our custom receipt
   let pdfBuffer: Buffer | null = null;
   let pdfFilename = `receipt-${booking.orderReference || bookingId}.pdf`;
-  const stripeInvoicePdfUrl = (booking as any).stripeInvoicePdfUrl as string | null;
+  const stripeInvoicePdfUrl = booking.stripeInvoicePdfUrl;
   if (stripeInvoicePdfUrl) {
     try {
       pdfBuffer = await downloadHttpsPdf(stripeInvoicePdfUrl);
@@ -328,7 +331,7 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
     }
   }
   if (!pdfBuffer) {
-    const faInvoiceUrl = (booking as any).freeagentInvoiceUrl as string | null;
+    const faInvoiceUrl = booking.freeagentInvoiceUrl;
     if (faInvoiceUrl) {
       try {
         const faToken = await getFreeAgentToken();
@@ -470,14 +473,14 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
       <strong>Venue:</strong> ${settings.eventVenue}, ${settings.eventVenuePostcode}
     </div>
     <p>A PDF VAT receipt is attached to this email for your records.</p>
-    ${(booking as any).stripeInvoicePaymentUrl || (booking as any).freeagentPaymentUrl ? `<p style="margin-top:16px;"><a href="${(booking as any).stripeInvoicePaymentUrl || (booking as any).freeagentPaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;">Pay Invoice Online →</a></p>` : ""}
+    ${booking.stripeInvoicePaymentUrl || booking.freeagentPaymentUrl ? `<p style="margin-top:16px;"><a href="${booking.stripeInvoicePaymentUrl || booking.freeagentPaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;">Pay Invoice Online →</a></p>` : ""}
     <p>We look forward to seeing you at the ${settings.eventName}!</p>
   `, settings);
 
   // Prefer Stripe invoice PDF, then FreeAgent PDF, then our custom receipt
   let pdfBuffer: Buffer | null = null;
   let pdfFilename = `receipt-${booking.orderReference || bookingId}.pdf`;
-  const stripeInvoicePdfUrlResend = (booking as any).stripeInvoicePdfUrl as string | null;
+  const stripeInvoicePdfUrlResend = booking.stripeInvoicePdfUrl;
   if (stripeInvoicePdfUrlResend) {
     try {
       pdfBuffer = await downloadHttpsPdf(stripeInvoicePdfUrlResend);
@@ -490,7 +493,7 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
     }
   }
   if (!pdfBuffer) {
-    const faInvoiceUrlResend = (booking as any).freeagentInvoiceUrl as string | null;
+    const faInvoiceUrlResend = booking.freeagentInvoiceUrl;
     if (faInvoiceUrlResend) {
       try {
         const faToken = await getFreeAgentToken();

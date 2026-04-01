@@ -45,11 +45,11 @@ function ExpandedRegistrationDetail({ id }: { id: number }) {
       </div>
 
       {/* Invoice links */}
-      {((data as any)?.stripeInvoicePaymentUrl || (data as any)?.stripeInvoicePdfUrl || (data as any)?.freeagentPaymentUrl) && (
+      {(data?.stripeInvoicePaymentUrl || data?.stripeInvoicePdfUrl || data?.freeagentPaymentUrl) && (
         <div className="flex flex-wrap gap-3 text-sm">
-          {(data as any)?.stripeInvoicePaymentUrl && (
+          {data?.stripeInvoicePaymentUrl && (
             <a
-              href={(data as any).stripeInvoicePaymentUrl}
+              href={data.stripeInvoicePaymentUrl}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 font-semibold text-primary underline underline-offset-2 hover:text-primary/80"
@@ -57,9 +57,9 @@ function ExpandedRegistrationDetail({ id }: { id: number }) {
               View Stripe Invoice →
             </a>
           )}
-          {(data as any)?.stripeInvoicePdfUrl && (
+          {data?.stripeInvoicePdfUrl && (
             <a
-              href={(data as any).stripeInvoicePdfUrl}
+              href={data.stripeInvoicePdfUrl}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 font-semibold text-blue-600 underline underline-offset-2 hover:text-blue-800"
@@ -67,9 +67,9 @@ function ExpandedRegistrationDetail({ id }: { id: number }) {
               Download Invoice PDF →
             </a>
           )}
-          {!(data as any)?.stripeInvoicePaymentUrl && (data as any)?.freeagentPaymentUrl && (
+          {!data?.stripeInvoicePaymentUrl && data?.freeagentPaymentUrl && (
             <a
-              href={(data as any).freeagentPaymentUrl}
+              href={data.freeagentPaymentUrl}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 font-semibold text-primary underline underline-offset-2 hover:text-primary/80"
