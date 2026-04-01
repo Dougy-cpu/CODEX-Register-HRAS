@@ -1,4 +1,3 @@
-import https from "https";
 import { Router, type IRouter } from "express";
 import Stripe from "stripe";
 import { eq, sql } from "drizzle-orm";
@@ -229,17 +228,6 @@ async function getOrCreateVatRate(stripe: Stripe): Promise<string | null> {
   }
 }
 
-async function downloadUrl(url: string): Promise<Buffer | null> {
-  return new Promise((resolve) => {
-    https.get(url, (res) => {
-      if (res.statusCode !== 200) { resolve(null); return; }
-      const chunks: Buffer[] = [];
-      res.on("data", (c: Buffer) => chunks.push(c));
-      res.on("end", () => resolve(Buffer.concat(chunks)));
-      res.on("error", () => resolve(null));
-    }).on("error", () => resolve(null));
-  });
-}
 
 router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
   const stripe = getStripe();
@@ -382,14 +370,6 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
     const invoiceId = sent.id;
     const invoicePdfUrl = sent.invoice_pdf || null;
     const invoicePaymentUrl = sent.hosted_invoice_url || null;
-
-    let pdfBuffer: Buffer | null = null;
-    if (invoicePdfUrl) {
-      pdfBuffer = await downloadUrl(invoicePdfUrl);
-      if (pdfBuffer) {
-        logger.info({ bookingId: id, sizeBytes: pdfBuffer.length }, "Downloaded Stripe invoice PDF");
-      }
-    }
 
     await db.update(bookingsTable).set({
       status: "invoiced",
