@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { useListRegistrations, useGetRegistration } from "@workspace/api-client-react";
 import AdminLayout from "@/components/layout/AdminLayout";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -315,9 +315,8 @@ export default function AdminRegistrations() {
             </TableHeader>
             <TableBody>
               {data?.registrations?.map((reg) => (
-                <>
+                <Fragment key={reg.id}>
                   <TableRow
-                    key={reg.id}
                     className="cursor-pointer hover:bg-muted/30"
                     onClick={() => setExpandedId(expandedId === reg.id ? null : reg.id)}
                   >
@@ -362,7 +361,7 @@ export default function AdminRegistrations() {
                       </TableCell>
                     </TableRow>
                   )}
-                </>
+                </Fragment>
               ))}
               {data?.registrations?.length === 0 && (
                 <TableRow>
