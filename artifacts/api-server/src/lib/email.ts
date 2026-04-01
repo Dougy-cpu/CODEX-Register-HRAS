@@ -361,7 +361,7 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
     attachments.push({ filename: pdfFilename, content: pdfBuffer, contentType: "application/pdf" });
   }
   const companyInfoPdf = getCompanyInfoPdf();
-  if (companyInfoPdf) {
+  if (companyInfoPdf && booking.paymentMethod === "invoice") {
     attachments.push({ filename: "DBL-company-information.pdf", content: companyInfoPdf, contentType: "application/pdf" });
   }
 
@@ -523,7 +523,7 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
     attachments.push({ filename: pdfFilename, content: pdfBuffer, contentType: "application/pdf" });
   }
   const companyInfoPdfResend = getCompanyInfoPdf();
-  if (companyInfoPdfResend) {
+  if (companyInfoPdfResend && booking.paymentMethod === "invoice") {
     attachments.push({ filename: "DBL-company-information.pdf", content: companyInfoPdfResend, contentType: "application/pdf" });
   }
 

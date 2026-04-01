@@ -187,6 +187,7 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
     billingRegion,
     billingPostcode,
     billingCountry,
+    billingVatNumber,
     // status is admin/webhook-only — excluded from public PATCH body
     status,
   } = req.body;
@@ -223,6 +224,7 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
   if (billingRegion !== undefined) updateData.billingRegion = billingRegion;
   if (billingPostcode !== undefined) updateData.billingPostcode = billingPostcode;
   if (billingCountry !== undefined) updateData.billingCountry = billingCountry;
+  if (billingVatNumber !== undefined) updateData.billingVatNumber = billingVatNumber || null;
 
   // Only admin requests may mutate status
   if (admin && status !== undefined) {

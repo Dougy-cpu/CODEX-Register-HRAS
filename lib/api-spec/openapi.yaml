@@ -936,6 +936,8 @@ components:
           type: ["string", "null"]
         billingCountry:
           type: ["string", "null"]
+        billingVatNumber:
+          type: ["string", "null"]
         createdAt:
           type: string
           format: date-time
@@ -1026,6 +1028,8 @@ components:
         billingPostcode:
           type: ["string", "null"]
         billingCountry:
+          type: ["string", "null"]
+        billingVatNumber:
           type: ["string", "null"]
         status:
           type: string
