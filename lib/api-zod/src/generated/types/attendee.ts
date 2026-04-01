@@ -21,6 +21,8 @@ export interface Attendee {
   gdprConsent: boolean;
   /** @nullable */
   gdprConsentAt?: Date | null;
+  /** @nullable */
+  dietaryAccessibility?: string | null;
   seatIndex?: number;
   createdAt: Date;
   updatedAt: Date;

@@ -133,6 +133,8 @@ export interface Attendee {
   gdprConsent: boolean;
   /** @nullable */
   gdprConsentAt?: string | null;
+  /** @nullable */
+  dietaryAccessibility?: string | null;
   seatIndex?: number;
   createdAt: string;
   updatedAt: string;

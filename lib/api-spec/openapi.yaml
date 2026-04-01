@@ -1067,6 +1067,8 @@ components:
         gdprConsentAt:
           type: ["string", "null"]
           format: date-time
+        dietaryAccessibility:
+          type: ["string", "null"]
         seatIndex:
           type: integer
         createdAt:
