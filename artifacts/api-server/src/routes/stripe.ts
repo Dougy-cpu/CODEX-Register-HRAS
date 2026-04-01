@@ -381,9 +381,23 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
   }
 
   // A payment dispute (chargeback) has been filed — mark booking disputed and alert organisers urgently.
-  if (event.type === "dispute.created") {
+  if (event.type === "charge.dispute.created") {
+    const stripe = getStripe();
     const dispute = event.data.object as Stripe.Dispute;
-    const piId = typeof dispute.payment_intent === "string" ? dispute.payment_intent : null;
+
+    // Resolve the payment intent ID — try the dispute object first, fall back to retrieving the charge
+    let piId = typeof dispute.payment_intent === "string" ? dispute.payment_intent : null;
+    if (!piId && stripe) {
+      const chargeId = typeof dispute.charge === "string" ? dispute.charge : null;
+      if (chargeId) {
+        try {
+          const charge = await stripe.charges.retrieve(chargeId);
+          piId = typeof charge.payment_intent === "string" ? charge.payment_intent : null;
+        } catch (chargeErr) {
+          logger.warn({ chargeErr, chargeId }, "charge.dispute.created: could not retrieve charge to resolve payment intent");
+        }
+      }
+    }
 
     if (piId) {
       const [booking] = await db
