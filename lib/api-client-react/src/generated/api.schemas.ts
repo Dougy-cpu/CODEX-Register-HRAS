@@ -321,6 +321,14 @@ export const PromoCodeDiscountType = {
   fixed: "fixed",
 } as const;
 
+export type PromoCodeApplicablePassTypesItem =
+  (typeof PromoCodeApplicablePassTypesItem)[keyof typeof PromoCodeApplicablePassTypesItem];
+
+export const PromoCodeApplicablePassTypesItem = {
+  single: "single",
+  business: "business",
+} as const;
+
 export interface PromoCode {
   id: number;
   code: string;
@@ -334,6 +342,7 @@ export interface PromoCode {
   /** @nullable */
   validUntil?: string | null;
   isActive: boolean;
+  applicablePassTypes: PromoCodeApplicablePassTypesItem[];
   /** @nullable */
   description?: string | null;
   createdAt: string;
@@ -347,6 +356,14 @@ export const CreatePromoCodeBodyDiscountType = {
   fixed: "fixed",
 } as const;
 
+export type CreatePromoCodeBodyApplicablePassTypesItem =
+  (typeof CreatePromoCodeBodyApplicablePassTypesItem)[keyof typeof CreatePromoCodeBodyApplicablePassTypesItem];
+
+export const CreatePromoCodeBodyApplicablePassTypesItem = {
+  single: "single",
+  business: "business",
+} as const;
+
 export interface CreatePromoCodeBody {
   code: string;
   discountType: CreatePromoCodeBodyDiscountType;
@@ -358,6 +375,7 @@ export interface CreatePromoCodeBody {
   /** @nullable */
   validUntil?: string | null;
   isActive?: boolean;
+  applicablePassTypes?: CreatePromoCodeBodyApplicablePassTypesItem[];
   /** @nullable */
   description?: string | null;
 }
@@ -368,6 +386,14 @@ export type UpdatePromoCodeBodyDiscountType =
 export const UpdatePromoCodeBodyDiscountType = {
   percentage: "percentage",
   fixed: "fixed",
+} as const;
+
+export type UpdatePromoCodeBodyApplicablePassTypesItem =
+  (typeof UpdatePromoCodeBodyApplicablePassTypesItem)[keyof typeof UpdatePromoCodeBodyApplicablePassTypesItem];
+
+export const UpdatePromoCodeBodyApplicablePassTypesItem = {
+  single: "single",
+  business: "business",
 } as const;
 
 export interface UpdatePromoCodeBody {
@@ -381,6 +407,7 @@ export interface UpdatePromoCodeBody {
   /** @nullable */
   validUntil?: string | null;
   isActive?: boolean;
+  applicablePassTypes?: UpdatePromoCodeBodyApplicablePassTypesItem[];
   /** @nullable */
   description?: string | null;
 }

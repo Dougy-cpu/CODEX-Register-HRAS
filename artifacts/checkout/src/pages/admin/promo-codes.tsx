@@ -16,6 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { Trash2, Plus } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -25,7 +26,31 @@ const promoSchema = z.object({
   discountValue: z.coerce.number().min(1, "Value must be greater than 0"),
   maxUses: z.coerce.number().optional().nullable(),
   isActive: z.boolean().default(true),
+  applySingle: z.boolean().default(true),
+  applyBusiness: z.boolean().default(true),
+}).refine((data) => data.applySingle || data.applyBusiness, {
+  message: "At least one pass type must be selected",
+  path: ["applySingle"],
 });
+
+function passTypeBadges(types: string[] | undefined) {
+  if (!types || types.length === 0) {
+    return <Badge variant="secondary">Both</Badge>;
+  }
+  if (types.includes("single") && types.includes("business")) {
+    return <Badge variant="secondary">Both</Badge>;
+  }
+  return (
+    <div className="flex gap-1 flex-wrap">
+      {types.includes("single") && (
+        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Single</Badge>
+      )}
+      {types.includes("business") && (
+        <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">Business</Badge>
+      )}
+    </div>
+  );
+}
 
 export default function AdminPromoCodes() {
   const queryClient = useQueryClient();
@@ -49,10 +74,20 @@ export default function AdminPromoCodes() {
       discountValue: 10,
       maxUses: null,
       isActive: true,
+      applySingle: true,
+      applyBusiness: true,
     }
   });
 
+  const { watch } = form;
+  const applySingle = watch("applySingle");
+  const applyBusiness = watch("applyBusiness");
+
   const onSubmit = async (values: z.infer<typeof promoSchema>) => {
+    const applicablePassTypes: string[] = [];
+    if (values.applySingle) applicablePassTypes.push("single");
+    if (values.applyBusiness) applicablePassTypes.push("business");
+
     await createPromo.mutateAsync({
       data: {
         code: values.code,
@@ -60,6 +95,7 @@ export default function AdminPromoCodes() {
         discountValue: values.discountValue,
         maxUses: values.maxUses,
         isActive: values.isActive,
+        applicablePassTypes,
       }
     });
     queryClient.invalidateQueries({ queryKey: ["promoCodes"] });
@@ -165,6 +201,52 @@ export default function AdminPromoCodes() {
                   )}
                 />
 
+                <div className="border rounded-md p-4 space-y-3">
+                  <FormLabel className="text-base">Applies To</FormLabel>
+                  <p className="text-xs text-muted-foreground">Select which pass types this code can be used with.</p>
+                  <FormField
+                    control={form.control}
+                    name="applySingle"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between">
+                        <div>
+                          <FormLabel className="font-normal">Single Pass</FormLabel>
+                          <p className="text-xs text-muted-foreground">HR professional ticket (£199)</p>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            disabled={!applyBusiness && field.value}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="applyBusiness"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between">
+                        <div>
+                          <FormLabel className="font-normal">Business Pass</FormLabel>
+                          <p className="text-xs text-muted-foreground">Vendor / supplier ticket (£599)</p>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            disabled={!applySingle && field.value}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  {form.formState.errors.applySingle && (
+                    <p className="text-sm text-destructive">{form.formState.errors.applySingle.message}</p>
+                  )}
+                </div>
+
                 <FormField
                   control={form.control}
                   name="isActive"
@@ -203,6 +285,7 @@ export default function AdminPromoCodes() {
               <TableRow>
                 <TableHead>Code</TableHead>
                 <TableHead>Discount</TableHead>
+                <TableHead>Applies To</TableHead>
                 <TableHead>Usage</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -214,6 +297,9 @@ export default function AdminPromoCodes() {
                   <TableCell className="font-mono font-bold text-lg">{promo.code}</TableCell>
                   <TableCell>
                     {promo.discountType === "percentage" ? `${promo.discountValue}%` : `£${promo.discountValue}`}
+                  </TableCell>
+                  <TableCell>
+                    {passTypeBadges(promo.applicablePassTypes)}
                   </TableCell>
                   <TableCell>
                     {promo.usedCount} {promo.maxUses ? `/ ${promo.maxUses}` : "used"}
@@ -233,7 +319,7 @@ export default function AdminPromoCodes() {
               ))}
               {data?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
                     No promo codes created yet.
                   </TableCell>
                 </TableRow>

@@ -418,6 +418,7 @@ export const ListPromoCodesResponseItem = zod.object({
   validFrom: zod.coerce.date().nullish(),
   validUntil: zod.coerce.date().nullish(),
   isActive: zod.boolean(),
+  applicablePassTypes: zod.array(zod.enum(["single", "business"])),
   description: zod.string().nullish(),
   createdAt: zod.coerce.date(),
 });
@@ -434,6 +435,7 @@ export const CreatePromoCodeBody = zod.object({
   validFrom: zod.coerce.date().nullish(),
   validUntil: zod.coerce.date().nullish(),
   isActive: zod.boolean().optional(),
+  applicablePassTypes: zod.array(zod.enum(["single", "business"])).optional(),
   description: zod.string().nullish(),
 });
 
@@ -452,6 +454,7 @@ export const UpdatePromoCodeBody = zod.object({
   validFrom: zod.coerce.date().nullish(),
   validUntil: zod.coerce.date().nullish(),
   isActive: zod.boolean().optional(),
+  applicablePassTypes: zod.array(zod.enum(["single", "business"])).optional(),
   description: zod.string().nullish(),
 });
 
@@ -465,6 +468,7 @@ export const UpdatePromoCodeResponse = zod.object({
   validFrom: zod.coerce.date().nullish(),
   validUntil: zod.coerce.date().nullish(),
   isActive: zod.boolean(),
+  applicablePassTypes: zod.array(zod.enum(["single", "business"])),
   description: zod.string().nullish(),
   createdAt: zod.coerce.date(),
 });

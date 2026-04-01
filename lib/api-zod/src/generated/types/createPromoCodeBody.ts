@@ -5,6 +5,7 @@
  * HR Analytics Summit Conference Registration API
  * OpenAPI spec version: 0.1.0
  */
+import type { CreatePromoCodeBodyApplicablePassTypesItem } from "./createPromoCodeBodyApplicablePassTypesItem";
 import type { CreatePromoCodeBodyDiscountType } from "./createPromoCodeBodyDiscountType";
 
 export interface CreatePromoCodeBody {
@@ -18,6 +19,7 @@ export interface CreatePromoCodeBody {
   /** @nullable */
   validUntil?: Date | null;
   isActive?: boolean;
+  applicablePassTypes?: CreatePromoCodeBodyApplicablePassTypesItem[];
   /** @nullable */
   description?: string | null;
 }

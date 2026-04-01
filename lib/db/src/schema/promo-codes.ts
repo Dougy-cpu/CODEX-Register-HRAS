@@ -1,6 +1,7 @@
 import { pgTable, text, serial, timestamp, integer, boolean, numeric, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { sql } from "drizzle-orm";
 
 export const discountTypeEnum = pgEnum("discount_type", ["percentage", "fixed"]);
 
@@ -14,6 +15,7 @@ export const promoCodesTable = pgTable("promo_codes", {
   validFrom: timestamp("valid_from", { withTimezone: true }),
   validUntil: timestamp("valid_until", { withTimezone: true }),
   isActive: boolean("is_active").notNull().default(true),
+  applicablePassTypes: text("applicable_pass_types").array().notNull().default(sql`ARRAY['single','business']`),
   description: text("description"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

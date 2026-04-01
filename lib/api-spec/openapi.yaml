@@ -1230,6 +1230,11 @@ components:
           format: date-time
         isActive:
           type: boolean
+        applicablePassTypes:
+          type: array
+          items:
+            type: string
+            enum: [single, business]
         description:
           type: ["string", "null"]
         createdAt:
@@ -1242,6 +1247,7 @@ components:
         - discountValue
         - usedCount
         - isActive
+        - applicablePassTypes
         - createdAt
 
     CreatePromoCodeBody:
@@ -1264,6 +1270,11 @@ components:
           format: date-time
         isActive:
           type: boolean
+        applicablePassTypes:
+          type: array
+          items:
+            type: string
+            enum: [single, business]
         description:
           type: ["string", "null"]
       required:
@@ -1291,6 +1302,11 @@ components:
           format: date-time
         isActive:
           type: boolean
+        applicablePassTypes:
+          type: array
+          items:
+            type: string
+            enum: [single, business]
         description:
           type: ["string", "null"]
 

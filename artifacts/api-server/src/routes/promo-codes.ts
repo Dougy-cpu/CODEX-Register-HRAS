@@ -47,6 +47,12 @@ router.post("/promo-codes/validate", async (req, res): Promise<void> => {
     return;
   }
 
+  if (promo.applicablePassTypes && !promo.applicablePassTypes.includes(passType as string)) {
+    const allowed = promo.applicablePassTypes.map((t: string) => t === "single" ? "Single Pass" : "Business Pass").join(" and ");
+    res.status(400).json({ error: `This promo code is only valid for ${allowed}` });
+    return;
+  }
+
   const passInfo = PASS_PRICES[passType as string];
   if (!passInfo) {
     res.status(400).json({ error: "Invalid pass type" });

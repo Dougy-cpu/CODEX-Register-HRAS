@@ -393,12 +393,16 @@ router.get("/admin/promo-codes", adminAuth, async (_req, res): Promise<void> => 
 });
 
 router.post("/admin/promo-codes", adminAuth, async (req, res): Promise<void> => {
-  const { code, discountType, discountValue, maxUses, validFrom, validUntil, isActive, description } = req.body;
+  const { code, discountType, discountValue, maxUses, validFrom, validUntil, isActive, description, applicablePassTypes } = req.body;
 
   if (!code || !discountType || discountValue === undefined) {
     res.status(400).json({ error: "code, discountType, and discountValue are required" });
     return;
   }
+
+  const passTypes: string[] = Array.isArray(applicablePassTypes) && applicablePassTypes.length > 0
+    ? applicablePassTypes
+    : ["single", "business"];
 
   const [promo] = await db
     .insert(promoCodesTable)
@@ -410,6 +414,7 @@ router.post("/admin/promo-codes", adminAuth, async (req, res): Promise<void> => 
       validFrom: validFrom ? new Date(validFrom) : null,
       validUntil: validUntil ? new Date(validUntil) : null,
       isActive: isActive !== false,
+      applicablePassTypes: passTypes,
       description: description || null,
     })
     .returning();
@@ -427,7 +432,7 @@ router.patch("/admin/promo-codes/:id", adminAuth, async (req, res): Promise<void
     return;
   }
 
-  const { code, discountType, discountValue, maxUses, validFrom, validUntil, isActive, description } = req.body;
+  const { code, discountType, discountValue, maxUses, validFrom, validUntil, isActive, description, applicablePassTypes } = req.body;
 
   const updateData: Partial<typeof promoCodesTable.$inferInsert> = {};
   if (code !== undefined) updateData.code = (code as string).toUpperCase();
@@ -438,6 +443,9 @@ router.patch("/admin/promo-codes/:id", adminAuth, async (req, res): Promise<void
   if (validUntil !== undefined) updateData.validUntil = validUntil ? new Date(validUntil) : null;
   if (isActive !== undefined) updateData.isActive = isActive;
   if (description !== undefined) updateData.description = description;
+  if (Array.isArray(applicablePassTypes) && applicablePassTypes.length > 0) {
+    updateData.applicablePassTypes = applicablePassTypes;
+  }
 
   const [updated] = await db
     .update(promoCodesTable)
