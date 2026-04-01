@@ -60,6 +60,10 @@ export const GetBookingResponse = zod
     stripePaymentIntentId: zod.string().nullish(),
     freeagentInvoiceId: zod.string().nullish(),
     freeagentInvoiceUrl: zod.string().nullish(),
+    freeagentPaymentUrl: zod.string().nullish(),
+    stripeInvoiceId: zod.string().nullish(),
+    stripeInvoicePdfUrl: zod.string().nullish(),
+    stripeInvoicePaymentUrl: zod.string().nullish(),
     orderReference: zod.string().nullish(),
     currentStep: zod.number(),
     billingName: zod.string().nullish(),
@@ -156,6 +160,10 @@ export const UpdateBookingResponse = zod.object({
   stripePaymentIntentId: zod.string().nullish(),
   freeagentInvoiceId: zod.string().nullish(),
   freeagentInvoiceUrl: zod.string().nullish(),
+  freeagentPaymentUrl: zod.string().nullish(),
+  stripeInvoiceId: zod.string().nullish(),
+  stripeInvoicePdfUrl: zod.string().nullish(),
+  stripeInvoicePaymentUrl: zod.string().nullish(),
   orderReference: zod.string().nullish(),
   currentStep: zod.number(),
   billingName: zod.string().nullish(),
@@ -206,6 +214,10 @@ export const GetBookingBySessionResponse = zod
     stripePaymentIntentId: zod.string().nullish(),
     freeagentInvoiceId: zod.string().nullish(),
     freeagentInvoiceUrl: zod.string().nullish(),
+    freeagentPaymentUrl: zod.string().nullish(),
+    stripeInvoiceId: zod.string().nullish(),
+    stripeInvoicePdfUrl: zod.string().nullish(),
+    stripeInvoicePaymentUrl: zod.string().nullish(),
     orderReference: zod.string().nullish(),
     currentStep: zod.number(),
     billingName: zod.string().nullish(),
@@ -497,6 +509,20 @@ export const CreateStripeCheckoutSessionResponse = zod.object({
 });
 
 /**
+ * @summary Create a Stripe invoice for a booking (invoice payment route)
+ */
+export const CreateStripeInvoiceBody = zod.object({
+  bookingId: zod.number(),
+});
+
+export const CreateStripeInvoiceResponse = zod.object({
+  invoiceId: zod.string(),
+  invoiceUrl: zod.string().nullish(),
+  paymentUrl: zod.string().nullish(),
+  invoiceReference: zod.string(),
+});
+
+/**
  * @summary Create a FreeAgent invoice for a booking (invoice payment route)
  */
 export const CreateFreeAgentInvoiceBody = zod.object({
@@ -506,6 +532,7 @@ export const CreateFreeAgentInvoiceBody = zod.object({
 export const CreateFreeAgentInvoiceResponse = zod.object({
   invoiceId: zod.string(),
   invoiceUrl: zod.string().nullish(),
+  paymentUrl: zod.string().nullish(),
   invoiceReference: zod.string(),
 });
 
@@ -668,6 +695,10 @@ export const GetRegistrationResponse = zod
     stripePaymentIntentId: zod.string().nullish(),
     freeagentInvoiceId: zod.string().nullish(),
     freeagentInvoiceUrl: zod.string().nullish(),
+    freeagentPaymentUrl: zod.string().nullish(),
+    stripeInvoiceId: zod.string().nullish(),
+    stripeInvoicePdfUrl: zod.string().nullish(),
+    stripeInvoicePaymentUrl: zod.string().nullish(),
     orderReference: zod.string().nullish(),
     currentStep: zod.number(),
     billingName: zod.string().nullish(),

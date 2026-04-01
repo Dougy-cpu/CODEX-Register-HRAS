@@ -44,6 +44,42 @@ function ExpandedRegistrationDetail({ id }: { id: number }) {
         </div>
       </div>
 
+      {/* Invoice links */}
+      {((data as any)?.stripeInvoicePaymentUrl || (data as any)?.stripeInvoicePdfUrl || (data as any)?.freeagentPaymentUrl) && (
+        <div className="flex flex-wrap gap-3 text-sm">
+          {(data as any)?.stripeInvoicePaymentUrl && (
+            <a
+              href={(data as any).stripeInvoicePaymentUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 font-semibold text-primary underline underline-offset-2 hover:text-primary/80"
+            >
+              View Stripe Invoice →
+            </a>
+          )}
+          {(data as any)?.stripeInvoicePdfUrl && (
+            <a
+              href={(data as any).stripeInvoicePdfUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 font-semibold text-blue-600 underline underline-offset-2 hover:text-blue-800"
+            >
+              Download Invoice PDF →
+            </a>
+          )}
+          {!(data as any)?.stripeInvoicePaymentUrl && (data as any)?.freeagentPaymentUrl && (
+            <a
+              href={(data as any).freeagentPaymentUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 font-semibold text-primary underline underline-offset-2 hover:text-primary/80"
+            >
+              View FreeAgent Invoice →
+            </a>
+          )}
+        </div>
+      )}
+
       {/* Attendee table */}
       <div>
         <h4 className="font-bold mb-3 uppercase text-xs tracking-wider text-muted-foreground">

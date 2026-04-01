@@ -84,6 +84,14 @@ export interface Booking {
   /** @nullable */
   freeagentInvoiceUrl?: string | null;
   /** @nullable */
+  freeagentPaymentUrl?: string | null;
+  /** @nullable */
+  stripeInvoiceId?: string | null;
+  /** @nullable */
+  stripeInvoicePdfUrl?: string | null;
+  /** @nullable */
+  stripeInvoicePaymentUrl?: string | null;
+  /** @nullable */
   orderReference?: string | null;
   currentStep: number;
   /** @nullable */
@@ -444,6 +452,8 @@ export interface InvoiceResponse {
   invoiceId: string;
   /** @nullable */
   invoiceUrl?: string | null;
+  /** @nullable */
+  paymentUrl?: string | null;
   invoiceReference: string;
 }
 

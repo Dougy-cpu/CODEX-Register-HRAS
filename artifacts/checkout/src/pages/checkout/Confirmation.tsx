@@ -60,14 +60,14 @@ export default function Confirmation({ booking }: ConfirmationProps) {
                 <div className="space-y-2">
                   <h4 className="font-bold text-accent-foreground">Invoice Requested</h4>
                   <p className="text-sm text-accent-foreground/80">An invoice has been sent to {booking.billingEmail || "your billing email"}. Please arrange payment within 14 days.</p>
-                  {(booking as any).freeagentPaymentUrl && (
+                  {((booking as any).stripeInvoicePaymentUrl || (booking as any).freeagentPaymentUrl) && (
                     <a
-                      href={(booking as any).freeagentPaymentUrl}
+                      href={(booking as any).stripeInvoicePaymentUrl || (booking as any).freeagentPaymentUrl}
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary underline underline-offset-2 hover:text-primary/80"
                     >
-                      Pay online via FreeAgent →
+                      Pay online →
                     </a>
                   )}
                 </div>

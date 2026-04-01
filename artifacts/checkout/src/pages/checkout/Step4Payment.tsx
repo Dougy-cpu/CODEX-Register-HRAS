@@ -8,7 +8,7 @@ import {
   useCalculatePricing, 
   useValidatePromoCode,
   useCreateStripeCheckoutSession,
-  useCreateFreeAgentInvoice
+  useCreateStripeInvoice
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -38,7 +38,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
   const updateBooking = useUpdateBooking();
   const validatePromoCode = useValidatePromoCode();
   const createStripeSession = useCreateStripeCheckoutSession();
-  const createInvoice = useCreateFreeAgentInvoice();
+  const createInvoice = useCreateStripeInvoice();
 
   const [paymentMethod, setPaymentMethod] = useState<"card" | "invoice">("card");
   const [promoCode, setPromoCode] = useState(booking.promoCode || "");

@@ -10,5 +10,7 @@ export interface InvoiceResponse {
   invoiceId: string;
   /** @nullable */
   invoiceUrl?: string | null;
+  /** @nullable */
+  paymentUrl?: string | null;
   invoiceReference: string;
 }

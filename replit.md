@@ -63,7 +63,7 @@ VAT: 20% always applied, shown as line breakdown.
 
 Tables: `bookings`, `attendees`, `promo_codes`, `discount_tiers`, `email_templates`, `email_logs`
 
-- `bookings`: sessionToken, passType, attendeeType, quantity, promoCode, pricing fields, currentStep, status, orderRef, leadEmail, stripeSessionId, freeagentInvoiceId
+- `bookings`: sessionToken, passType, attendeeType, quantity, promoCode, pricing fields, currentStep, status, orderRef, leadEmail, stripeSessionId, stripePaymentIntentId, stripeInvoiceId, stripeInvoicePdfUrl, stripeInvoicePaymentUrl, freeagentInvoiceId, freeagentInvoiceUrl, freeagentPaymentUrl
 - `attendees`: bookingId, isLead, firstName, lastName, jobTitle, company, workEmail, phone, dietaryRequirements, accessibilityNeeds, linkedinUrl, gdprConsent
 
 ## Required Environment Variables
@@ -89,7 +89,17 @@ Set these in the Replit Secrets panel:
 - URL: `/admin`
 - Default password: `admin123` (set `ADMIN_PASSWORD` env var to override)
 - Auth: JWT token stored in localStorage as `admin_token`, passed as `x-admin-token` header
-- Features: registrations list, promo code management, discount tier config, email logs & template editor
+- Features: registrations list (with Stripe/FA invoice links), promo code management, discount tier config, email logs & template editor
+
+## Invoice Payment Flow
+
+Invoice payments now use **Stripe Invoicing** (not FreeAgent):
+- `POST /api/stripe/create-invoice` — creates Stripe customer (deduped by email), creates invoice with 20% UK VAT tax rate, finalizes and sends (Stripe emails customer); stores `stripeInvoiceId`, `stripeInvoicePdfUrl`, `stripeInvoicePaymentUrl`
+- Email confirmation attaches the real Stripe invoice PDF (downloaded from `stripeInvoicePdfUrl`)
+- Fallback chain: Stripe PDF → FreeAgent PDF → custom pdfkit receipt
+- FreeAgent route (`/api/freeagent/create-invoice`) kept for backward compat with old invoiced bookings
+- Invoice footer: "Sort code: 04-06-05 | Account: 16963209 | IBAN: GB65CLRB04060516963209 | VAT No: 336124621"
+- VAT tax rate: 20% exclusive, cached per process (reuses existing Stripe tax rate if found)
 
 ## Order Reference Format
 

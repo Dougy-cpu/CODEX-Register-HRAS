@@ -1626,6 +1626,92 @@ export const useStripeWebhook = <
 };
 
 /**
+ * @summary Create a Stripe invoice for a booking (invoice payment route)
+ */
+export const getCreateStripeInvoiceUrl = () => {
+  return `/api/stripe/create-invoice`;
+};
+
+export const createStripeInvoice = async (
+  createInvoiceBody: CreateInvoiceBody,
+  options?: RequestInit,
+): Promise<InvoiceResponse> => {
+  return customFetch<InvoiceResponse>(getCreateStripeInvoiceUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createInvoiceBody),
+  });
+};
+
+export const getCreateStripeInvoiceMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createStripeInvoice>>,
+    TError,
+    { data: BodyType<CreateInvoiceBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createStripeInvoice>>,
+  TError,
+  { data: BodyType<CreateInvoiceBody> },
+  TContext
+> => {
+  const mutationKey = ["createStripeInvoice"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createStripeInvoice>>,
+    { data: BodyType<CreateInvoiceBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createStripeInvoice(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateStripeInvoiceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createStripeInvoice>>
+>;
+export type CreateStripeInvoiceMutationBody = BodyType<CreateInvoiceBody>;
+export type CreateStripeInvoiceMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Create a Stripe invoice for a booking (invoice payment route)
+ */
+export const useCreateStripeInvoice = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createStripeInvoice>>,
+    TError,
+    { data: BodyType<CreateInvoiceBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createStripeInvoice>>,
+  TError,
+  { data: BodyType<CreateInvoiceBody> },
+  TContext
+> => {
+  return useMutation(getCreateStripeInvoiceMutationOptions(options));
+};
+
+/**
  * @summary Create a FreeAgent invoice for a booking (invoice payment route)
  */
 export const getCreateFreeAgentInvoiceUrl = () => {
