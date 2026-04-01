@@ -415,6 +415,7 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
         "Company No. 12252258  |  VAT No. 336124621",
         "Registered Address: 45 Lemsford Village, Welwyn Garden City, Hertfordshire AL8 7TR",
         "Contact: douglas@dynamicbusinessleaders.co.uk  |  Tel: 07763618052",
+        "Goods: Conference",
         "",
         "Bank: Tide (ClearBank)  |  Sort Code: 04-06-05  |  Account: 16963209",
         "IBAN (GBP): GB65CLRB04060516963209  |  SWIFT: CLRBGB22",
