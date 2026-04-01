@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useQueryClient } from "@tanstack/react-query";
-import { RefreshCcw, Send, Bold, Italic, Heading2, List, ListOrdered, Link2, Code, RotateCcw, ImageIcon, Upload, X } from "lucide-react";
+import { RefreshCcw, Send, Bold, Italic, Heading2, List, ListOrdered, Link2, Code, RotateCcw, ImageIcon, Upload, X, Loader2, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const API_BASE = `${import.meta.env.BASE_URL}api`;
@@ -473,6 +473,8 @@ export default function AdminEmails() {
   );
 
   const resendEmails = useResendBookingEmails();
+  const [sendingIds, setSendingIds] = useState<Set<number>>(new Set());
+  const [sentIds, setSentIds] = useState<Set<number>>(new Set());
 
   // Load event settings for template preview
   useEffect(() => {
@@ -488,11 +490,18 @@ export default function AdminEmails() {
   }, []);
 
   const handleResend = async (bookingId: number) => {
+    if (sendingIds.has(bookingId)) return;
+    setSendingIds(prev => new Set(prev).add(bookingId));
+    setSentIds(prev => { const s = new Set(prev); s.delete(bookingId); return s; });
     try {
       await resendEmails.mutateAsync({ bookingId });
-      toast({ title: "Emails Resent", description: `Confirmation emails for booking #${bookingId} resent.` });
+      setSentIds(prev => new Set(prev).add(bookingId));
+      toast({ title: "Emails resent", description: `Confirmation emails for booking #${bookingId} have been resent.` });
+      setTimeout(() => setSentIds(prev => { const s = new Set(prev); s.delete(bookingId); return s; }), 3000);
     } catch {
-      toast({ title: "Error", description: "Failed to resend emails.", variant: "destructive" });
+      toast({ title: "Failed to resend", description: "Something went wrong. Please try again.", variant: "destructive" });
+    } finally {
+      setSendingIds(prev => { const s = new Set(prev); s.delete(bookingId); return s; });
     }
   };
 
@@ -554,8 +563,20 @@ export default function AdminEmails() {
                         </TableCell>
                         <TableCell className="text-right">
                           {log.bookingId && (
-                            <Button variant="ghost" size="sm" onClick={() => handleResend(log.bookingId!)} className="h-8 px-2">
-                              <RefreshCcw className="w-4 h-4 mr-2" /> Resend
+                            <Button
+                              variant={sentIds.has(log.bookingId) ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => handleResend(log.bookingId!)}
+                              disabled={sendingIds.has(log.bookingId)}
+                              className={`h-8 px-3 min-w-[100px] transition-all ${sentIds.has(log.bookingId) ? "bg-green-600 hover:bg-green-700 text-white border-green-600" : ""}`}
+                            >
+                              {sendingIds.has(log.bookingId) ? (
+                                <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Sending…</>
+                              ) : sentIds.has(log.bookingId) ? (
+                                <><CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Sent</>
+                              ) : (
+                                <><RefreshCcw className="w-3.5 h-3.5 mr-1.5" /> Resend</>
+                              )}
                             </Button>
                           )}
                         </TableCell>

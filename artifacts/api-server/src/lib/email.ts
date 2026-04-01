@@ -1,4 +1,5 @@
 import https from "https";
+import http from "http";
 import nodemailer from "nodemailer";
 import { logger } from "./logger";
 import { readFileSync, existsSync } from "node:fs";
@@ -10,9 +11,15 @@ import type { EventSettings } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { generatePdfReceipt } from "./pdf";
 
-async function downloadHttpsPdf(url: string): Promise<Buffer | null> {
+async function downloadHttpsPdf(url: string, redirectsLeft = 5): Promise<Buffer | null> {
   return new Promise((resolve) => {
-    https.get(url, (res) => {
+    const lib = url.startsWith("https") ? https : http;
+    lib.get(url, (res) => {
+      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        if (redirectsLeft <= 0) { resolve(null); return; }
+        downloadHttpsPdf(res.headers.location, redirectsLeft - 1).then(resolve);
+        return;
+      }
       if (res.statusCode !== 200) { resolve(null); return; }
       const chunks: Buffer[] = [];
       res.on("data", (c: Buffer) => chunks.push(c));
