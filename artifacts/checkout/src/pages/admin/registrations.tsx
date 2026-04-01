@@ -155,50 +155,50 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
                 </span>
               )}
             </h4>
-            {data?.stripeInvoicePaymentUrl && (
-              <button
-                onClick={handleSendReminder}
-                disabled={reminderState === "loading" || reminderState === "success"}
-                className={`
-                  inline-flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded transition-all
-                  ${reminderState === "success"
-                    ? "bg-green-100 text-green-700 cursor-not-allowed"
-                    : reminderState === "error"
-                    ? "bg-red-100 text-red-700 hover:bg-red-200"
-                    : reminderState === "loading"
-                    ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-                    : isInvoiceOverdue
-                    ? "bg-red-600 text-white hover:bg-red-700"
-                    : "bg-blue-600 text-white hover:bg-blue-700"
-                  }
-                `}
-              >
-                {reminderState === "loading" && <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-current" />}
-                {reminderState === "success" && <Check className="w-3 h-3" />}
-                {reminderState === "error" && <AlertTriangle className="w-3 h-3" />}
-                {reminderState === "idle" && <Send className="w-3 h-3" />}
-                {reminderState === "loading" ? "Sending…"
-                  : reminderState === "success" ? "Sent!"
-                  : reminderState === "error" ? (reminderError || "Failed")
-                  : "Send Reminder"}
-              </button>
-            )}
+            <button
+              onClick={handleSendReminder}
+              disabled={reminderState === "loading" || reminderState === "success"}
+              className={`
+                inline-flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded transition-all
+                ${reminderState === "success"
+                  ? "bg-green-100 text-green-700 cursor-not-allowed"
+                  : reminderState === "error"
+                  ? "bg-red-100 text-red-700 hover:bg-red-200"
+                  : reminderState === "loading"
+                  ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                  : isInvoiceOverdue
+                  ? "bg-red-600 text-white hover:bg-red-700"
+                  : "bg-blue-600 text-white hover:bg-blue-700"
+                }
+              `}
+            >
+              {reminderState === "loading" && <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-current" />}
+              {reminderState === "success" && <Check className="w-3 h-3" />}
+              {reminderState === "error" && <AlertTriangle className="w-3 h-3" />}
+              {reminderState === "idle" && <Send className="w-3 h-3" />}
+              {reminderState === "loading" ? "Sending…"
+                : reminderState === "success" ? "Sent!"
+                : reminderState === "error" ? (reminderError || "Failed")
+                : "Send Reminder"}
+            </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
             <div className="flex gap-2">
               <span className="text-muted-foreground w-36 shrink-0">Invoice Ref</span>
               <span className="font-mono font-semibold">{data?.orderReference || "—"}</span>
             </div>
-            {invoiceDueDateStr && (
-              <div className="flex gap-2">
-                <span className={`w-36 shrink-0 ${isInvoiceOverdue ? "text-red-600 font-semibold" : "text-muted-foreground"}`}>
-                  {isInvoiceOverdue ? "⚠️ Due Date" : "Due Date"}
-                </span>
-                <span className={`font-medium ${isInvoiceOverdue ? "text-red-700 font-bold" : ""}`}>
-                  {invoiceDueDateStr}{isInvoiceOverdue ? " — OVERDUE" : ""}
-                </span>
-              </div>
-            )}
+            <div className="flex gap-2">
+              <span className={`w-36 shrink-0 ${isInvoiceOverdue ? "text-red-600 font-semibold" : "text-muted-foreground"}`}>
+                {isInvoiceOverdue ? "⚠️ Due Date" : "Due Date"}
+              </span>
+              <span className={`font-medium ${isInvoiceOverdue ? "text-red-700 font-bold" : ""}`}>
+                {invoiceDueDateStr ? (
+                  <>{invoiceDueDateStr}{isInvoiceOverdue ? " — OVERDUE" : ""}</>
+                ) : (
+                  <span className="text-muted-foreground italic">Not recorded</span>
+                )}
+              </span>
+            </div>
             {data?.billingName && (
               <div className="flex gap-2">
                 <span className="text-muted-foreground w-36 shrink-0">Billing Contact</span>
