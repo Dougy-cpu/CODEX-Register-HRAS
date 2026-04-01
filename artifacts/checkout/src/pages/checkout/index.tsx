@@ -65,15 +65,15 @@ export default function CheckoutFlow() {
             method: "POST",
             body: JSON.stringify({ bookingId: booking.id, sessionId: stripeSessionId }),
           });
+          await queryClient.invalidateQueries({ queryKey: ["booking", sessionToken] });
         } catch {
-          // Fallback to polling if confirm fails
+          // Confirm call failed — webhook will still fulfil the booking, so polling continues
         }
       }
     };
 
-    tryConfirmCardPayment().then(() => {
-      queryClient.invalidateQueries({ queryKey: ["booking", sessionToken] });
-    });
+    // Fire-and-forget: if it succeeds the booking status updates and polling stops naturally
+    tryConfirmCardPayment();
 
     pollIntervalRef.current = setInterval(async () => {
       const elapsed = Date.now() - (pollStartRef.current ?? 0);

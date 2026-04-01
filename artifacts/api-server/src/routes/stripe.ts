@@ -242,6 +242,21 @@ router.post("/stripe/confirm-card-payment", async (req, res): Promise<void> => {
       return;
     }
 
+    // Verify this Stripe session was created for this booking (prevents cross-session abuse)
+    const sessionBookingId = session.metadata?.bookingId;
+    if (!sessionBookingId || String(sessionBookingId) !== String(id)) {
+      logger.warn({ bookingId: id, sessionBookingId, sessionId }, "confirm-card-payment: session/booking mismatch");
+      res.status(403).json({ error: "Stripe session does not belong to this booking" });
+      return;
+    }
+
+    // Verify the stored stripeSessionId matches (if we have one)
+    if (existing.stripeSessionId && existing.stripeSessionId !== sessionId) {
+      logger.warn({ bookingId: id, storedSessionId: existing.stripeSessionId, sessionId }, "confirm-card-payment: sessionId mismatch");
+      res.status(403).json({ error: "Stripe session ID does not match booking record" });
+      return;
+    }
+
     const orderRef = existing.orderReference || `HRAS26-${6541 + id}`;
 
     await db.update(bookingsTable).set({
