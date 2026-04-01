@@ -281,7 +281,7 @@ router.get("/admin/registrations/export", adminAuth, async (req, res): Promise<v
         company: a.isTbc ? "" : (a.company || ""),
         workEmail: a.isTbc ? "" : (a.workEmail || ""),
         phone: a.isTbc ? "" : (a.phone || ""),
-        dietary: a.isTbc ? "" : ((a as any).dietaryAccessibility || ""),
+        dietary: a.isTbc ? "" : (a.dietaryAccessibility || ""),
         gdpr: a.isTbc ? "" : (a.gdprConsent ? "Yes" : "No"),
         registeredAt: booking.createdAt.toISOString(),
       });

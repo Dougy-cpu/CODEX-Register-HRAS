@@ -179,7 +179,7 @@ function ExpandedRegistrationDetail({ id }: { id: number }) {
                     <td className="p-3 text-muted-foreground">{a.isTbc ? "—" : (a.workEmail || "—")}</td>
                     <td className="p-3 text-muted-foreground">{a.isTbc ? "—" : (a.phone || "—")}</td>
                     <td className="p-3 text-muted-foreground max-w-[200px]">
-                      {a.isTbc ? "—" : ((a as any).dietaryAccessibility || "—")}
+                      {a.isTbc ? "—" : (a.dietaryAccessibility || "—")}
                     </td>
                     <td className="p-3">
                       {a.isTbc ? (
