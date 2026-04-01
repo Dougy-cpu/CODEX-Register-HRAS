@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, ilike, or, and, sql, count } from "drizzle-orm";
+import ExcelJS from "exceljs";
 import { db } from "@workspace/db";
 import {
   bookingsTable,
@@ -186,47 +187,132 @@ router.get("/admin/registrations/export", adminAuth, async (req, res): Promise<v
     bookings = bookings.filter((b) => b.status === statusFilter);
   }
 
-  const attendees = await db.select().from(attendeesTable);
+  const allAttendees = await db.select().from(attendeesTable);
 
-  const csvRows: string[] = [];
-  csvRows.push(
-    "Order Reference,Status,Pass Type,Attendee Type,Quantity,Subtotal,VAT,Total,Payment Method,Lead Name,Lead Email,Lead Company,Lead Job Title,Lead Phone,GDPR Consent,GDPR Consent At,Promo Code,Group Discount,Created At"
-  );
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "HR Analytics Summit";
+  workbook.created = new Date();
+
+  const sheet = workbook.addWorksheet("Registrations");
+
+  const columns: ExcelJS.Column[] = [
+    { header: "Booking Reference", key: "bookingRef", width: 18 },
+    { header: "Status", key: "status", width: 14 },
+    { header: "Pass Type", key: "passType", width: 14 },
+    { header: "Qty", key: "qty", width: 6 },
+    { header: "Subtotal (ex VAT) £", key: "subtotal", width: 18 },
+    { header: "VAT £", key: "vat", width: 10 },
+    { header: "Total £", key: "total", width: 10 },
+    { header: "Payment Method", key: "paymentMethod", width: 16 },
+    { header: "Invoice Ref", key: "invoiceRef", width: 16 },
+    { header: "Billing Name", key: "billingName", width: 20 },
+    { header: "Billing Company", key: "billingCompany", width: 24 },
+    { header: "Billing Email", key: "billingEmail", width: 26 },
+    { header: "Lead", key: "lead", width: 6 },
+    { header: "First Name", key: "firstName", width: 16 },
+    { header: "Last Name", key: "lastName", width: 16 },
+    { header: "Job Title", key: "jobTitle", width: 26 },
+    { header: "Company", key: "company", width: 24 },
+    { header: "Work Email", key: "workEmail", width: 28 },
+    { header: "Phone", key: "phone", width: 16 },
+    { header: "Dietary / Access", key: "dietary", width: 22 },
+    { header: "GDPR Consent", key: "gdpr", width: 14 },
+    { header: "Registered At", key: "registeredAt", width: 22 },
+  ] as ExcelJS.Column[];
+  sheet.columns = columns;
+
+  const headerRow = sheet.getRow(1);
+  headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E293B" } };
+  headerRow.alignment = { vertical: "middle" };
+  headerRow.height = 22;
 
   for (const booking of bookings) {
-    const lead = attendees.find((a) => a.bookingId === booking.id && a.isLead);
-    const row = [
-      booking.orderReference || "",
-      booking.status,
-      booking.passType,
-      booking.attendeeType,
-      booking.quantity,
-      parseFloat(booking.subtotalAmount?.toString() || "0").toFixed(2),
-      parseFloat(booking.vatAmount?.toString() || "0").toFixed(2),
-      parseFloat(booking.totalAmount?.toString() || "0").toFixed(2),
-      booking.paymentMethod || "",
-      lead ? `${lead.firstName} ${lead.lastName}` : "",
-      lead?.workEmail || "",
-      lead?.company || "",
-      lead?.jobTitle || "",
-      lead?.phone || "",
-      lead?.gdprConsent ? "Yes" : "No",
-      lead?.gdprConsentAt ? lead.gdprConsentAt.toISOString() : "",
-      booking.promoCode || "",
-      booking.groupDiscountAmount ? parseFloat(booking.groupDiscountAmount.toString()).toFixed(2) : "0",
-      booking.createdAt.toISOString(),
-    ]
-      .map((v) => `"${String(v).replace(/"/g, '""')}"`)
-      .join(",");
-    csvRows.push(row);
+    const bookingAttendees = allAttendees
+      .filter((a) => a.bookingId === booking.id)
+      .sort((a, b) => (a.seatIndex ?? 0) - (b.seatIndex ?? 0));
+
+    if (bookingAttendees.length === 0) {
+      sheet.addRow({
+        bookingRef: booking.orderReference || "",
+        status: booking.status,
+        passType: booking.passType,
+        qty: booking.quantity,
+        subtotal: parseFloat(booking.subtotalAmount?.toString() || "0"),
+        vat: parseFloat(booking.vatAmount?.toString() || "0"),
+        total: parseFloat(booking.totalAmount?.toString() || "0"),
+        paymentMethod: booking.paymentMethod || "",
+        invoiceRef: booking.orderReference || "",
+        billingName: booking.billingName || "",
+        billingCompany: booking.billingCompany || "",
+        billingEmail: booking.billingEmail || "",
+        lead: "",
+        firstName: "",
+        lastName: "",
+        jobTitle: "",
+        company: "",
+        workEmail: "",
+        phone: "",
+        dietary: "",
+        gdpr: "",
+        registeredAt: booking.createdAt.toISOString(),
+      });
+      continue;
+    }
+
+    for (const a of bookingAttendees) {
+      const row = sheet.addRow({
+        bookingRef: booking.orderReference || "",
+        status: booking.status,
+        passType: booking.passType,
+        qty: booking.quantity,
+        subtotal: parseFloat(booking.subtotalAmount?.toString() || "0"),
+        vat: parseFloat(booking.vatAmount?.toString() || "0"),
+        total: parseFloat(booking.totalAmount?.toString() || "0"),
+        paymentMethod: booking.paymentMethod || "",
+        invoiceRef: booking.orderReference || "",
+        billingName: booking.billingName || "",
+        billingCompany: booking.billingCompany || "",
+        billingEmail: booking.billingEmail || "",
+        lead: a.isLead ? "★" : "",
+        firstName: a.isTbc ? "(TBC)" : (a.firstName || ""),
+        lastName: a.isTbc ? "" : (a.lastName || ""),
+        jobTitle: a.isTbc ? "" : (a.jobTitle || ""),
+        company: a.isTbc ? "" : (a.company || ""),
+        workEmail: a.isTbc ? "" : (a.workEmail || ""),
+        phone: a.isTbc ? "" : (a.phone || ""),
+        dietary: a.isTbc ? "" : ((a as any).dietaryAccessibility || ""),
+        gdpr: a.isTbc ? "" : (a.gdprConsent ? "Yes" : "No"),
+        registeredAt: booking.createdAt.toISOString(),
+      });
+      if (a.isLead) {
+        row.getCell("lead").font = { bold: true, color: { argb: "FFE74F3E" } };
+      }
+    }
   }
 
-  res.setHeader("Content-Type", "text/csv");
-  res.setHeader(
-    "Content-Disposition",
-    `attachment; filename="registrations-${new Date().toISOString().split("T")[0]}.csv"`
-  );
-  res.send(csvRows.join("\n"));
+  sheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) return;
+    row.eachCell((cell) => {
+      cell.border = {
+        top: { style: "thin", color: { argb: "FFE5E7EB" } },
+        left: { style: "thin", color: { argb: "FFE5E7EB" } },
+        bottom: { style: "thin", color: { argb: "FFE5E7EB" } },
+        right: { style: "thin", color: { argb: "FFE5E7EB" } },
+      };
+    });
+    if (rowNumber % 2 === 0) {
+      row.eachCell((cell) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF9FAFB" } };
+      });
+    }
+  });
+
+  const date = new Date().toISOString().split("T")[0];
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename="hras26-registrations-${date}.xlsx"`);
+  await workbook.xlsx.write(res);
+  res.end();
 });
 
 router.get("/admin/registrations/:id", adminAuth, async (req, res): Promise<void> => {

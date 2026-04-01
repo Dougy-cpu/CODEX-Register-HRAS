@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, Download } from "lucide-react";
 
 function ExpandedRegistrationDetail({ id }: { id: number }) {
   const { data, isLoading } = useGetRegistration(id, {
@@ -20,15 +20,15 @@ function ExpandedRegistrationDetail({ id }: { id: number }) {
     );
   }
 
-  const lead = data?.attendees?.find(a => a.isLead);
+  const isGroup = (data?.attendees?.length ?? 0) > 1;
 
   return (
     <div className="space-y-6">
       {/* Booking meta strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
         <div className="bg-white border border-border p-3">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">Company</p>
-          <p className="font-medium">{lead?.company || data?.billingCompany || "—"}</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">Booking Ref</p>
+          <p className="font-mono font-medium">{data?.orderReference || "—"}</p>
         </div>
         <div className="bg-white border border-border p-3">
           <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">Payment</p>
@@ -36,7 +36,7 @@ function ExpandedRegistrationDetail({ id }: { id: number }) {
         </div>
         <div className="bg-white border border-border p-3">
           <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">Billing Email</p>
-          <p className="font-medium truncate">{data?.billingEmail || lead?.workEmail || "—"}</p>
+          <p className="font-medium truncate">{data?.billingEmail || data?.attendees?.find(a => a.isLead)?.workEmail || "—"}</p>
         </div>
         <div className="bg-white border border-border p-3">
           <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">Promo Code</p>
@@ -44,37 +44,88 @@ function ExpandedRegistrationDetail({ id }: { id: number }) {
         </div>
       </div>
 
-      {/* Invoice links */}
-      {(data?.stripeInvoicePaymentUrl || data?.stripeInvoicePdfUrl || data?.freeagentPaymentUrl) && (
+      {/* Invoice details — shown when payment method is invoice */}
+      {data?.paymentMethod === "invoice" && (
+        <div className="bg-blue-50 border border-blue-200 p-4">
+          <h4 className="font-bold mb-3 uppercase text-xs tracking-wider text-blue-700">Invoice Details</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
+            <div className="flex gap-2">
+              <span className="text-muted-foreground w-36 shrink-0">Invoice Ref</span>
+              <span className="font-mono font-semibold">{data?.orderReference || "—"}</span>
+            </div>
+            {data?.billingName && (
+              <div className="flex gap-2">
+                <span className="text-muted-foreground w-36 shrink-0">Billing Contact</span>
+                <span className="font-medium">{data.billingName}</span>
+              </div>
+            )}
+            {data?.billingCompany && (
+              <div className="flex gap-2">
+                <span className="text-muted-foreground w-36 shrink-0">Billing Company</span>
+                <span className="font-medium">{data.billingCompany}</span>
+              </div>
+            )}
+            {data?.billingEmail && (
+              <div className="flex gap-2">
+                <span className="text-muted-foreground w-36 shrink-0">Billing Email</span>
+                <span className="font-medium">{data.billingEmail}</span>
+              </div>
+            )}
+            {(data?.billingAddressLine1 || data?.billingAddress) && (
+              <div className="flex gap-2 sm:col-span-2">
+                <span className="text-muted-foreground w-36 shrink-0">Billing Address</span>
+                <span className="font-medium">
+                  {data.billingAddressLine1 ? (
+                    <>
+                      {data.billingAddressLine1}{data.billingAddressLine2 ? `, ${data.billingAddressLine2}` : ""}
+                      {(data.billingTown || data.billingRegion) ? `, ${[data.billingTown, data.billingRegion].filter(Boolean).join(", ")}` : ""}
+                      {data.billingPostcode ? `, ${data.billingPostcode}` : ""}
+                      {data.billingCountry ? `, ${data.billingCountry}` : ""}
+                    </>
+                  ) : data.billingAddress}
+                </span>
+              </div>
+            )}
+          </div>
+          {/* Invoice links */}
+          {(data?.stripeInvoicePaymentUrl || data?.stripeInvoicePdfUrl || data?.freeagentPaymentUrl) && (
+            <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-blue-200">
+              {data?.stripeInvoicePaymentUrl && (
+                <a href={data.stripeInvoicePaymentUrl} target="_blank" rel="noreferrer"
+                  className="text-sm font-semibold text-primary underline underline-offset-2 hover:text-primary/80">
+                  View Stripe Invoice →
+                </a>
+              )}
+              {data?.stripeInvoicePdfUrl && (
+                <a href={data.stripeInvoicePdfUrl} target="_blank" rel="noreferrer"
+                  className="text-sm font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900">
+                  Download PDF →
+                </a>
+              )}
+              {!data?.stripeInvoicePaymentUrl && data?.freeagentPaymentUrl && (
+                <a href={data.freeagentPaymentUrl} target="_blank" rel="noreferrer"
+                  className="text-sm font-semibold text-primary underline underline-offset-2 hover:text-primary/80">
+                  View FreeAgent Invoice →
+                </a>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Card payment invoice links (non-invoice method) */}
+      {data?.paymentMethod !== "invoice" && (data?.stripeInvoicePaymentUrl || data?.stripeInvoicePdfUrl) && (
         <div className="flex flex-wrap gap-3 text-sm">
           {data?.stripeInvoicePaymentUrl && (
-            <a
-              href={data.stripeInvoicePaymentUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 font-semibold text-primary underline underline-offset-2 hover:text-primary/80"
-            >
+            <a href={data.stripeInvoicePaymentUrl} target="_blank" rel="noreferrer"
+              className="inline-flex items-center gap-1.5 font-semibold text-primary underline underline-offset-2 hover:text-primary/80">
               View Stripe Invoice →
             </a>
           )}
           {data?.stripeInvoicePdfUrl && (
-            <a
-              href={data.stripeInvoicePdfUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 font-semibold text-blue-600 underline underline-offset-2 hover:text-blue-800"
-            >
+            <a href={data.stripeInvoicePdfUrl} target="_blank" rel="noreferrer"
+              className="inline-flex items-center gap-1.5 font-semibold text-blue-600 underline underline-offset-2 hover:text-blue-800">
               Download Invoice PDF →
-            </a>
-          )}
-          {!data?.stripeInvoicePaymentUrl && data?.freeagentPaymentUrl && (
-            <a
-              href={data.freeagentPaymentUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 font-semibold text-primary underline underline-offset-2 hover:text-primary/80"
-            >
-              View FreeAgent Invoice →
             </a>
           )}
         </div>
@@ -112,9 +163,12 @@ function ExpandedRegistrationDetail({ id }: { id: number }) {
                           TBC — pending
                         </span>
                       ) : (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
+                          {a.isLead && isGroup && (
+                            <span className="text-primary font-bold text-base leading-none" title="Lead attendee">★</span>
+                          )}
                           <span className="font-medium">{a.firstName} {a.lastName}</span>
-                          {a.isLead && (
+                          {a.isLead && !isGroup && (
                             <span className="text-[10px] font-bold bg-primary text-white px-1.5 py-0.5 uppercase tracking-wider">Lead</span>
                           )}
                         </div>
@@ -156,6 +210,7 @@ export default function AdminRegistrations() {
   const [status, setStatus] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const { data, isLoading } = useListRegistrations(
     {
@@ -171,6 +226,31 @@ export default function AdminRegistrations() {
     }
   );
 
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const token = localStorage.getItem("admin_token") || "";
+      const params = new URLSearchParams();
+      if (status !== "all") params.set("status", status);
+      const res = await fetch(`/api/admin/registrations/export?${params.toString()}`, {
+        headers: { "x-admin-token": token },
+      });
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const date = new Date().toISOString().split("T")[0];
+      a.download = `hras26-registrations-${date}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Export failed. Please try again.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <AdminLayout title="Registrations">
       <div className="bg-white p-6 border border-border shadow-sm mb-6 flex flex-col md:flex-row gap-4 items-end">
@@ -178,15 +258,15 @@ export default function AdminRegistrations() {
           <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">Search</label>
           <div className="relative">
             <Search className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
-            <Input 
-              placeholder="Search by name, email or reference..." 
+            <Input
+              placeholder="Search by name, email or reference..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               className="pl-10 h-12"
             />
           </div>
         </div>
-        <div className="w-full md:w-64">
+        <div className="w-full md:w-48">
           <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">Status</label>
           <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
             <SelectTrigger className="h-12 bg-white">
@@ -202,6 +282,15 @@ export default function AdminRegistrations() {
             </SelectContent>
           </Select>
         </div>
+        <Button
+          onClick={handleExport}
+          disabled={exporting}
+          variant="outline"
+          className="h-12 gap-2 shrink-0 border-primary text-primary hover:bg-primary hover:text-white"
+        >
+          <Download className="w-4 h-4" />
+          {exporting ? "Exporting…" : "Export Excel"}
+        </Button>
       </div>
 
       <div className="bg-white border border-border shadow-sm">
@@ -227,8 +316,8 @@ export default function AdminRegistrations() {
             <TableBody>
               {data?.registrations?.map((reg) => (
                 <>
-                  <TableRow 
-                    key={reg.id} 
+                  <TableRow
+                    key={reg.id}
                     className="cursor-pointer hover:bg-muted/30"
                     onClick={() => setExpandedId(expandedId === reg.id ? null : reg.id)}
                   >
@@ -277,7 +366,7 @@ export default function AdminRegistrations() {
               ))}
               {data?.registrations?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
                     No registrations found.
                   </TableCell>
                 </TableRow>
@@ -286,22 +375,22 @@ export default function AdminRegistrations() {
           </Table>
         )}
       </div>
-      
+
       {data && data.total > 0 && (
         <div className="flex justify-between items-center mt-6">
           <p className="text-sm text-muted-foreground">
             Showing {(page - 1) * data.limit + 1} to {Math.min(page * data.limit, data.total)} of {data.total}
           </p>
           <div className="flex gap-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               disabled={page === 1}
               onClick={() => setPage(p => p - 1)}
             >
               Previous
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               disabled={page * data.limit >= data.total}
               onClick={() => setPage(p => p + 1)}
             >
