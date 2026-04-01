@@ -819,3 +819,128 @@ export async function sendWelcomeEmail(
     logger.error({ err }, "Failed to send welcome email");
   }
 }
+
+export async function sendCheckoutExpiredEmail(bookingId: number): Promise<void> {
+  const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
+  if (!booking) return;
+
+  const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
+  const lead = attendees.find((a) => a.isLead) || attendees[0];
+  if (!lead) return;
+
+  const settings = await getEventSettings();
+  const organisers = await getOrganiserEmails();
+
+  const name = `${lead.firstName} ${lead.lastName}`;
+  const checkoutUrl = settings.orgWebsite || "https://www.hranalyticssummit.com";
+
+  const html = wrapInBrandedLayout(`
+    <div style="background:#fff3cd;border:1px solid #ffc107;padding:16px 20px;border-radius:4px;margin-bottom:24px;">
+      <strong style="color:#856404;">⚠ Checkout session expired</strong>
+    </div>
+    <h2 style="margin-top:0;">Incomplete Registration — Session Expired</h2>
+    <p>Hi ${name},</p>
+    <p>Your checkout session for <strong>HR Analytics Summit 2026</strong> expired before the payment was completed. This usually happens if the browser was left open for more than 24 hours without submitting payment.</p>
+    <p><strong>Your booking details are still saved.</strong> To complete your registration, simply return to the checkout and restart the payment step — you won't need to re-enter your attendee information.</p>
+    <p style="text-align:center;margin:32px 0;">
+      <a href="${checkoutUrl}" class="cta-btn" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;border-radius:300px;text-decoration:none;font-weight:600;">
+        Return to Checkout →
+      </a>
+    </p>
+    <p style="color:#666;font-size:14px;">If you have any questions, please contact us at <a href="mailto:douglas@dynamicbusinessleaders.co.uk">douglas@dynamicbusinessleaders.co.uk</a>.</p>
+  `, settings);
+
+  const recipientEmail = booking.billingEmail || lead.workEmail;
+
+  await sendMail({
+    to: recipientEmail,
+    bcc: organisers.length > 0 ? organisers : undefined,
+    subject: `Action Required: Your HR Analytics Summit checkout session expired — ${name}`,
+    html,
+  });
+
+  logger.info({ bookingId, to: recipientEmail }, "Checkout expired email sent");
+}
+
+export async function sendRefundConfirmationEmail(bookingId: number, refundAmountPence: number): Promise<void> {
+  const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
+  if (!booking) return;
+
+  const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
+  const lead = attendees.find((a) => a.isLead) || attendees[0];
+  if (!lead) return;
+
+  const settings = await getEventSettings();
+  const recipients = await getOrganiserEmails();
+
+  const name = `${lead.firstName} ${lead.lastName}`;
+  const refundAmount = (refundAmountPence / 100).toFixed(2);
+  const orderRef = booking.orderReference || `HRAS26-${6541 + bookingId}`;
+
+  const html = wrapInBrandedLayout(`
+    <h2 style="margin-top:0;">Your Refund Has Been Processed</h2>
+    <p>Hi ${name},</p>
+    <p>We have processed a refund for your registration at <strong>HR Analytics Summit 2026</strong>. The amount will appear in your account within 5–10 business days depending on your bank.</p>
+    <div class="info-box">
+      <table style="width:100%;font-size:15px;">
+        <tr><td style="color:#666;padding:4px 0;">Booking Reference</td><td style="text-align:right;font-family:monospace;font-weight:600;">${orderRef}</td></tr>
+        <tr><td style="color:#666;padding:4px 0;">Refund Amount</td><td style="text-align:right;font-weight:700;color:#E74F3E;">£${refundAmount}</td></tr>
+        <tr><td style="color:#666;padding:4px 0;">Status</td><td style="text-align:right;">Refunded &amp; Booking Cancelled</td></tr>
+      </table>
+    </div>
+    <p>If you have any questions about your refund, please contact us at <a href="mailto:douglas@dynamicbusinessleaders.co.uk">douglas@dynamicbusinessleaders.co.uk</a> quoting your booking reference above.</p>
+    <p>We hope to see you at a future event.</p>
+  `, settings);
+
+  await sendMail({
+    to: booking.billingEmail || lead.workEmail,
+    bcc: recipients.length > 0 ? recipients : undefined,
+    subject: `Refund Confirmed — HR Analytics Summit 2026 (${orderRef})`,
+    html,
+  });
+
+  logger.info({ bookingId, refundAmount }, "Refund confirmation email sent");
+}
+
+export async function sendInvoicePaymentFailedEmail(bookingId: number): Promise<void> {
+  const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
+  if (!booking) return;
+
+  const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
+  const lead = attendees.find((a) => a.isLead) || attendees[0];
+  if (!lead) return;
+
+  const settings = await getEventSettings();
+  const recipients = await getOrganiserEmails();
+
+  const name = `${lead.firstName} ${lead.lastName}`;
+  const orderRef = booking.orderReference || `HRAS26-${6541 + bookingId}`;
+  const paymentUrl = booking.stripeInvoicePaymentUrl;
+
+  const html = wrapInBrandedLayout(`
+    <div style="background:#fff3cd;border:1px solid #ffc107;padding:16px 20px;border-radius:4px;margin-bottom:24px;">
+      <strong style="color:#856404;">⚠ Invoice payment unsuccessful</strong>
+    </div>
+    <h2 style="margin-top:0;">Action Required: Invoice Payment Failed</h2>
+    <p>Hi ${name},</p>
+    <p>We attempted to collect payment for your HR Analytics Summit 2026 invoice but the payment was unsuccessful. Your booking reference is <strong>${orderRef}</strong>.</p>
+    <p>Please use the button below to pay your invoice. If you continue to have difficulties, contact your bank or reach out to us directly.</p>
+    ${paymentUrl ? `
+    <p style="text-align:center;margin:32px 0;">
+      <a href="${paymentUrl}" class="cta-btn" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;border-radius:300px;text-decoration:none;font-weight:600;">
+        Pay Invoice Now →
+      </a>
+    </p>
+    ` : ""}
+    <p style="color:#666;font-size:14px;">If you need assistance, email us at <a href="mailto:douglas@dynamicbusinessleaders.co.uk">douglas@dynamicbusinessleaders.co.uk</a> or call <a href="tel:+447763618052">07763 618052</a>.</p>
+  `, settings);
+
+  await sendMail({
+    to: booking.billingEmail || lead.workEmail,
+    bcc: recipients.length > 0 ? recipients : undefined,
+    subject: `Action Required: Invoice Payment Failed — HR Analytics Summit 2026 (${orderRef})`,
+    html,
+  });
+
+  logger.info({ bookingId, orderRef }, "Invoice payment failed email sent");
+}

@@ -3,7 +3,13 @@ import Stripe from "stripe";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { bookingsTable, attendeesTable, promoCodesTable } from "@workspace/db";
-import { sendBookingEmails, sendOrganiserNotification } from "../lib/email";
+import {
+  sendBookingEmails,
+  sendOrganiserNotification,
+  sendCheckoutExpiredEmail,
+  sendRefundConfirmationEmail,
+  sendInvoicePaymentFailedEmail,
+} from "../lib/email";
 import { syncBookingToSheets } from "../lib/google-sheets";
 import { logger } from "../lib/logger";
 
@@ -241,6 +247,87 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
       await sendOrganiserNotification(booking.id);
     } catch (err) {
       logger.error({ err, bookingId: booking.id }, "invoice.paid: failed to send organiser notification");
+    }
+  }
+
+  // Stripe Checkout session expired without payment — reset booking to "partial" so
+  // the customer can retry, and email them to let them know.
+  if (event.type === "checkout.session.expired") {
+    const session = event.data.object as Stripe.Checkout.Session;
+    const bookingId = parseInt(session.metadata?.bookingId || "0", 10);
+
+    if (bookingId) {
+      const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
+
+      if (booking && booking.status === "pending_payment") {
+        await db
+          .update(bookingsTable)
+          .set({ status: "partial", stripeSessionId: null, updatedAt: new Date() })
+          .where(eq(bookingsTable.id, bookingId));
+
+        logger.info({ bookingId }, "checkout.session.expired: booking reset to partial");
+
+        try {
+          await sendCheckoutExpiredEmail(bookingId);
+        } catch (err) {
+          logger.error({ err, bookingId }, "checkout.session.expired: failed to send expired email");
+        }
+      }
+    }
+  }
+
+  // A charge was refunded — mark the booking as cancelled and email the customer.
+  if (event.type === "charge.refunded") {
+    const charge = event.data.object as Stripe.Charge;
+    const paymentIntentId = typeof charge.payment_intent === "string" ? charge.payment_intent : null;
+
+    if (paymentIntentId) {
+      const [booking] = await db
+        .select()
+        .from(bookingsTable)
+        .where(eq(bookingsTable.stripePaymentIntentId, paymentIntentId));
+
+      if (booking && booking.status !== "cancelled") {
+        await db
+          .update(bookingsTable)
+          .set({ status: "cancelled", updatedAt: new Date() })
+          .where(eq(bookingsTable.id, booking.id));
+
+        logger.info({ bookingId: booking.id, paymentIntentId, refunded: charge.amount_refunded }, "charge.refunded: booking cancelled");
+
+        try {
+          await sendRefundConfirmationEmail(booking.id, charge.amount_refunded);
+        } catch (err) {
+          logger.error({ err, bookingId: booking.id }, "charge.refunded: failed to send refund confirmation email");
+        }
+
+        try {
+          await syncBookingToSheets(booking.id);
+        } catch (err) {
+          logger.error({ err, bookingId: booking.id }, "charge.refunded: failed to re-sync to Google Sheets");
+        }
+      }
+    }
+  }
+
+  // Stripe invoice payment attempt failed — email the customer their payment link to retry.
+  if (event.type === "invoice.payment_failed") {
+    const invoice = event.data.object as Stripe.Invoice;
+    const invoiceId = invoice.id;
+
+    const [booking] = await db
+      .select()
+      .from(bookingsTable)
+      .where(eq(bookingsTable.stripeInvoiceId, invoiceId));
+
+    if (booking) {
+      logger.info({ bookingId: booking.id, invoiceId }, "invoice.payment_failed: notifying customer");
+
+      try {
+        await sendInvoicePaymentFailedEmail(booking.id);
+      } catch (err) {
+        logger.error({ err, bookingId: booking.id }, "invoice.payment_failed: failed to send notification email");
+      }
     }
   }
 
