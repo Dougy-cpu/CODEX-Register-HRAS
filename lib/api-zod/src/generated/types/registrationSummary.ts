@@ -27,8 +27,6 @@ export interface RegistrationSummary {
   stripeInvoiceId?: string | null;
   /** @nullable */
   stripeInvoicePaymentUrl?: string | null;
-  /** @nullable */
-  freeagentPaymentUrl?: string | null;
   currentStep: number;
   createdAt: Date;
   updatedAt: Date;

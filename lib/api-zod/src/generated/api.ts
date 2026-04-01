@@ -59,9 +59,6 @@ export const GetBookingResponse = zod
       .nullish(),
     stripeSessionId: zod.string().nullish(),
     stripePaymentIntentId: zod.string().nullish(),
-    freeagentInvoiceId: zod.string().nullish(),
-    freeagentInvoiceUrl: zod.string().nullish(),
-    freeagentPaymentUrl: zod.string().nullish(),
     stripeInvoiceId: zod.string().nullish(),
     stripeInvoicePdfUrl: zod.string().nullish(),
     stripeInvoicePaymentUrl: zod.string().nullish(),
@@ -77,6 +74,7 @@ export const GetBookingResponse = zod
     billingRegion: zod.string().nullish(),
     billingPostcode: zod.string().nullish(),
     billingCountry: zod.string().nullish(),
+    billingVatNumber: zod.string().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   })
@@ -131,6 +129,7 @@ export const UpdateBookingBody = zod.object({
   billingRegion: zod.string().nullish(),
   billingPostcode: zod.string().nullish(),
   billingCountry: zod.string().nullish(),
+  billingVatNumber: zod.string().nullish(),
   status: zod
     .enum([
       "partial",
@@ -144,9 +143,6 @@ export const UpdateBookingBody = zod.object({
   stripeInvoiceId: zod.string().nullish(),
   stripeInvoicePdfUrl: zod.string().nullish(),
   stripeInvoicePaymentUrl: zod.string().nullish(),
-  freeagentInvoiceId: zod.string().nullish(),
-  freeagentInvoiceUrl: zod.string().nullish(),
-  freeagentPaymentUrl: zod.string().nullish(),
 });
 
 export const UpdateBookingResponse = zod.object({
@@ -174,9 +170,6 @@ export const UpdateBookingResponse = zod.object({
     .nullish(),
   stripeSessionId: zod.string().nullish(),
   stripePaymentIntentId: zod.string().nullish(),
-  freeagentInvoiceId: zod.string().nullish(),
-  freeagentInvoiceUrl: zod.string().nullish(),
-  freeagentPaymentUrl: zod.string().nullish(),
   stripeInvoiceId: zod.string().nullish(),
   stripeInvoicePdfUrl: zod.string().nullish(),
   stripeInvoicePaymentUrl: zod.string().nullish(),
@@ -192,6 +185,7 @@ export const UpdateBookingResponse = zod.object({
   billingRegion: zod.string().nullish(),
   billingPostcode: zod.string().nullish(),
   billingCountry: zod.string().nullish(),
+  billingVatNumber: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -229,9 +223,6 @@ export const GetBookingBySessionResponse = zod
       .nullish(),
     stripeSessionId: zod.string().nullish(),
     stripePaymentIntentId: zod.string().nullish(),
-    freeagentInvoiceId: zod.string().nullish(),
-    freeagentInvoiceUrl: zod.string().nullish(),
-    freeagentPaymentUrl: zod.string().nullish(),
     stripeInvoiceId: zod.string().nullish(),
     stripeInvoicePdfUrl: zod.string().nullish(),
     stripeInvoicePaymentUrl: zod.string().nullish(),
@@ -247,6 +238,7 @@ export const GetBookingBySessionResponse = zod
     billingRegion: zod.string().nullish(),
     billingPostcode: zod.string().nullish(),
     billingCountry: zod.string().nullish(),
+    billingVatNumber: zod.string().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   })
@@ -561,20 +553,6 @@ export const CreateStripeInvoiceResponse = zod.object({
 });
 
 /**
- * @summary Create a FreeAgent invoice for a booking (invoice payment route)
- */
-export const CreateFreeAgentInvoiceBody = zod.object({
-  bookingId: zod.number(),
-});
-
-export const CreateFreeAgentInvoiceResponse = zod.object({
-  invoiceId: zod.string(),
-  invoiceUrl: zod.string().nullish(),
-  paymentUrl: zod.string().nullish(),
-  invoiceReference: zod.string(),
-});
-
-/**
  * @summary Get the current welcome email template
  */
 export const GetWelcomeEmailTemplateResponse = zod.object({
@@ -692,7 +670,6 @@ export const ListRegistrationsResponse = zod.object({
       leadCompany: zod.string().nullish(),
       stripeInvoiceId: zod.string().nullish(),
       stripeInvoicePaymentUrl: zod.string().nullish(),
-      freeagentPaymentUrl: zod.string().nullish(),
       currentStep: zod.number(),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),
@@ -736,9 +713,6 @@ export const GetRegistrationResponse = zod
       .nullish(),
     stripeSessionId: zod.string().nullish(),
     stripePaymentIntentId: zod.string().nullish(),
-    freeagentInvoiceId: zod.string().nullish(),
-    freeagentInvoiceUrl: zod.string().nullish(),
-    freeagentPaymentUrl: zod.string().nullish(),
     stripeInvoiceId: zod.string().nullish(),
     stripeInvoicePdfUrl: zod.string().nullish(),
     stripeInvoicePaymentUrl: zod.string().nullish(),
@@ -754,6 +728,7 @@ export const GetRegistrationResponse = zod
     billingRegion: zod.string().nullish(),
     billingPostcode: zod.string().nullish(),
     billingCountry: zod.string().nullish(),
+    billingVatNumber: zod.string().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   })
@@ -821,7 +796,6 @@ export const GetAdminStatsResponse = zod.object({
       leadCompany: zod.string().nullish(),
       stripeInvoiceId: zod.string().nullish(),
       stripeInvoicePaymentUrl: zod.string().nullish(),
-      freeagentPaymentUrl: zod.string().nullish(),
       currentStep: zod.number(),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),

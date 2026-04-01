@@ -80,12 +80,6 @@ export interface Booking {
   /** @nullable */
   stripePaymentIntentId?: string | null;
   /** @nullable */
-  freeagentInvoiceId?: string | null;
-  /** @nullable */
-  freeagentInvoiceUrl?: string | null;
-  /** @nullable */
-  freeagentPaymentUrl?: string | null;
-  /** @nullable */
   stripeInvoiceId?: string | null;
   /** @nullable */
   stripeInvoicePdfUrl?: string | null;
@@ -114,6 +108,8 @@ export interface Booking {
   billingPostcode?: string | null;
   /** @nullable */
   billingCountry?: string | null;
+  /** @nullable */
+  billingVatNumber?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -237,6 +233,8 @@ export interface UpdateBookingBody {
   billingPostcode?: string | null;
   /** @nullable */
   billingCountry?: string | null;
+  /** @nullable */
+  billingVatNumber?: string | null;
   status?: UpdateBookingBodyStatus;
   /** @nullable */
   stripeInvoiceId?: string | null;
@@ -244,12 +242,6 @@ export interface UpdateBookingBody {
   stripeInvoicePdfUrl?: string | null;
   /** @nullable */
   stripeInvoicePaymentUrl?: string | null;
-  /** @nullable */
-  freeagentInvoiceId?: string | null;
-  /** @nullable */
-  freeagentInvoiceUrl?: string | null;
-  /** @nullable */
-  freeagentPaymentUrl?: string | null;
 }
 
 export interface CreateAttendeeBody {
@@ -593,8 +585,6 @@ export interface RegistrationSummary {
   stripeInvoiceId?: string | null;
   /** @nullable */
   stripeInvoicePaymentUrl?: string | null;
-  /** @nullable */
-  freeagentPaymentUrl?: string | null;
   currentStep: number;
   createdAt: string;
   updatedAt: string;

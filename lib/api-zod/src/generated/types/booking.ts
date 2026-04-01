@@ -33,12 +33,6 @@ export interface Booking {
   /** @nullable */
   stripePaymentIntentId?: string | null;
   /** @nullable */
-  freeagentInvoiceId?: string | null;
-  /** @nullable */
-  freeagentInvoiceUrl?: string | null;
-  /** @nullable */
-  freeagentPaymentUrl?: string | null;
-  /** @nullable */
   stripeInvoiceId?: string | null;
   /** @nullable */
   stripeInvoicePdfUrl?: string | null;
@@ -67,6 +61,8 @@ export interface Booking {
   billingPostcode?: string | null;
   /** @nullable */
   billingCountry?: string | null;
+  /** @nullable */
+  billingVatNumber?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

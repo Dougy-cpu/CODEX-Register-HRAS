@@ -157,24 +157,18 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
             )}
           </div>
           {/* Invoice links */}
-          {(data?.stripeInvoicePaymentUrl || data?.stripeInvoicePdfUrl || data?.freeagentPaymentUrl) && (
+          {(data?.stripeInvoicePaymentUrl || data?.stripeInvoicePdfUrl) && (
             <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-blue-200">
               {data?.stripeInvoicePaymentUrl && (
                 <a href={data.stripeInvoicePaymentUrl} target="_blank" rel="noreferrer"
                   className="text-sm font-semibold text-primary underline underline-offset-2 hover:text-primary/80">
-                  View Stripe Invoice →
+                  View Invoice →
                 </a>
               )}
               {data?.stripeInvoicePdfUrl && (
                 <a href={data.stripeInvoicePdfUrl} target="_blank" rel="noreferrer"
                   className="text-sm font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900">
                   Download PDF →
-                </a>
-              )}
-              {!data?.stripeInvoicePaymentUrl && data?.freeagentPaymentUrl && (
-                <a href={data.freeagentPaymentUrl} target="_blank" rel="noreferrer"
-                  className="text-sm font-semibold text-primary underline underline-offset-2 hover:text-primary/80">
-                  View FreeAgent Invoice →
                 </a>
               )}
             </div>
@@ -538,14 +532,14 @@ export default function AdminRegistrations() {
                     <TableCell>{statusBadge(reg.status)}</TableCell>
                     <TableCell className="text-sm">{new Date(reg.createdAt).toLocaleDateString()}</TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
-                      {(reg.stripeInvoicePaymentUrl || reg.freeagentPaymentUrl) && (
+                      {reg.stripeInvoicePaymentUrl && (
                         <a
-                          href={reg.stripeInvoicePaymentUrl || reg.freeagentPaymentUrl || ""}
+                          href={reg.stripeInvoicePaymentUrl}
                           target="_blank"
                           rel="noreferrer"
                           className="text-xs font-semibold text-primary underline underline-offset-2 hover:text-primary/80 whitespace-nowrap"
                         >
-                          {reg.stripeInvoiceId ? "Stripe Invoice ↗" : "Invoice ↗"}
+                          Invoice ↗
                         </a>
                       )}
                     </TableCell>

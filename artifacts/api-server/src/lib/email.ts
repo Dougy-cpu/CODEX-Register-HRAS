@@ -9,7 +9,6 @@ import { emailLogsTable, emailTemplatesTable, bookingsTable, attendeesTable, not
 import type { EventSettings } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { generatePdfReceipt } from "./pdf";
-import { getFreeAgentToken, downloadFreeAgentInvoicePdf } from "./freeagent-client";
 
 async function downloadHttpsPdf(url: string): Promise<Buffer | null> {
   return new Promise((resolve) => {
@@ -309,11 +308,11 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
     </div>
 
     <p>A PDF VAT receipt is attached to this email for your records.</p>
-    ${booking.stripeInvoicePaymentUrl || booking.freeagentPaymentUrl ? `<p style="margin-top:16px;"><a href="${booking.stripeInvoicePaymentUrl || booking.freeagentPaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;">Download Invoice/Pay Online →</a></p>` : ""}
+    ${booking.stripeInvoicePaymentUrl ? `<p style="margin-top:16px;"><a href="${booking.stripeInvoicePaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;">Download Invoice/Pay Online →</a></p>` : ""}
     <p>We look forward to seeing you at the ${settings.eventName}!</p>
   `, settings);
 
-  // Prefer Stripe invoice PDF, then FreeAgent PDF, then our custom receipt
+  // Prefer Stripe invoice PDF, then fall back to our custom receipt
   let pdfBuffer: Buffer | null = null;
   let pdfFilename = `receipt-${booking.orderReference || bookingId}.pdf`;
   const stripeInvoicePdfUrl = booking.stripeInvoicePdfUrl;
@@ -324,27 +323,10 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
         pdfFilename = `invoice-${booking.orderReference || bookingId}.pdf`;
         logger.info({ bookingId, sizeBytes: pdfBuffer.length }, "Using Stripe invoice PDF for email attachment");
       } else {
-        logger.warn({ bookingId }, "Stripe PDF not available — falling back");
+        logger.warn({ bookingId }, "Stripe PDF not available — falling back to custom receipt");
       }
     } catch (err) {
-      logger.warn({ err }, "Could not download Stripe PDF — falling back");
-    }
-  }
-  if (!pdfBuffer) {
-    const faInvoiceUrl = booking.freeagentInvoiceUrl;
-    if (faInvoiceUrl) {
-      try {
-        const faToken = await getFreeAgentToken();
-        if (faToken) {
-          pdfBuffer = await downloadFreeAgentInvoicePdf(faInvoiceUrl, faToken);
-          if (pdfBuffer) {
-            pdfFilename = `invoice-${booking.orderReference || bookingId}.pdf`;
-            logger.info({ bookingId, sizeBytes: pdfBuffer.length }, "Using FreeAgent invoice PDF for email attachment");
-          }
-        }
-      } catch (err) {
-        logger.warn({ err }, "Could not download FreeAgent PDF — falling back to custom receipt");
-      }
+      logger.warn({ err }, "Could not download Stripe PDF — falling back to custom receipt");
     }
   }
   if (!pdfBuffer) {
@@ -473,11 +455,11 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
       <strong>Venue:</strong> ${settings.eventVenue}, ${settings.eventVenuePostcode}
     </div>
     <p>A PDF VAT receipt is attached to this email for your records.</p>
-    ${booking.stripeInvoicePaymentUrl || booking.freeagentPaymentUrl ? `<p style="margin-top:16px;"><a href="${booking.stripeInvoicePaymentUrl || booking.freeagentPaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;">Download Invoice/Pay Online →</a></p>` : ""}
+    ${booking.stripeInvoicePaymentUrl ? `<p style="margin-top:16px;"><a href="${booking.stripeInvoicePaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;">Download Invoice/Pay Online →</a></p>` : ""}
     <p>We look forward to seeing you at the ${settings.eventName}!</p>
   `, settings);
 
-  // Prefer Stripe invoice PDF, then FreeAgent PDF, then our custom receipt
+  // Prefer Stripe invoice PDF, then fall back to custom receipt
   let pdfBuffer: Buffer | null = null;
   let pdfFilename = `receipt-${booking.orderReference || bookingId}.pdf`;
   const stripeInvoicePdfUrlResend = booking.stripeInvoicePdfUrl;
@@ -487,26 +469,11 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
       if (pdfBuffer) {
         pdfFilename = `invoice-${booking.orderReference || bookingId}.pdf`;
         logger.info({ bookingId, sizeBytes: pdfBuffer.length }, "Using Stripe invoice PDF for resend");
+      } else {
+        logger.warn({ bookingId }, "Stripe PDF not available for resend — falling back to custom receipt");
       }
     } catch (err) {
-      logger.warn({ err }, "Could not download Stripe PDF for resend — falling back");
-    }
-  }
-  if (!pdfBuffer) {
-    const faInvoiceUrlResend = booking.freeagentInvoiceUrl;
-    if (faInvoiceUrlResend) {
-      try {
-        const faToken = await getFreeAgentToken();
-        if (faToken) {
-          pdfBuffer = await downloadFreeAgentInvoicePdf(faInvoiceUrlResend, faToken);
-          if (pdfBuffer) {
-            pdfFilename = `invoice-${booking.orderReference || bookingId}.pdf`;
-            logger.info({ bookingId, sizeBytes: pdfBuffer.length }, "Using FreeAgent invoice PDF for resend");
-          }
-        }
-      } catch (err) {
-        logger.warn({ err }, "Could not download FreeAgent PDF for resend — falling back to custom receipt");
-      }
+      logger.warn({ err }, "Could not download Stripe PDF for resend — falling back to custom receipt");
     }
   }
   if (!pdfBuffer) {

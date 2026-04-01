@@ -22,8 +22,6 @@ tags:
     description: Group discount tier management
   - name: stripe
     description: Stripe payment operations
-  - name: freeagent
-    description: FreeAgent invoice operations
   - name: email
     description: Email template and log management
   - name: admin
@@ -524,32 +522,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
-  # ==================== FREEAGENT ====================
-  /freeagent/create-invoice:
-    post:
-      operationId: createFreeAgentInvoice
-      tags: [freeagent]
-      summary: Create a FreeAgent invoice for a booking (invoice payment route)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateInvoiceBody"
-      responses:
-        "200":
-          description: Invoice created and sent
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/InvoiceResponse"
-        "400":
-          description: Invalid booking or FreeAgent error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
   # ==================== EMAIL TEMPLATES ====================
   /email-templates/welcome:
     get:
@@ -900,12 +872,6 @@ components:
           type: ["string", "null"]
         stripePaymentIntentId:
           type: ["string", "null"]
-        freeagentInvoiceId:
-          type: ["string", "null"]
-        freeagentInvoiceUrl:
-          type: ["string", "null"]
-        freeagentPaymentUrl:
-          type: ["string", "null"]
         stripeInvoiceId:
           type: ["string", "null"]
         stripeInvoicePdfUrl:
@@ -1039,12 +1005,6 @@ components:
         stripeInvoicePdfUrl:
           type: ["string", "null"]
         stripeInvoicePaymentUrl:
-          type: ["string", "null"]
-        freeagentInvoiceId:
-          type: ["string", "null"]
-        freeagentInvoiceUrl:
-          type: ["string", "null"]
-        freeagentPaymentUrl:
           type: ["string", "null"]
 
     # ==================== ATTENDEE SCHEMAS ====================
@@ -1606,8 +1566,6 @@ components:
         stripeInvoiceId:
           type: ["string", "null"]
         stripeInvoicePaymentUrl:
-          type: ["string", "null"]
-        freeagentPaymentUrl:
           type: ["string", "null"]
         currentStep:
           type: integer

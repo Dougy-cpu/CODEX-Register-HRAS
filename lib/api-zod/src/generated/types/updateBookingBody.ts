@@ -39,6 +39,8 @@ export interface UpdateBookingBody {
   billingPostcode?: string | null;
   /** @nullable */
   billingCountry?: string | null;
+  /** @nullable */
+  billingVatNumber?: string | null;
   status?: UpdateBookingBodyStatus;
   /** @nullable */
   stripeInvoiceId?: string | null;
@@ -46,10 +48,4 @@ export interface UpdateBookingBody {
   stripeInvoicePdfUrl?: string | null;
   /** @nullable */
   stripeInvoicePaymentUrl?: string | null;
-  /** @nullable */
-  freeagentInvoiceId?: string | null;
-  /** @nullable */
-  freeagentInvoiceUrl?: string | null;
-  /** @nullable */
-  freeagentPaymentUrl?: string | null;
 }
