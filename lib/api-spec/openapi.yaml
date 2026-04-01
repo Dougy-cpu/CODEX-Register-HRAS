@@ -875,7 +875,7 @@ components:
           enum: [partial, pending_payment, paid, invoiced, cancelled, disputed]
         passType:
           type: string
-          enum: [single, team, business]
+          enum: [single, business]
         attendeeType:
           type: string
           enum: [hr_professional, consultant_vendor]
@@ -975,7 +975,7 @@ components:
           type: string
         passType:
           type: string
-          enum: [single, team, business]
+          enum: [single, business]
         attendeeType:
           type: string
           enum: [hr_professional, consultant_vendor]
@@ -994,7 +994,7 @@ components:
       properties:
         passType:
           type: string
-          enum: [single, team, business]
+          enum: [single, business]
         attendeeType:
           type: string
           enum: [hr_professional, consultant_vendor]
@@ -1152,7 +1152,7 @@ components:
       properties:
         passType:
           type: string
-          enum: [single, team, business]
+          enum: [single, business]
         quantity:
           type: integer
         promoCode:
@@ -1301,7 +1301,7 @@ components:
           type: string
         passType:
           type: string
-          enum: [single, team, business]
+          enum: [single, business]
         quantity:
           type: integer
       required:
@@ -1339,7 +1339,7 @@ components:
           type: integer
         passType:
           type: string
-          enum: [single, team, business]
+          enum: [single, business]
         minQuantity:
           type: integer
         discountPercent:
@@ -1357,7 +1357,7 @@ components:
       properties:
         passType:
           type: string
-          enum: [single, team, business]
+          enum: [single, business]
         tiers:
           type: array
           items:
@@ -1645,13 +1645,10 @@ components:
           properties:
             single:
               type: integer
-            team:
-              type: integer
             business:
               type: integer
           required:
             - single
-            - team
             - business
         paymentMethodCounts:
           type: object

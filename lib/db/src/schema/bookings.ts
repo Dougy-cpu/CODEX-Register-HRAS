@@ -11,7 +11,7 @@ export const bookingStatusEnum = pgEnum("booking_status", [
   "disputed",
 ]);
 
-export const passTypeEnum = pgEnum("pass_type", ["single", "team", "business"]);
+export const passTypeEnum = pgEnum("pass_type", ["single", "business"]);
 
 export const attendeeTypeEnum = pgEnum("attendee_type", [
   "hr_professional",

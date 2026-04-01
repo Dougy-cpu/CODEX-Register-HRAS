@@ -141,15 +141,6 @@ export default function AdminDashboard() {
               </div>
               <div>
                 <div className="flex justify-between mb-2">
-                  <span className="font-bold">Team Pass</span>
-                  <span className="font-medium">{stats.passCounts.team}</span>
-                </div>
-                <div className="w-full bg-muted h-2 rounded-full overflow-hidden">
-                  <div className="bg-secondary h-full" style={{ width: `${(stats.passCounts.team / Math.max(1, stats.completedRegistrations)) * 100}%` }}></div>
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between mb-2">
                   <span className="font-bold">Business Pass</span>
                   <span className="font-medium">{stats.passCounts.business}</span>
                 </div>

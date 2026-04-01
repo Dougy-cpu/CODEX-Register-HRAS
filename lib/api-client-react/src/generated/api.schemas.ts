@@ -34,7 +34,6 @@ export type BookingPassType =
 
 export const BookingPassType = {
   single: "single",
-  team: "team",
   business: "business",
 } as const;
 
@@ -150,7 +149,6 @@ export type CreateBookingBodyPassType =
 
 export const CreateBookingBodyPassType = {
   single: "single",
-  team: "team",
   business: "business",
 } as const;
 
@@ -175,7 +173,6 @@ export type UpdateBookingBodyPassType =
 
 export const UpdateBookingBodyPassType = {
   single: "single",
-  team: "team",
   business: "business",
 } as const;
 
@@ -290,7 +287,6 @@ export type PricingRequestPassType =
 
 export const PricingRequestPassType = {
   single: "single",
-  team: "team",
   business: "business",
 } as const;
 
@@ -394,7 +390,6 @@ export type ValidatePromoCodeBodyPassType =
 
 export const ValidatePromoCodeBodyPassType = {
   single: "single",
-  team: "team",
   business: "business",
 } as const;
 
@@ -419,7 +414,6 @@ export type DiscountTierPassType =
 
 export const DiscountTierPassType = {
   single: "single",
-  team: "team",
   business: "business",
 } as const;
 
@@ -437,7 +431,6 @@ export type UpdateDiscountTiersBodyPassType =
 
 export const UpdateDiscountTiersBodyPassType = {
   single: "single",
-  team: "team",
   business: "business",
 } as const;
 
@@ -589,7 +582,6 @@ export interface RegistrationList {
 
 export type AdminStatsPassCounts = {
   single: number;
-  team: number;
   business: number;
 };
 

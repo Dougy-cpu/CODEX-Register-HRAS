@@ -8,6 +8,5 @@
 
 export type AdminStatsPassCounts = {
   single: number;
-  team: number;
   business: number;
 };

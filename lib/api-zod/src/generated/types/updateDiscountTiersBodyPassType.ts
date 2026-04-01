@@ -11,6 +11,5 @@ export type UpdateDiscountTiersBodyPassType =
 
 export const UpdateDiscountTiersBodyPassType = {
   single: "single",
-  team: "team",
   business: "business",
 } as const;

@@ -11,6 +11,5 @@ export type BookingPassType =
 
 export const BookingPassType = {
   single: "single",
-  team: "team",
   business: "business",
 } as const;

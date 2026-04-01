@@ -90,7 +90,6 @@ router.get("/admin/stats", adminAuth, async (_req, res): Promise<void> => {
 
   const passCounts = {
     single: allBookings.filter((b) => b.passType === "single").length,
-    team: allBookings.filter((b) => b.passType === "team").length,
     business: allBookings.filter((b) => b.passType === "business").length,
   };
 

@@ -25,7 +25,6 @@ export default function AdminDiscountTiers() {
   if (tiers && Object.keys(localTiers).length === 0) {
     const grouped = {
       single: tiers.filter(t => t.passType === "single"),
-      team: tiers.filter(t => t.passType === "team"),
       business: tiers.filter(t => t.passType === "business"),
     };
     setLocalTiers(grouped);
@@ -35,7 +34,7 @@ export default function AdminDiscountTiers() {
     const passTiers = localTiers[passType] || [];
     await updateTiers.mutateAsync({
       data: {
-        passType: passType as "single" | "team" | "business",
+        passType: passType as "single" | "business",
         tiers: passTiers.map(t => ({
           minQuantity: Number(t.minQuantity),
           discountPercent: Number(t.discountPercent),
@@ -153,11 +152,9 @@ export default function AdminDiscountTiers() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="bg-white border border-border h-12 w-full justify-start rounded-none">
           <TabsTrigger value="single" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-8 rounded-none">Single Pass</TabsTrigger>
-          <TabsTrigger value="team" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-8 rounded-none">Team Pass</TabsTrigger>
           <TabsTrigger value="business" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-8 rounded-none">Business Pass</TabsTrigger>
         </TabsList>
         <TabsContent value="single">{renderTabContent("single")}</TabsContent>
-        <TabsContent value="team">{renderTabContent("team")}</TabsContent>
         <TabsContent value="business">{renderTabContent("business")}</TabsContent>
       </Tabs>
     </AdminLayout>

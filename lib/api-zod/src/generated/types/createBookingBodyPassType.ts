@@ -11,6 +11,5 @@ export type CreateBookingBodyPassType =
 
 export const CreateBookingBodyPassType = {
   single: "single",
-  team: "team",
   business: "business",
 } as const;

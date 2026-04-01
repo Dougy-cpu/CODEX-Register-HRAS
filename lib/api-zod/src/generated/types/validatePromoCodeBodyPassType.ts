@@ -11,6 +11,5 @@ export type ValidatePromoCodeBodyPassType =
 
 export const ValidatePromoCodeBodyPassType = {
   single: "single",
-  team: "team",
   business: "business",
 } as const;

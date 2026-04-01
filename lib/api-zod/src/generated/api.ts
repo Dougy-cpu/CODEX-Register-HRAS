@@ -20,7 +20,7 @@ export const HealthCheckResponse = zod.object({
  */
 export const CreateBookingBody = zod.object({
   sessionToken: zod.string(),
-  passType: zod.enum(["single", "team", "business"]),
+  passType: zod.enum(["single", "business"]),
   attendeeType: zod.enum(["hr_professional", "consultant_vendor"]),
   quantity: zod.number(),
   currentStep: zod.number().optional(),
@@ -45,7 +45,7 @@ export const GetBookingResponse = zod
       "cancelled",
       "disputed",
     ]),
-    passType: zod.enum(["single", "team", "business"]),
+    passType: zod.enum(["single", "business"]),
     attendeeType: zod.enum(["hr_professional", "consultant_vendor"]),
     quantity: zod.number(),
     promoCode: zod.string().nullish(),
@@ -113,7 +113,7 @@ export const UpdateBookingParams = zod.object({
 });
 
 export const UpdateBookingBody = zod.object({
-  passType: zod.enum(["single", "team", "business"]).optional(),
+  passType: zod.enum(["single", "business"]).optional(),
   attendeeType: zod.enum(["hr_professional", "consultant_vendor"]).optional(),
   quantity: zod.number().optional(),
   promoCode: zod.string().nullish(),
@@ -160,7 +160,7 @@ export const UpdateBookingResponse = zod.object({
     "cancelled",
     "disputed",
   ]),
-  passType: zod.enum(["single", "team", "business"]),
+  passType: zod.enum(["single", "business"]),
   attendeeType: zod.enum(["hr_professional", "consultant_vendor"]),
   quantity: zod.number(),
   promoCode: zod.string().nullish(),
@@ -215,7 +215,7 @@ export const GetBookingBySessionResponse = zod
       "cancelled",
       "disputed",
     ]),
-    passType: zod.enum(["single", "team", "business"]),
+    passType: zod.enum(["single", "business"]),
     attendeeType: zod.enum(["hr_professional", "consultant_vendor"]),
     quantity: zod.number(),
     promoCode: zod.string().nullish(),
@@ -366,7 +366,7 @@ export const UpdateAttendeeResponse = zod.object({
  * @summary Calculate pricing for a given pass type and quantity
  */
 export const CalculatePricingBody = zod.object({
-  passType: zod.enum(["single", "team", "business"]),
+  passType: zod.enum(["single", "business"]),
   quantity: zod.number(),
   promoCode: zod.string().nullish(),
 });
@@ -392,7 +392,7 @@ export const CalculatePricingResponse = zod.object({
  */
 export const ValidatePromoCodeBody = zod.object({
   code: zod.string(),
-  passType: zod.enum(["single", "team", "business"]),
+  passType: zod.enum(["single", "business"]),
   quantity: zod.number(),
 });
 
@@ -481,7 +481,7 @@ export const DeletePromoCodeParams = zod.object({
  */
 export const ListDiscountTiersResponseItem = zod.object({
   id: zod.number(),
-  passType: zod.enum(["single", "team", "business"]),
+  passType: zod.enum(["single", "business"]),
   minQuantity: zod.number(),
   discountPercent: zod.number(),
   label: zod.string().nullish(),
@@ -494,7 +494,7 @@ export const ListDiscountTiersResponse = zod.array(
  * @summary Replace all discount tiers for a pass type (admin)
  */
 export const UpdateDiscountTiersBody = zod.object({
-  passType: zod.enum(["single", "team", "business"]),
+  passType: zod.enum(["single", "business"]),
   tiers: zod.array(
     zod.object({
       minQuantity: zod.number(),
@@ -506,7 +506,7 @@ export const UpdateDiscountTiersBody = zod.object({
 
 export const UpdateDiscountTiersResponseItem = zod.object({
   id: zod.number(),
-  passType: zod.enum(["single", "team", "business"]),
+  passType: zod.enum(["single", "business"]),
   minQuantity: zod.number(),
   discountPercent: zod.number(),
   label: zod.string().nullish(),
@@ -718,7 +718,7 @@ export const GetRegistrationResponse = zod
       "cancelled",
       "disputed",
     ]),
-    passType: zod.enum(["single", "team", "business"]),
+    passType: zod.enum(["single", "business"]),
     attendeeType: zod.enum(["hr_professional", "consultant_vendor"]),
     quantity: zod.number(),
     promoCode: zod.string().nullish(),
@@ -796,7 +796,6 @@ export const GetAdminStatsResponse = zod.object({
   totalVat: zod.number(),
   passCounts: zod.object({
     single: zod.number(),
-    team: zod.number(),
     business: zod.number(),
   }),
   paymentMethodCounts: zod.object({

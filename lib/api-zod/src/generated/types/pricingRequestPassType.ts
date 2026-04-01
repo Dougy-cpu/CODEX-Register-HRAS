@@ -11,6 +11,5 @@ export type PricingRequestPassType =
 
 export const PricingRequestPassType = {
   single: "single",
-  team: "team",
   business: "business",
 } as const;

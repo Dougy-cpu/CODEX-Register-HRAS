@@ -11,6 +11,5 @@ export type DiscountTierPassType =
 
 export const DiscountTierPassType = {
   single: "single",
-  team: "team",
   business: "business",
 } as const;
