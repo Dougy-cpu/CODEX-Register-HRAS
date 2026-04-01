@@ -9,9 +9,38 @@ import {
   sendCheckoutExpiredEmail,
   sendRefundConfirmationEmail,
   sendInvoicePaymentFailedEmail,
+  sendDisputeAlertEmail,
 } from "../lib/email";
-import { syncBookingToSheets } from "../lib/google-sheets";
-import { logger } from "../lib/logger";
+
+const DECLINE_CODE_LABELS: Record<string, string> = {
+  authentication_required: "Strong customer authentication required — please retry your payment",
+  card_declined: "Card declined by your bank",
+  do_not_honor: "Card declined — please contact your bank",
+  expired_card: "Card has expired",
+  fraudulent: "Suspected fraudulent activity — please contact your bank",
+  generic_decline: "Card declined",
+  incorrect_cvc: "Incorrect security code (CVC)",
+  insufficient_funds: "Insufficient funds",
+  invalid_account: "Invalid account",
+  lost_card: "Card reported lost — please contact your bank",
+  new_account_information_available: "Card details have changed — please use your updated card",
+  no_action_taken: "Card declined — no action taken by bank",
+  not_permitted: "This card type is not permitted for this transaction",
+  restricted_card: "Card is restricted",
+  stolen_card: "Card reported stolen — please contact your bank",
+  transaction_not_allowed: "Transaction not allowed on this card",
+};
+
+const DISPUTE_REASON_LABELS: Record<string, string> = {
+  credit_not_processed: "Credit not processed",
+  duplicate: "Duplicate charge",
+  fraudulent: "Fraudulent",
+  general: "General",
+  product_not_received: "Product / service not received",
+  product_unacceptable: "Product / service unacceptable",
+  subscription_canceled: "Subscription cancelled",
+  unrecognized: "Unrecognised transaction",
+};
 
 let cachedVatRateId: string | null = null;
 
@@ -310,8 +339,9 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
     }
   }
 
-  // Stripe invoice payment attempt failed — email the customer their payment link to retry.
+  // Stripe invoice payment attempt failed — email the customer with the specific decline reason.
   if (event.type === "invoice.payment_failed") {
+    const stripe = getStripe();
     const invoice = event.data.object as Stripe.Invoice;
     const invoiceId = invoice.id;
 
@@ -321,14 +351,93 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
       .where(eq(bookingsTable.stripeInvoiceId, invoiceId));
 
     if (booking) {
-      logger.info({ bookingId: booking.id, invoiceId }, "invoice.payment_failed: notifying customer");
+      // Attempt to retrieve the payment intent to get the specific decline reason
+      let declineReason: string | undefined;
+      const piId = typeof invoice.payment_intent === "string" ? invoice.payment_intent : null;
+      if (piId && stripe) {
+        try {
+          const pi = await stripe.paymentIntents.retrieve(piId);
+          const err = pi.last_payment_error;
+          if (err) {
+            const code = err.decline_code || err.code || "";
+            declineReason = DECLINE_CODE_LABELS[code] || err.message || undefined;
+          }
+        } catch (piErr) {
+          logger.warn({ piErr, piId }, "invoice.payment_failed: could not retrieve payment intent for decline reason");
+        }
+      }
+
+      const attemptCount = invoice.attempt_count ?? undefined;
+      logger.info({ bookingId: booking.id, invoiceId, declineReason, attemptCount }, "invoice.payment_failed: notifying customer");
 
       try {
-        await sendInvoicePaymentFailedEmail(booking.id);
+        await sendInvoicePaymentFailedEmail(booking.id, declineReason, attemptCount);
       } catch (err) {
         logger.error({ err, bookingId: booking.id }, "invoice.payment_failed: failed to send notification email");
       }
     }
+  }
+
+  // A payment dispute (chargeback) has been filed — mark booking disputed and alert organisers urgently.
+  if (event.type === "dispute.created") {
+    const dispute = event.data.object as Stripe.Dispute;
+    const piId = typeof dispute.payment_intent === "string" ? dispute.payment_intent : null;
+
+    if (piId) {
+      const [booking] = await db
+        .select()
+        .from(bookingsTable)
+        .where(eq(bookingsTable.stripePaymentIntentId, piId));
+
+      if (booking) {
+        await db
+          .update(bookingsTable)
+          .set({ status: "disputed", updatedAt: new Date() })
+          .where(eq(bookingsTable.id, booking.id));
+
+        const reasonLabel = DISPUTE_REASON_LABELS[dispute.reason] || dispute.reason || "Unknown";
+        const dueBy = dispute.evidence_details?.due_by
+          ? new Date(dispute.evidence_details.due_by * 1000)
+          : null;
+
+        logger.info({ bookingId: booking.id, disputeId: dispute.id, reason: dispute.reason, dueBy }, "dispute.created: booking marked as disputed");
+
+        try {
+          await sendDisputeAlertEmail(booking.id, dispute.id, dispute.amount, reasonLabel, dueBy);
+        } catch (err) {
+          logger.error({ err, bookingId: booking.id, disputeId: dispute.id }, "dispute.created: failed to send alert email");
+        }
+
+        try {
+          await syncBookingToSheets(booking.id);
+        } catch (err) {
+          logger.error({ err, bookingId: booking.id }, "dispute.created: failed to re-sync to Google Sheets");
+        }
+      } else {
+        logger.info({ piId, disputeId: dispute.id }, "dispute.created: no matching booking found, skipping");
+      }
+    }
+  }
+
+  // A card payment attempt failed during Stripe Checkout — log the decline code for admin visibility.
+  // No status change; Stripe Checkout handles retries inline so no customer email is sent here.
+  if (event.type === "payment_intent.payment_failed") {
+    const pi = event.data.object as Stripe.PaymentIntent;
+    const piId = pi.id;
+    const err = pi.last_payment_error;
+    const declineCode = err?.decline_code || err?.code || "unknown";
+    const declineMessage = DECLINE_CODE_LABELS[declineCode] || err?.message || "Unknown reason";
+
+    // Try to identify the booking for richer log context
+    const [booking] = await db
+      .select()
+      .from(bookingsTable)
+      .where(eq(bookingsTable.stripePaymentIntentId, piId));
+
+    logger.info(
+      { piId, declineCode, declineMessage, bookingId: booking?.id ?? null },
+      "payment_intent.payment_failed: card decline logged",
+    );
   }
 
   res.json({ received: true });

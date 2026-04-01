@@ -902,7 +902,11 @@ export async function sendRefundConfirmationEmail(bookingId: number, refundAmoun
   logger.info({ bookingId, refundAmount }, "Refund confirmation email sent");
 }
 
-export async function sendInvoicePaymentFailedEmail(bookingId: number): Promise<void> {
+export async function sendInvoicePaymentFailedEmail(
+  bookingId: number,
+  declineReason?: string,
+  attemptCount?: number,
+): Promise<void> {
   const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
   if (!booking) return;
 
@@ -917,6 +921,16 @@ export async function sendInvoicePaymentFailedEmail(bookingId: number): Promise<
   const orderRef = booking.orderReference || `HRAS26-${6541 + bookingId}`;
   const paymentUrl = booking.stripeInvoicePaymentUrl;
 
+  const attemptNote = attemptCount && attemptCount > 1
+    ? `<p style="color:#666;font-size:14px;">This is payment attempt <strong>${attemptCount}</strong>.</p>`
+    : "";
+
+  const declineNote = declineReason
+    ? `<div style="background:#f8d7da;border:1px solid #f5c2c7;padding:12px 16px;border-radius:4px;margin:16px 0;font-size:14px;color:#842029;">
+        <strong>Reason:</strong> ${declineReason}
+      </div>`
+    : "";
+
   const html = wrapInBrandedLayout(`
     <div style="background:#fff3cd;border:1px solid #ffc107;padding:16px 20px;border-radius:4px;margin-bottom:24px;">
       <strong style="color:#856404;">⚠ Invoice payment unsuccessful</strong>
@@ -924,6 +938,8 @@ export async function sendInvoicePaymentFailedEmail(bookingId: number): Promise<
     <h2 style="margin-top:0;">Action Required: Invoice Payment Failed</h2>
     <p>Hi ${name},</p>
     <p>We attempted to collect payment for your HR Analytics Summit 2026 invoice but the payment was unsuccessful. Your booking reference is <strong>${orderRef}</strong>.</p>
+    ${declineNote}
+    ${attemptNote}
     <p>Please use the button below to pay your invoice. If you continue to have difficulties, contact your bank or reach out to us directly.</p>
     ${paymentUrl ? `
     <p style="text-align:center;margin:32px 0;">
@@ -942,5 +958,65 @@ export async function sendInvoicePaymentFailedEmail(bookingId: number): Promise<
     html,
   });
 
-  logger.info({ bookingId, orderRef }, "Invoice payment failed email sent");
+  logger.info({ bookingId, orderRef, declineReason, attemptCount }, "Invoice payment failed email sent");
+}
+
+export async function sendDisputeAlertEmail(
+  bookingId: number,
+  disputeId: string,
+  disputeAmountPence: number,
+  disputeReason: string,
+  evidenceDueBy: Date | null,
+): Promise<void> {
+  const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
+  if (!booking) return;
+
+  const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
+  const lead = attendees.find((a) => a.isLead) || attendees[0];
+
+  const settings = await getEventSettings();
+  const recipients = await getOrganiserEmails();
+  if (recipients.length === 0) {
+    logger.warn({ bookingId, disputeId }, "sendDisputeAlertEmail: no organiser emails configured, skipping");
+    return;
+  }
+
+  const customerName = lead ? `${lead.firstName} ${lead.lastName}` : "Unknown";
+  const orderRef = booking.orderReference || `HRAS26-${6541 + bookingId}`;
+  const disputeAmount = (disputeAmountPence / 100).toFixed(2);
+  const deadlineStr = evidenceDueBy
+    ? evidenceDueBy.toLocaleDateString("en-GB", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
+    : "Check Stripe dashboard";
+  const stripeUrl = `https://dashboard.stripe.com/disputes/${disputeId}`;
+
+  const html = wrapInBrandedLayout(`
+    <div style="background:#f8d7da;border:2px solid #dc3545;padding:16px 20px;border-radius:4px;margin-bottom:24px;">
+      <strong style="color:#842029;font-size:16px;">🚨 Chargeback / Dispute Filed</strong>
+    </div>
+    <h2 style="margin-top:0;color:#842029;">Urgent: Payment Dispute Received</h2>
+    <p>A customer has filed a chargeback with their bank. <strong>You must respond by the deadline below</strong> or the funds will be automatically returned and a dispute fee charged.</p>
+    <div class="info-box">
+      <table style="width:100%;font-size:15px;">
+        <tr><td style="color:#666;padding:6px 0;">Booking Reference</td><td style="text-align:right;font-family:monospace;font-weight:600;">${orderRef}</td></tr>
+        <tr><td style="color:#666;padding:6px 0;">Customer</td><td style="text-align:right;font-weight:600;">${customerName}</td></tr>
+        <tr><td style="color:#666;padding:6px 0;">Disputed Amount</td><td style="text-align:right;font-weight:700;color:#842029;">£${disputeAmount}</td></tr>
+        <tr><td style="color:#666;padding:6px 0;">Dispute Reason</td><td style="text-align:right;">${disputeReason}</td></tr>
+        <tr><td style="color:#666;padding:6px 0;font-weight:700;">Evidence Deadline</td><td style="text-align:right;font-weight:700;color:#842029;">${deadlineStr}</td></tr>
+      </table>
+    </div>
+    <p style="text-align:center;margin:32px 0;">
+      <a href="${stripeUrl}" class="cta-btn" style="display:inline-block;background:#842029;color:#fff;padding:12px 28px;border-radius:300px;text-decoration:none;font-weight:600;">
+        View Dispute in Stripe →
+      </a>
+    </p>
+    <p style="font-size:14px;color:#666;">Evidence to submit typically includes: the booking confirmation email, signed terms and conditions, and any correspondence with the customer.</p>
+  `, settings);
+
+  await sendMail({
+    to: recipients,
+    subject: `🚨 Dispute Filed — ${orderRef} — £${disputeAmount} — Deadline: ${deadlineStr}`,
+    html,
+  });
+
+  logger.info({ bookingId, disputeId, disputeAmount, deadlineStr, recipients }, "Dispute alert email sent to organisers");
 }
