@@ -237,6 +237,18 @@ export interface UpdateBookingBody {
   /** @nullable */
   billingCountry?: string | null;
   status?: UpdateBookingBodyStatus;
+  /** @nullable */
+  stripeInvoiceId?: string | null;
+  /** @nullable */
+  stripeInvoicePdfUrl?: string | null;
+  /** @nullable */
+  stripeInvoicePaymentUrl?: string | null;
+  /** @nullable */
+  freeagentInvoiceId?: string | null;
+  /** @nullable */
+  freeagentInvoiceUrl?: string | null;
+  /** @nullable */
+  freeagentPaymentUrl?: string | null;
 }
 
 export interface CreateAttendeeBody {

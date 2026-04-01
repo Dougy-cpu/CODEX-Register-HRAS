@@ -994,6 +994,18 @@ components:
         status:
           type: string
           enum: [partial, pending_payment, paid, invoiced, cancelled]
+        stripeInvoiceId:
+          type: ["string", "null"]
+        stripeInvoicePdfUrl:
+          type: ["string", "null"]
+        stripeInvoicePaymentUrl:
+          type: ["string", "null"]
+        freeagentInvoiceId:
+          type: ["string", "null"]
+        freeagentInvoiceUrl:
+          type: ["string", "null"]
+        freeagentPaymentUrl:
+          type: ["string", "null"]
 
     # ==================== ATTENDEE SCHEMAS ====================
     Attendee:

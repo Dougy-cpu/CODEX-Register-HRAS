@@ -132,6 +132,12 @@ export const UpdateBookingBody = zod.object({
   status: zod
     .enum(["partial", "pending_payment", "paid", "invoiced", "cancelled"])
     .optional(),
+  stripeInvoiceId: zod.string().nullish(),
+  stripeInvoicePdfUrl: zod.string().nullish(),
+  stripeInvoicePaymentUrl: zod.string().nullish(),
+  freeagentInvoiceId: zod.string().nullish(),
+  freeagentInvoiceUrl: zod.string().nullish(),
+  freeagentPaymentUrl: zod.string().nullish(),
 });
 
 export const UpdateBookingResponse = zod.object({

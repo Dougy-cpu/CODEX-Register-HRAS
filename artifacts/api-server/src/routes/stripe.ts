@@ -329,7 +329,11 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
     }
 
     const vatRateId = await getOrCreateVatRate(stripe);
-    const vatParams = vatRateId ? { tax_rates: [vatRateId] } : {};
+    if (!vatRateId) {
+      res.status(500).json({ error: "Could not establish UK VAT 20% tax rate in Stripe. Invoice not created." });
+      return;
+    }
+    const vatParams = { tax_rates: [vatRateId] };
 
     const invoiceObj = await stripe.invoices.create({
       customer: customer.id,
