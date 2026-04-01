@@ -221,6 +221,7 @@ export default function AdminRegistrations() {
                 <TableHead>Total</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
+                <TableHead>Invoice</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -252,10 +253,22 @@ export default function AdminRegistrations() {
                       </span>
                     </TableCell>
                     <TableCell className="text-sm">{new Date(reg.createdAt).toLocaleDateString()}</TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      {(reg.stripeInvoicePaymentUrl || reg.freeagentPaymentUrl) && (
+                        <a
+                          href={reg.stripeInvoicePaymentUrl || reg.freeagentPaymentUrl || ""}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs font-semibold text-primary underline underline-offset-2 hover:text-primary/80 whitespace-nowrap"
+                        >
+                          {reg.stripeInvoiceId ? "Stripe Invoice ↗" : "Invoice ↗"}
+                        </a>
+                      )}
+                    </TableCell>
                   </TableRow>
                   {expandedId === reg.id && (
                     <TableRow className="bg-muted/10">
-                      <TableCell colSpan={8} className="p-6">
+                      <TableCell colSpan={9} className="p-6">
                         <ExpandedRegistrationDetail id={reg.id} />
                       </TableCell>
                     </TableRow>

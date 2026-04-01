@@ -551,6 +551,12 @@ export interface RegistrationSummary {
   leadEmail?: string | null;
   /** @nullable */
   leadCompany?: string | null;
+  /** @nullable */
+  stripeInvoiceId?: string | null;
+  /** @nullable */
+  stripeInvoicePaymentUrl?: string | null;
+  /** @nullable */
+  freeagentPaymentUrl?: string | null;
   currentStep: number;
   createdAt: string;
   updatedAt: string;

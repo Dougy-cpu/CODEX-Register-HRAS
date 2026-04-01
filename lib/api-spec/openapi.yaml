@@ -1519,6 +1519,12 @@ components:
           type: ["string", "null"]
         leadCompany:
           type: ["string", "null"]
+        stripeInvoiceId:
+          type: ["string", "null"]
+        stripeInvoicePaymentUrl:
+          type: ["string", "null"]
+        freeagentPaymentUrl:
+          type: ["string", "null"]
         currentStep:
           type: integer
         createdAt:
