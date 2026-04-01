@@ -26,6 +26,7 @@ export const BookingStatus = {
   paid: "paid",
   invoiced: "invoiced",
   cancelled: "cancelled",
+  disputed: "disputed",
 } as const;
 
 export type BookingPassType =
@@ -207,6 +208,7 @@ export const UpdateBookingBodyStatus = {
   paid: "paid",
   invoiced: "invoiced",
   cancelled: "cancelled",
+  disputed: "disputed",
 } as const;
 
 export interface UpdateBookingBody {

@@ -872,7 +872,7 @@ components:
           type: string
         status:
           type: string
-          enum: [partial, pending_payment, paid, invoiced, cancelled]
+          enum: [partial, pending_payment, paid, invoiced, cancelled, disputed]
         passType:
           type: string
           enum: [single, team, business]
@@ -1029,7 +1029,7 @@ components:
           type: ["string", "null"]
         status:
           type: string
-          enum: [partial, pending_payment, paid, invoiced, cancelled]
+          enum: [partial, pending_payment, paid, invoiced, cancelled, disputed]
         stripeInvoiceId:
           type: ["string", "null"]
         stripeInvoicePdfUrl:

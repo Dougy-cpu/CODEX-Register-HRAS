@@ -11,6 +11,8 @@ import {
   sendInvoicePaymentFailedEmail,
   sendDisputeAlertEmail,
 } from "../lib/email";
+import { syncBookingToSheets } from "../lib/google-sheets";
+import { logger } from "../lib/logger";
 
 const DECLINE_CODE_LABELS: Record<string, string> = {
   authentication_required: "Strong customer authentication required — please retry your payment",

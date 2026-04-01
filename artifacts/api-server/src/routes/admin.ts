@@ -345,7 +345,7 @@ router.patch("/admin/registrations/:id/status", adminAuth, async (req, res): Pro
   const id = parseInt(raw, 10);
   const { status } = req.body as { status: string };
 
-  const allowed = ["paid", "invoiced", "partial", "pending_payment", "cancelled"];
+  const allowed = ["paid", "invoiced", "partial", "pending_payment", "cancelled", "disputed"];
   if (!status || !allowed.includes(status)) {
     res.status(400).json({ error: `status must be one of: ${allowed.join(", ")}` });
     return;

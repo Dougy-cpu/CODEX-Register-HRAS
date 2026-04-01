@@ -43,6 +43,7 @@ export const GetBookingResponse = zod
       "paid",
       "invoiced",
       "cancelled",
+      "disputed",
     ]),
     passType: zod.enum(["single", "team", "business"]),
     attendeeType: zod.enum(["hr_professional", "consultant_vendor"]),
@@ -131,7 +132,14 @@ export const UpdateBookingBody = zod.object({
   billingPostcode: zod.string().nullish(),
   billingCountry: zod.string().nullish(),
   status: zod
-    .enum(["partial", "pending_payment", "paid", "invoiced", "cancelled"])
+    .enum([
+      "partial",
+      "pending_payment",
+      "paid",
+      "invoiced",
+      "cancelled",
+      "disputed",
+    ])
     .optional(),
   stripeInvoiceId: zod.string().nullish(),
   stripeInvoicePdfUrl: zod.string().nullish(),
@@ -150,6 +158,7 @@ export const UpdateBookingResponse = zod.object({
     "paid",
     "invoiced",
     "cancelled",
+    "disputed",
   ]),
   passType: zod.enum(["single", "team", "business"]),
   attendeeType: zod.enum(["hr_professional", "consultant_vendor"]),
@@ -204,6 +213,7 @@ export const GetBookingBySessionResponse = zod
       "paid",
       "invoiced",
       "cancelled",
+      "disputed",
     ]),
     passType: zod.enum(["single", "team", "business"]),
     attendeeType: zod.enum(["hr_professional", "consultant_vendor"]),
@@ -706,6 +716,7 @@ export const GetRegistrationResponse = zod
       "paid",
       "invoiced",
       "cancelled",
+      "disputed",
     ]),
     passType: zod.enum(["single", "team", "business"]),
     attendeeType: zod.enum(["hr_professional", "consultant_vendor"]),

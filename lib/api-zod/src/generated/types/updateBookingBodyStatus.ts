@@ -15,4 +15,5 @@ export const UpdateBookingBodyStatus = {
   paid: "paid",
   invoiced: "invoiced",
   cancelled: "cancelled",
+  disputed: "disputed",
 } as const;
