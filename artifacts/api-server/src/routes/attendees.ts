@@ -93,15 +93,21 @@ router.post("/bookings/:bookingId/attendees", async (req, res): Promise<void> =>
 
   res.status(existing ? 200 : 201).json(formatAttendee(attendee));
 
-  // Fire incomplete-form notification when the lead attendee is saved for the first time
-  // on a still-partial booking. Only send once (partialNotificationSent guards duplicates).
+  // Fire incomplete-form notification when the lead attendee is saved on a still-partial
+  // booking. Atomic: claim the flag first with a conditional UPDATE (only if it's still
+  // false), then send the email only when the claim succeeds. This prevents duplicate
+  // emails under concurrent requests.
   if (isLead && booking.status === "partial" && !booking.partialNotificationSent) {
     try {
-      await sendIncompleteFormNotification(bookingId);
-      await db
+      const claimed = await db
         .update(bookingsTable)
         .set({ partialNotificationSent: true })
-        .where(eq(bookingsTable.id, bookingId));
+        .where(and(eq(bookingsTable.id, bookingId), eq(bookingsTable.partialNotificationSent, false)))
+        .returning({ id: bookingsTable.id });
+
+      if (claimed.length > 0) {
+        await sendIncompleteFormNotification(bookingId);
+      }
     } catch (err) {
       // Non-fatal — log but don't affect the response
       logger.error({ err, bookingId }, "Failed to send incomplete form notification");
