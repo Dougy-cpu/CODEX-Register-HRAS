@@ -22,6 +22,7 @@ function formatBooking(b: typeof bookingsTable.$inferSelect) {
     totalAmount: parseFloat(b.totalAmount?.toString() || "0"),
     promoDiscountAmount: b.promoDiscountAmount ? parseFloat(b.promoDiscountAmount.toString()) : null,
     groupDiscountAmount: b.groupDiscountAmount ? parseFloat(b.groupDiscountAmount.toString()) : null,
+    invoiceDueDate: b.invoiceDueDate ? b.invoiceDueDate.toISOString() : null,
     createdAt: b.createdAt.toISOString(),
     updatedAt: b.updatedAt.toISOString(),
   };

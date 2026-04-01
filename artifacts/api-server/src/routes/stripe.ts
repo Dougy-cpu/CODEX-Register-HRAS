@@ -727,6 +727,7 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
     const invoiceId = sent.id;
     const invoicePdfUrl = sent.invoice_pdf || null;
     const invoicePaymentUrl = sent.hosted_invoice_url || null;
+    const invoiceDueDate = sent.due_date ? new Date(sent.due_date * 1000) : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
 
     await db.update(bookingsTable).set({
       status: "invoiced",
@@ -736,6 +737,7 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
       stripeInvoiceId: invoiceId,
       stripeInvoicePdfUrl: invoicePdfUrl,
       stripeInvoicePaymentUrl: invoicePaymentUrl,
+      invoiceDueDate,
     }).where(eq(bookingsTable.id, id));
 
     if (booking.promoCode) {

@@ -238,6 +238,22 @@ router.post("/admin/email-logs/:bookingId/resend", adminAuth, async (req, res): 
   res.json({ success: true, message: "Confirmation and PDF receipt resent successfully" });
 });
 
+router.post("/admin/bookings/:bookingId/send-invoice-reminder", adminAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.bookingId) ? req.params.bookingId[0] : req.params.bookingId;
+  const bookingId = parseInt(raw, 10);
+  if (isNaN(bookingId)) {
+    res.status(400).json({ error: "Invalid booking ID" });
+    return;
+  }
+  try {
+    const { sendInvoiceReminder } = await import("../lib/email");
+    await sendInvoiceReminder(bookingId);
+    res.json({ success: true, message: "Invoice reminder sent successfully" });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Failed to send invoice reminder" });
+  }
+});
+
 // Debug: download the receipt PDF directly for a booking (to verify it's valid)
 router.get("/admin/email-logs/:bookingId/receipt-pdf", adminAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.bookingId) ? req.params.bookingId[0] : req.params.bookingId;

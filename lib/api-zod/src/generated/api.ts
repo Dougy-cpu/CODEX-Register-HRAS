@@ -75,6 +75,7 @@ export const GetBookingResponse = zod
     billingPostcode: zod.string().nullish(),
     billingCountry: zod.string().nullish(),
     billingVatNumber: zod.string().nullish(),
+    invoiceDueDate: zod.coerce.date().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   })
@@ -130,6 +131,7 @@ export const UpdateBookingBody = zod.object({
   billingPostcode: zod.string().nullish(),
   billingCountry: zod.string().nullish(),
   billingVatNumber: zod.string().nullish(),
+  invoiceDueDate: zod.coerce.date().nullish(),
   status: zod
     .enum([
       "partial",
@@ -186,6 +188,7 @@ export const UpdateBookingResponse = zod.object({
   billingPostcode: zod.string().nullish(),
   billingCountry: zod.string().nullish(),
   billingVatNumber: zod.string().nullish(),
+  invoiceDueDate: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -239,6 +242,7 @@ export const GetBookingBySessionResponse = zod
     billingPostcode: zod.string().nullish(),
     billingCountry: zod.string().nullish(),
     billingVatNumber: zod.string().nullish(),
+    invoiceDueDate: zod.coerce.date().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   })
@@ -632,6 +636,18 @@ export const ResendBookingEmailsResponse = zod.object({
 });
 
 /**
+ * @summary Send invoice payment reminder email to the billing contact
+ */
+export const SendInvoiceReminderParams = zod.object({
+  bookingId: zod.coerce.number(),
+});
+
+export const SendInvoiceReminderResponse = zod.object({
+  success: zod.boolean(),
+  message: zod.string().optional(),
+});
+
+/**
  * @summary Admin login — validate password and return session token
  */
 export const AdminLoginBody = zod.object({
@@ -670,6 +686,7 @@ export const ListRegistrationsResponse = zod.object({
       leadCompany: zod.string().nullish(),
       stripeInvoiceId: zod.string().nullish(),
       stripeInvoicePaymentUrl: zod.string().nullish(),
+      invoiceDueDate: zod.coerce.date().nullish(),
       currentStep: zod.number(),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),
@@ -729,6 +746,7 @@ export const GetRegistrationResponse = zod
     billingPostcode: zod.string().nullish(),
     billingCountry: zod.string().nullish(),
     billingVatNumber: zod.string().nullish(),
+    invoiceDueDate: zod.coerce.date().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   })
@@ -796,6 +814,7 @@ export const GetAdminStatsResponse = zod.object({
       leadCompany: zod.string().nullish(),
       stripeInvoiceId: zod.string().nullish(),
       stripeInvoicePaymentUrl: zod.string().nullish(),
+      invoiceDueDate: zod.coerce.date().nullish(),
       currentStep: zod.number(),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),

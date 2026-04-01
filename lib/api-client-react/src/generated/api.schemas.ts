@@ -110,6 +110,8 @@ export interface Booking {
   billingCountry?: string | null;
   /** @nullable */
   billingVatNumber?: string | null;
+  /** @nullable */
+  invoiceDueDate?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -235,6 +237,8 @@ export interface UpdateBookingBody {
   billingCountry?: string | null;
   /** @nullable */
   billingVatNumber?: string | null;
+  /** @nullable */
+  invoiceDueDate?: string | null;
   status?: UpdateBookingBodyStatus;
   /** @nullable */
   stripeInvoiceId?: string | null;
@@ -585,6 +589,8 @@ export interface RegistrationSummary {
   stripeInvoiceId?: string | null;
   /** @nullable */
   stripeInvoicePaymentUrl?: string | null;
+  /** @nullable */
+  invoiceDueDate?: string | null;
   currentStep: number;
   createdAt: string;
   updatedAt: string;

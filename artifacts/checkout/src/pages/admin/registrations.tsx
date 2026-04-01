@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronDown, ChevronRight, Search, Download, Trash2, AlertTriangle } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, Download, Trash2, AlertTriangle, Send, Check, Clock } from "lucide-react";
 
 const STATUS_OPTIONS = [
   { value: "paid", label: "Paid" },
@@ -37,6 +37,36 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
     query: { queryKey: ["registration", id] }
   });
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [reminderState, setReminderState] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [reminderError, setReminderError] = useState<string | null>(null);
+
+  const invoiceDueDate = data?.invoiceDueDate ? new Date(data.invoiceDueDate) : null;
+  const isInvoiceOverdue = data?.status === "invoiced" && !!invoiceDueDate && invoiceDueDate < new Date();
+  const invoiceDueDateStr = invoiceDueDate
+    ? invoiceDueDate.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
+    : null;
+
+  const handleSendReminder = async () => {
+    setReminderState("loading");
+    setReminderError(null);
+    try {
+      const token = localStorage.getItem("admin_token") || "";
+      const res = await fetch(`/api/admin/bookings/${id}/send-invoice-reminder`, {
+        method: "POST",
+        headers: { "x-admin-token": token },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error || "Failed to send reminder");
+      }
+      setReminderState("success");
+      setTimeout(() => setReminderState("idle"), 3500);
+    } catch (err: any) {
+      setReminderError(err?.message || "Failed to send reminder");
+      setReminderState("error");
+      setTimeout(() => { setReminderState("idle"); setReminderError(null); }, 4000);
+    }
+  };
 
   const handleStatusChange = async (newStatus: string) => {
     if (newStatus === data?.status) return;
@@ -115,13 +145,60 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
 
       {/* Invoice details — shown when payment method is invoice */}
       {data?.paymentMethod === "invoice" && (
-        <div className="bg-blue-50 border border-blue-200 p-4">
-          <h4 className="font-bold mb-3 uppercase text-xs tracking-wider text-blue-700">Invoice Details</h4>
+        <div className={`${isInvoiceOverdue ? "bg-red-50 border-red-300" : "bg-blue-50 border-blue-200"} border p-4`}>
+          <div className="flex items-center justify-between mb-3">
+            <h4 className={`font-bold uppercase text-xs tracking-wider ${isInvoiceOverdue ? "text-red-700" : "text-blue-700"}`}>
+              Invoice Details
+              {isInvoiceOverdue && (
+                <span className="ml-2 inline-flex items-center gap-1 bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs font-bold uppercase">
+                  <AlertTriangle className="w-3 h-3" /> Overdue
+                </span>
+              )}
+            </h4>
+            {data?.stripeInvoicePaymentUrl && (
+              <button
+                onClick={handleSendReminder}
+                disabled={reminderState === "loading" || reminderState === "success"}
+                className={`
+                  inline-flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded transition-all
+                  ${reminderState === "success"
+                    ? "bg-green-100 text-green-700 cursor-not-allowed"
+                    : reminderState === "error"
+                    ? "bg-red-100 text-red-700 hover:bg-red-200"
+                    : reminderState === "loading"
+                    ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                    : isInvoiceOverdue
+                    ? "bg-red-600 text-white hover:bg-red-700"
+                    : "bg-blue-600 text-white hover:bg-blue-700"
+                  }
+                `}
+              >
+                {reminderState === "loading" && <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-current" />}
+                {reminderState === "success" && <Check className="w-3 h-3" />}
+                {reminderState === "error" && <AlertTriangle className="w-3 h-3" />}
+                {reminderState === "idle" && <Send className="w-3 h-3" />}
+                {reminderState === "loading" ? "Sending…"
+                  : reminderState === "success" ? "Sent!"
+                  : reminderState === "error" ? (reminderError || "Failed")
+                  : "Send Reminder"}
+              </button>
+            )}
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
             <div className="flex gap-2">
               <span className="text-muted-foreground w-36 shrink-0">Invoice Ref</span>
               <span className="font-mono font-semibold">{data?.orderReference || "—"}</span>
             </div>
+            {invoiceDueDateStr && (
+              <div className="flex gap-2">
+                <span className={`w-36 shrink-0 ${isInvoiceOverdue ? "text-red-600 font-semibold" : "text-muted-foreground"}`}>
+                  {isInvoiceOverdue ? "⚠️ Due Date" : "Due Date"}
+                </span>
+                <span className={`font-medium ${isInvoiceOverdue ? "text-red-700 font-bold" : ""}`}>
+                  {invoiceDueDateStr}{isInvoiceOverdue ? " — OVERDUE" : ""}
+                </span>
+              </div>
+            )}
             {data?.billingName && (
               <div className="flex gap-2">
                 <span className="text-muted-foreground w-36 shrink-0">Billing Contact</span>
@@ -529,8 +606,24 @@ export default function AdminRegistrations() {
                     </TableCell>
                     <TableCell>{reg.quantity}</TableCell>
                     <TableCell className="font-medium">£{reg.totalAmount}</TableCell>
-                    <TableCell>{statusBadge(reg.status)}</TableCell>
-                    <TableCell className="text-sm">{new Date(reg.createdAt).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        {statusBadge(reg.status)}
+                        {reg.status === "invoiced" && reg.invoiceDueDate && new Date(reg.invoiceDueDate) < new Date() && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-red-700 bg-red-100 px-1.5 py-0.5 rounded">
+                            <Clock className="w-2.5 h-2.5" /> Overdue
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      <div>{new Date(reg.createdAt).toLocaleDateString()}</div>
+                      {reg.status === "invoiced" && reg.invoiceDueDate && (
+                        <div className={`text-xs mt-0.5 ${new Date(reg.invoiceDueDate) < new Date() ? "text-red-600 font-semibold" : "text-muted-foreground"}`}>
+                          Due: {new Date(reg.invoiceDueDate).toLocaleDateString()}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       {reg.stripeInvoicePaymentUrl && (
                         <a

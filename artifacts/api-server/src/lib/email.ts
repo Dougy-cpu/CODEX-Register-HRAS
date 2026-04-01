@@ -994,3 +994,122 @@ export async function sendDisputeAlertEmail(
 
   logger.info({ bookingId, disputeId, disputeAmount, deadlineStr, recipients }, "Dispute alert email sent to organisers");
 }
+
+export async function sendInvoiceReminder(bookingId: number): Promise<void> {
+  const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
+  if (!booking) throw new Error(`Booking ${bookingId} not found`);
+  if (!booking.stripeInvoicePaymentUrl && !booking.stripeInvoicePdfUrl) {
+    throw new Error("No Stripe invoice found for this booking");
+  }
+
+  const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
+  const lead = attendees.find((a) => a.isLead) || attendees[0];
+  if (!lead) throw new Error("No attendee found for booking");
+
+  const settings = await getEventSettings();
+  const to = booking.billingEmail || lead.workEmail;
+  const orderRef = booking.orderReference || `HRAS26-${6541 + bookingId}`;
+
+  const dueDate = booking.invoiceDueDate ? new Date(booking.invoiceDueDate) : null;
+  const now = new Date();
+  const isOverdue = dueDate ? dueDate < now : false;
+  const dueDateStr = dueDate
+    ? dueDate.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
+    : "14 days from invoice issue";
+
+  const passLabels: Record<string, string> = {
+    single: "Single Pass — HR Professional",
+    business: "Business Pass — Vendor/Consultant",
+  };
+  const passLabel = passLabels[booking.passType] || booking.passType;
+  const totalAmount = parseFloat(booking.totalAmount?.toString() || "0").toFixed(2);
+  const vatAmount = parseFloat(booking.vatAmount?.toString() || "0").toFixed(2);
+  const subtotalAfterDiscounts = parseFloat(booking.subtotalAmount?.toString() || "0");
+  const groupDiscount = parseFloat(booking.groupDiscountAmount?.toString() || "0");
+  const promoDiscount = parseFloat(booking.promoDiscountAmount?.toString() || "0");
+  const baseAmount = subtotalAfterDiscounts + groupDiscount + promoDiscount;
+
+  const subject = isOverdue
+    ? `Overdue Invoice — ${orderRef} — HR Analytics Summit 2026`
+    : `Invoice Reminder — ${orderRef} — HR Analytics Summit 2026`;
+
+  const recipientName = booking.billingName || `${lead.firstName} ${lead.lastName}`;
+
+  const html = wrapInBrandedLayout(`
+    <div style="background:${isOverdue ? "#fff3cd" : "#e8f4fd"};border-left:4px solid ${isOverdue ? "#E74F3E" : "#F48847"};padding:16px 20px;border-radius:4px;margin-bottom:24px;">
+      <strong style="color:${isOverdue ? "#E74F3E" : "#F48847"};font-size:15px;">${isOverdue ? "⚠️ Invoice Overdue" : "📋 Invoice Reminder"}</strong>
+    </div>
+
+    <p>Dear ${recipientName},</p>
+    <p>${isOverdue
+      ? `We are writing to remind you that invoice <strong>${orderRef}</strong> for your registration to the <strong>HR Analytics Summit 2026</strong> was due on <strong>${dueDateStr}</strong> and remains unpaid.`
+      : `This is a friendly reminder that invoice <strong>${orderRef}</strong> for your registration to the <strong>HR Analytics Summit 2026</strong> is due on <strong>${dueDateStr}</strong>.`
+    }</p>
+    <p>Please arrange payment at your earliest convenience using the details below. A copy of the invoice PDF is attached to this email for your reference.</p>
+
+    <div class="info-box" style="margin-bottom:24px;">
+      <strong>Order Details</strong><br><br>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;">
+        <tr><td style="padding:6px 0;color:#666;width:180px;border-bottom:1px solid #f0f0f0">Reference</td><td style="border-bottom:1px solid #f0f0f0;font-family:monospace;font-weight:600;">${orderRef}</td></tr>
+        <tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">Event</td><td style="border-bottom:1px solid #f0f0f0">HR Analytics Summit 2026, 3 September 2026</td></tr>
+        <tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">Venue</td><td style="border-bottom:1px solid #f0f0f0">155 Bishopsgate, London EC2M 3TQ</td></tr>
+        <tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">Pass Type</td><td style="border-bottom:1px solid #f0f0f0">${passLabel}</td></tr>
+        <tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">Quantity</td><td style="border-bottom:1px solid #f0f0f0">${booking.quantity}</td></tr>
+        <tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">Net Amount</td><td style="border-bottom:1px solid #f0f0f0">£${baseAmount.toFixed(2)}</td></tr>
+        ${groupDiscount > 0 ? `<tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">Group Discount</td><td style="border-bottom:1px solid #f0f0f0;color:#E74F3E">-£${groupDiscount.toFixed(2)}</td></tr>` : ""}
+        ${promoDiscount > 0 ? `<tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">Promo Discount</td><td style="border-bottom:1px solid #f0f0f0;color:#E74F3E">-£${promoDiscount.toFixed(2)}</td></tr>` : ""}
+        <tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">VAT (20%)</td><td style="border-bottom:1px solid #f0f0f0">£${vatAmount}</td></tr>
+        <tr><td style="padding:6px 0;font-weight:700;border-bottom:1px solid #f0f0f0">Total Due</td><td style="border-bottom:1px solid #f0f0f0"><strong style="font-size:16px;">£${totalAmount}</strong></td></tr>
+        <tr><td style="padding:6px 0;color:${isOverdue ? "#E74F3E" : "#888"};border-bottom:1px solid #f0f0f0">Invoice Due</td><td style="border-bottom:1px solid #f0f0f0;color:${isOverdue ? "#E74F3E" : "inherit"};font-weight:${isOverdue ? "700" : "400"};">${dueDateStr}${isOverdue ? " — OVERDUE" : ""}</td></tr>
+      </table>
+    </div>
+
+    ${booking.stripeInvoicePaymentUrl ? `
+    <p style="margin:24px 0;text-align:center;">
+      <a href="${booking.stripeInvoicePaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:14px 32px;text-decoration:none;font-weight:bold;font-size:15px;border-radius:4px;">Pay Invoice Online →</a>
+    </p>
+    ` : ""}
+
+    <div class="info-box" style="margin-bottom:24px;">
+      <strong>Bank Transfer Details</strong><br><br>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;">
+        <tr><td style="padding:6px 0;color:#666;width:180px;border-bottom:1px solid #f0f0f0">Account Name</td><td style="border-bottom:1px solid #f0f0f0">Dynamic Business Leaders Limited</td></tr>
+        <tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">Bank</td><td style="border-bottom:1px solid #f0f0f0">Tide (ClearBank)</td></tr>
+        <tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">Sort Code</td><td style="border-bottom:1px solid #f0f0f0;font-family:monospace;font-weight:600;">04-06-05</td></tr>
+        <tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">Account Number</td><td style="border-bottom:1px solid #f0f0f0;font-family:monospace;font-weight:600;">16963209</td></tr>
+        <tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">IBAN (GBP)</td><td style="border-bottom:1px solid #f0f0f0;font-family:monospace;">GB65CLRB04060516963209</td></tr>
+        <tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">SWIFT/BIC</td><td style="border-bottom:1px solid #f0f0f0;font-family:monospace;">CLRBGB22</td></tr>
+        <tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">Reference</td><td style="border-bottom:1px solid #f0f0f0;font-family:monospace;font-weight:600;">${orderRef}</td></tr>
+      </table>
+    </div>
+
+    <p style="font-size:14px;color:#666;">If you have already arranged payment, please disregard this email. For queries, please contact <a href="mailto:douglas@dynamicbusinessleaders.co.uk">douglas@dynamicbusinessleaders.co.uk</a>.</p>
+    <p style="font-size:14px;color:#666;"><strong>Dynamic Business Leaders Limited</strong> · Company No. 12252258 · VAT No. 336124621</p>
+  `, settings);
+
+  let pdfBuffer: Buffer | null = null;
+  let pdfFilename = `invoice-${orderRef}.pdf`;
+  if (booking.stripeInvoicePdfUrl) {
+    try {
+      pdfBuffer = await downloadHttpsPdf(booking.stripeInvoicePdfUrl);
+      if (pdfBuffer) logger.info({ bookingId, sizeBytes: pdfBuffer.length }, "Stripe invoice PDF attached to reminder");
+    } catch (err) {
+      logger.warn({ err }, "Could not download Stripe PDF for reminder — attaching custom receipt");
+    }
+  }
+  if (!pdfBuffer) {
+    try {
+      pdfBuffer = await generatePdfReceipt(booking, attendees);
+    } catch (err) {
+      logger.warn({ err }, "Could not generate PDF receipt for reminder");
+    }
+  }
+
+  const attachments: Array<{ filename: string; content: Buffer; contentType: string }> = [];
+  if (pdfBuffer) attachments.push({ filename: pdfFilename, content: pdfBuffer, contentType: "application/pdf" });
+  const companyInfoPdf = getCompanyInfoPdf();
+  if (companyInfoPdf) attachments.push({ filename: "DBL-company-information.pdf", content: companyInfoPdf, contentType: "application/pdf" });
+
+  await sendMail({ to, subject, html, attachments });
+  logger.info({ bookingId, to, orderRef, isOverdue }, "Invoice reminder email sent");
+}

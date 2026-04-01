@@ -41,6 +41,8 @@ export interface UpdateBookingBody {
   billingCountry?: string | null;
   /** @nullable */
   billingVatNumber?: string | null;
+  /** @nullable */
+  invoiceDueDate?: Date | null;
   status?: UpdateBookingBodyStatus;
   /** @nullable */
   stripeInvoiceId?: string | null;

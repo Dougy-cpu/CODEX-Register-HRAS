@@ -79,9 +79,9 @@ Set these in the Replit Secrets panel:
 | `SMTP_USER` | Email SMTP username | Email notifications |
 | `SMTP_PASS` | Email SMTP password | Email notifications |
 | `FROM_EMAIL` | Sender email address | Email notifications |
-| `FREEAGENT_CLIENT_ID` | FreeAgent API auth | Invoice payments |
-| `FREEAGENT_CLIENT_SECRET` | FreeAgent API auth | Invoice payments |
-| `FREEAGENT_REFRESH_TOKEN` | FreeAgent API auth | Invoice payments |
+| `FREEAGENT_CLIENT_ID` | FreeAgent OAuth (legacy, unused) | — |
+| `FREEAGENT_CLIENT_SECRET` | FreeAgent OAuth (legacy, unused) | — |
+| `FREEAGENT_REFRESH_TOKEN` | FreeAgent OAuth (legacy, unused) | — |
 | `ADMIN_PASSWORD` | Admin panel access (default: "admin123") | Admin panel |
 
 ## Admin Panel
@@ -89,21 +89,22 @@ Set these in the Replit Secrets panel:
 - URL: `/admin`
 - Default password: `admin123` (set `ADMIN_PASSWORD` env var to override)
 - Auth: JWT token stored in localStorage as `admin_token`, passed as `x-admin-token` header
-- Features: registrations list (with Stripe/FA invoice links), promo code management, discount tier config, email logs & template editor
+- Features: registrations list (with Stripe invoice links, due date, overdue badges, Send Reminder button), promo code management, discount tier config, email logs & template editor
 
 ## Invoice Payment Flow
 
-Invoice payments now use **Stripe Invoicing** (not FreeAgent):
-- `POST /api/stripe/create-invoice` — creates Stripe customer (deduped by email), creates invoice with 20% UK VAT tax rate, finalizes and sends (Stripe emails customer); stores `stripeInvoiceId`, `stripeInvoicePdfUrl`, `stripeInvoicePaymentUrl`
+Invoice payments use **Stripe Invoicing** (not FreeAgent):
+- `POST /api/stripe/create-invoice` — creates Stripe customer (deduped by email), creates invoice with 20% UK VAT, 14 day payment terms, finalizes and sends; stores `stripeInvoiceId`, `stripeInvoicePdfUrl`, `stripeInvoicePaymentUrl`, `invoiceDueDate`
+- `POST /api/admin/bookings/:id/send-invoice-reminder` — sends branded reminder email to billing contact with Stripe PDF attached, banking details, overdue flag if past due
 - Email confirmation attaches the real Stripe invoice PDF (downloaded from `stripeInvoicePdfUrl`)
-- Fallback chain: Stripe PDF → FreeAgent PDF → custom pdfkit receipt
-- FreeAgent route (`/api/freeagent/create-invoice`) kept for backward compat with old invoiced bookings
+- Fallback chain: Stripe PDF → custom pdfkit receipt
 - Invoice footer: "Sort code: 04-06-05 | Account: 16963209 | IBAN: GB65CLRB04060516963209 | VAT No: 336124621"
 - VAT tax rate: 20% exclusive, cached per process (reuses existing Stripe tax rate if found)
+- Overdue detection: admin registrations table shows "Overdue" badge and red styling when `invoiceDueDate` < today and status is `invoiced`
 
 ## Order Reference Format
 
-`HRS-2026-{5-digit-random}` — generated on payment/invoice completion
+`HRAS26-{6541 + bookingId}` — generated on payment/invoice completion
 
 ## TypeScript & Composite Projects
 

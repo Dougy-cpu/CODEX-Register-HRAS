@@ -63,6 +63,8 @@ export interface Booking {
   billingCountry?: string | null;
   /** @nullable */
   billingVatNumber?: string | null;
+  /** @nullable */
+  invoiceDueDate?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

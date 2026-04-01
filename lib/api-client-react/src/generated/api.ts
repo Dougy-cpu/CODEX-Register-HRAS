@@ -2227,6 +2227,90 @@ export const useResendBookingEmails = <
 };
 
 /**
+ * @summary Send invoice payment reminder email to the billing contact
+ */
+export const getSendInvoiceReminderUrl = (bookingId: number) => {
+  return `/api/admin/bookings/${bookingId}/send-invoice-reminder`;
+};
+
+export const sendInvoiceReminder = async (
+  bookingId: number,
+  options?: RequestInit,
+): Promise<SuccessResponse> => {
+  return customFetch<SuccessResponse>(getSendInvoiceReminderUrl(bookingId), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getSendInvoiceReminderMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendInvoiceReminder>>,
+    TError,
+    { bookingId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof sendInvoiceReminder>>,
+  TError,
+  { bookingId: number },
+  TContext
+> => {
+  const mutationKey = ["sendInvoiceReminder"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof sendInvoiceReminder>>,
+    { bookingId: number }
+  > = (props) => {
+    const { bookingId } = props ?? {};
+
+    return sendInvoiceReminder(bookingId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SendInvoiceReminderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof sendInvoiceReminder>>
+>;
+
+export type SendInvoiceReminderMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Send invoice payment reminder email to the billing contact
+ */
+export const useSendInvoiceReminder = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendInvoiceReminder>>,
+    TError,
+    { bookingId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof sendInvoiceReminder>>,
+  TError,
+  { bookingId: number },
+  TContext
+> => {
+  return useMutation(getSendInvoiceReminderMutationOptions(options));
+};
+
+/**
  * @summary Admin login — validate password and return session token
  */
 export const getAdminLoginUrl = () => {
