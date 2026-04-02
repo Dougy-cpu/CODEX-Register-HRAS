@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { useUpdateBooking, useCalculatePricing, type PricingRequestPassType } from "@workspace/api-client-react";
+import { useUpdateBooking, useCalculatePricing, useListDiscountTiers, type PricingRequestPassType, type DiscountTier } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Check, Minus, Plus, Users, Flame, AlertCircle } from "lucide-react";
+import { Check, Minus, Plus, Users, Flame, AlertCircle, TrendingUp } from "lucide-react";
 import type { BookingWithAttendees } from "@/types/booking";
 
 interface Step2PassesProps {
@@ -28,18 +28,127 @@ const BUSINESS_EXTRA_BENEFITS = [
   "Company Branding at the Summit",
 ];
 
-function getHRDiscountLabel(qty: number): string | null {
-  if (qty >= 12) return "20% off";
-  if (qty >= 8) return "15% off";
-  if (qty >= 4) return "10% off";
-  if (qty === 3) return "Most Popular";
-  return null;
+function getActiveTier(tiers: DiscountTier[], passType: string, qty: number): DiscountTier | null {
+  const relevant = tiers
+    .filter(t => t.passType === passType)
+    .sort((a, b) => a.minQuantity - b.minQuantity);
+  let active: DiscountTier | null = null;
+  for (const tier of relevant) {
+    if (qty >= tier.minQuantity) active = tier;
+  }
+  return active;
 }
 
-function getBusinessDiscountLabel(qty: number): string | null {
-  if (qty >= 5) return "15% off";
-  if (qty >= 2) return "10% off";
-  return null;
+function getNextTier(tiers: DiscountTier[], passType: string, qty: number): DiscountTier | null {
+  const relevant = tiers
+    .filter(t => t.passType === passType)
+    .sort((a, b) => a.minQuantity - b.minQuantity);
+  return relevant.find(t => t.minQuantity > qty) ?? null;
+}
+
+interface TierRow {
+  key: string;
+  label: string;
+  note: string;
+  active: boolean;
+  isSpecial?: boolean;
+}
+
+function buildHRTierRows(tiers: DiscountTier[], qty: number, pricePerTicket: number): TierRow[] {
+  const relevant = tiers
+    .filter(t => t.passType === "single")
+    .sort((a, b) => a.minQuantity - b.minQuantity);
+
+  const rows: TierRow[] = [];
+
+  if (relevant.length === 0) {
+    rows.push({ key: "all", label: "All quantities", note: `£${pricePerTicket}/ticket`, active: true });
+    return rows;
+  }
+
+  const firstTierMin = relevant[0].minQuantity;
+  const noDiscountEnd = firstTierMin - 1;
+
+  if (noDiscountEnd >= 3) {
+    rows.push({ key: "1-2", label: "1–2 tickets", note: `£${pricePerTicket}/ticket`, active: qty <= 2 });
+    rows.push({ key: "3", label: "3 tickets", note: "Most Popular", active: qty === 3, isSpecial: true });
+    if (noDiscountEnd > 3) {
+      rows.push({
+        key: `4-${noDiscountEnd}`,
+        label: `4–${noDiscountEnd} tickets`,
+        note: `£${pricePerTicket}/ticket`,
+        active: qty >= 4 && qty <= noDiscountEnd,
+      });
+    }
+  } else if (noDiscountEnd >= 1) {
+    rows.push({
+      key: `1-${noDiscountEnd}`,
+      label: noDiscountEnd === 1 ? "1 ticket" : `1–${noDiscountEnd} tickets`,
+      note: `£${pricePerTicket}/ticket`,
+      active: qty <= noDiscountEnd,
+    });
+  }
+
+  for (let i = 0; i < relevant.length; i++) {
+    const tier = relevant[i];
+    const nextTier = relevant[i + 1];
+    const maxQty = nextTier ? nextTier.minQuantity - 1 : null;
+    const savingPerTicket = Math.round(pricePerTicket * tier.discountPercent / 100);
+    const rangeLabel = maxQty
+      ? `${tier.minQuantity}–${maxQty} tickets`
+      : `${tier.minQuantity}+ tickets`;
+    rows.push({
+      key: rangeLabel,
+      label: rangeLabel,
+      note: `${tier.discountPercent}% off — save £${savingPerTicket}/ticket`,
+      active: qty >= tier.minQuantity && (maxQty === null || qty <= maxQty),
+    });
+  }
+
+  return rows;
+}
+
+function buildBusinessTierRows(tiers: DiscountTier[], qty: number, pricePerPass: number): TierRow[] {
+  const relevant = tiers
+    .filter(t => t.passType === "business")
+    .sort((a, b) => a.minQuantity - b.minQuantity);
+
+  const rows: TierRow[] = [];
+
+  if (relevant.length === 0) {
+    rows.push({ key: "all", label: "All quantities", note: `£${pricePerPass}/pass`, active: true });
+    return rows;
+  }
+
+  const firstTierMin = relevant[0].minQuantity;
+  const noDiscountEnd = firstTierMin - 1;
+
+  if (noDiscountEnd >= 1) {
+    rows.push({
+      key: `1-${noDiscountEnd}`,
+      label: noDiscountEnd === 1 ? "1 pass" : `1–${noDiscountEnd} passes`,
+      note: `£${pricePerPass}/pass`,
+      active: qty <= noDiscountEnd,
+    });
+  }
+
+  for (let i = 0; i < relevant.length; i++) {
+    const tier = relevant[i];
+    const nextTier = relevant[i + 1];
+    const maxQty = nextTier ? nextTier.minQuantity - 1 : null;
+    const savingPerPass = Math.round(pricePerPass * tier.discountPercent / 100);
+    const rangeLabel = maxQty
+      ? `${tier.minQuantity}–${maxQty} pass${maxQty > 1 ? "es" : ""}`
+      : `${tier.minQuantity}+ passes`;
+    rows.push({
+      key: rangeLabel,
+      label: rangeLabel,
+      note: `${tier.discountPercent}% off — save £${savingPerPass}/pass`,
+      active: qty >= tier.minQuantity && (maxQty === null || qty <= maxQty),
+    });
+  }
+
+  return rows;
 }
 
 function InventoryBadge({ remaining, className = "" }: { remaining: number | null; className?: string }) {
@@ -69,6 +178,45 @@ function InventoryBadge({ remaining, className = "" }: { remaining: number | nul
   );
 }
 
+interface UpsellNudgeProps {
+  tiers: DiscountTier[];
+  passType: string;
+  quantity: number;
+  pricePerUnit: number;
+  unitLabel: string;
+}
+
+function UpsellNudge({ tiers, passType, quantity, pricePerUnit, unitLabel }: UpsellNudgeProps) {
+  const nextTier = getNextTier(tiers, passType, quantity);
+  if (!nextTier) return null;
+
+  const needed = nextTier.minQuantity - quantity;
+  if (needed > 3) return null;
+
+  const currentTier = getActiveTier(tiers, passType, quantity);
+  const currentDiscountPct = currentTier?.discountPercent ?? 0;
+  const uplift = Math.round(quantity * pricePerUnit * (nextTier.discountPercent - currentDiscountPct) / 100);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      className="flex items-start gap-2 bg-amber-50 border border-amber-300 rounded-sm px-3 py-2.5 text-xs text-amber-900"
+    >
+      <TrendingUp className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-600" />
+      <span>
+        <span className="font-bold">Add {needed} more {unitLabel}{needed > 1 ? "s" : ""}</span> to unlock{" "}
+        <span className="font-bold">{nextTier.discountPercent}% off</span>
+        {uplift > 0 && (
+          <span> — save an extra <span className="font-bold">£{uplift}</span> on your order</span>
+        )}
+        !
+      </span>
+    </motion.div>
+  );
+}
+
 export default function Step2Passes({ booking }: Step2PassesProps) {
   const updateBooking = useUpdateBooking();
   const isHR = booking.attendeeType === "hr_professional";
@@ -87,6 +235,8 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
 
   const calculatePricingMutation = useCalculatePricing();
   const queryClient = useQueryClient();
+
+  const { data: allTiers = [] } = useListDiscountTiers();
 
   useEffect(() => {
     fetch("/api/passes/inventory")
@@ -111,8 +261,12 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
     queryClient.invalidateQueries({ queryKey: ["booking"] });
   };
 
-  const hrDiscountLabel = getHRDiscountLabel(quantity);
-  const businessDiscountLabel = getBusinessDiscountLabel(quantity);
+  const activeTier = getActiveTier(allTiers, selectedPass, quantity);
+  const discountLabel = activeTier ? `${activeTier.discountPercent}% off` : null;
+  const isMostPopular = isHR && quantity === 3;
+
+  const hrTierRows = buildHRTierRows(allTiers, quantity, 199);
+  const businessTierRows = buildBusinessTierRows(allTiers, quantity, 599);
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -153,14 +307,14 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
             </div>
 
             {/* Quantity picker */}
-            <div className="md:w-64 shrink-0">
-              <p className="text-sm font-semibold mb-3">How many tickets?</p>
+            <div className="md:w-64 shrink-0 space-y-3">
+              <p className="text-sm font-semibold">How many tickets?</p>
 
               {/* 3 tickets shortcut */}
               <button
                 type="button"
                 onClick={() => setQuantity(3)}
-                className={`w-full flex items-center justify-between gap-2 px-4 py-3 rounded-sm border-2 mb-3 text-sm font-semibold transition-all ${
+                className={`w-full flex items-center justify-between gap-2 px-4 py-3 rounded-sm border-2 text-sm font-semibold transition-all ${
                   quantity === 3
                     ? "border-primary bg-primary text-white"
                     : "border-primary/40 bg-primary/5 text-primary hover:border-primary hover:bg-primary/10"
@@ -174,7 +328,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
               </button>
 
               {/* Stepper */}
-              <div className="flex items-center border border-border bg-white rounded-sm overflow-hidden mb-3">
+              <div className="flex items-center border border-border bg-white rounded-sm overflow-hidden">
                 <button
                   type="button"
                   className="flex-none w-11 h-11 flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors disabled:opacity-30"
@@ -195,32 +349,34 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                 </button>
               </div>
 
+              {/* Upsell nudge */}
+              <UpsellNudge
+                tiers={allTiers}
+                passType="single"
+                quantity={quantity}
+                pricePerUnit={199}
+                unitLabel="ticket"
+              />
+
               {/* Tier table */}
               <div className="space-y-1 text-xs">
-                {[
-                  { label: "1–2 tickets", note: "£199/ticket", test: (q: number) => q <= 2 },
-                  { label: "3 tickets", note: "Most Popular", highlight: true, test: (q: number) => q === 3 },
-                  { label: "4–7 tickets", note: "10% off", test: (q: number) => q >= 4 && q <= 7 },
-                  { label: "8–11 tickets", note: "15% off", test: (q: number) => q >= 8 && q <= 11 },
-                  { label: "12+ tickets", note: "20% off", test: (q: number) => q >= 12 },
-                ].map(({ label, note, highlight, test }) => {
-                  const active = test(quantity);
-                  return (
-                    <div
-                      key={label}
-                      className={`flex justify-between px-2 py-1 rounded-sm transition-colors ${
-                        active
-                          ? highlight
-                            ? "bg-accent/60 text-foreground font-semibold"
-                            : "bg-muted text-foreground font-semibold"
-                          : "text-muted-foreground"
-                      }`}
-                    >
-                      <span>{label}</span>
-                      <span className={highlight && active ? "text-primary font-bold" : ""}>{note}</span>
-                    </div>
-                  );
-                })}
+                {hrTierRows.map(({ key, label, note, active, isSpecial }) => (
+                  <div
+                    key={key}
+                    className={`flex justify-between px-2 py-1.5 rounded-sm transition-colors ${
+                      active
+                        ? isSpecial
+                          ? "bg-accent/60 text-foreground font-semibold"
+                          : "bg-primary/10 border border-primary/20 text-foreground font-semibold"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    <span>{label}</span>
+                    <span className={isSpecial && active ? "text-primary font-bold" : active && !isSpecial ? "text-primary" : ""}>
+                      {note}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -262,11 +418,11 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
             </div>
 
             {/* Quantity picker */}
-            <div className="md:w-64 shrink-0">
-              <p className="text-sm font-semibold mb-3">How many passes?</p>
+            <div className="md:w-64 shrink-0 space-y-3">
+              <p className="text-sm font-semibold">How many passes?</p>
 
               {/* Stepper */}
-              <div className="flex items-center border border-border bg-white rounded-sm overflow-hidden mb-3">
+              <div className="flex items-center border border-border bg-white rounded-sm overflow-hidden">
                 <button
                   type="button"
                   className="flex-none w-11 h-11 flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors disabled:opacity-30"
@@ -288,31 +444,35 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                 </button>
               </div>
 
+              {/* Upsell nudge */}
+              <UpsellNudge
+                tiers={allTiers}
+                passType="business"
+                quantity={quantity}
+                pricePerUnit={599}
+                unitLabel="pass"
+              />
+
               {/* Business discount tiers */}
-              <div className="space-y-1 text-xs mb-3">
-                {[
-                  { label: "1 pass", note: "£599/pass", test: (q: number) => q === 1 },
-                  { label: "2–4 passes", note: "10% off", test: (q: number) => q >= 2 && q <= 4 },
-                  { label: "5–10 passes", note: "15% off", test: (q: number) => q >= 5 },
-                ].map(({ label, note, test }) => {
-                  const active = test(quantity);
-                  return (
-                    <div
-                      key={label}
-                      className={`flex justify-between px-2 py-1 rounded-sm transition-colors ${
-                        active ? "bg-muted text-foreground font-semibold" : "text-muted-foreground"
-                      }`}
-                    >
-                      <span>{label}</span>
-                      <span>{note}</span>
-                    </div>
-                  );
-                })}
+              <div className="space-y-1 text-xs">
+                {businessTierRows.map(({ key, label, note, active }) => (
+                  <div
+                    key={key}
+                    className={`flex justify-between px-2 py-1.5 rounded-sm transition-colors ${
+                      active
+                        ? "bg-primary/10 border border-primary/20 text-foreground font-semibold"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    <span>{label}</span>
+                    <span className={active ? "text-primary" : ""}>{note}</span>
+                  </div>
+                ))}
               </div>
 
-              {businessDiscountLabel && (
+              {discountLabel && (
                 <div className="bg-primary/10 border border-primary/20 rounded-sm px-3 py-2 text-sm font-semibold text-primary">
-                  {businessDiscountLabel} group discount applied
+                  {discountLabel} group discount applied
                 </div>
               )}
             </div>
@@ -326,14 +486,11 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
           <h2 className="text-xl font-bold">
             {quantity} {isHR ? `ticket${quantity !== 1 ? "s" : ""}` : `pass${quantity !== 1 ? "es" : ""}`} selected
           </h2>
-          {isHR && hrDiscountLabel && hrDiscountLabel !== "Most Popular" && (
-            <p className="text-sm font-semibold text-primary">{hrDiscountLabel} group discount applied</p>
+          {discountLabel && !isMostPopular && (
+            <p className="text-sm font-semibold text-primary">{discountLabel} group discount applied</p>
           )}
-          {isHR && quantity === 3 && (
+          {isMostPopular && (
             <p className="text-sm font-semibold text-primary">Most popular choice for teams</p>
-          )}
-          {isVendor && businessDiscountLabel && (
-            <p className="text-sm font-semibold text-primary">{businessDiscountLabel} group discount applied</p>
           )}
           <p className="text-sm text-muted-foreground pt-1">
             You'll add attendee details in the next step.
@@ -373,6 +530,13 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                 <span>Total</span>
                 <span>£{currentPricing.total.toFixed(2)}</span>
               </div>
+
+              {currentPricing.groupDiscountAmount > 0 && (
+                <div className="flex justify-between text-sm font-semibold text-primary bg-primary/10 rounded-sm px-3 py-2 -mx-1 mt-1">
+                  <span>You're saving</span>
+                  <span>£{(currentPricing.groupDiscountAmount * 1.2).toFixed(2)}</span>
+                </div>
+              )}
             </div>
           ) : (
             <div className="animate-pulse space-y-3">
