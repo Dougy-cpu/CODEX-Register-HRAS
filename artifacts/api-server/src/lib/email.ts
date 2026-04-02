@@ -316,11 +316,21 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
       <strong>Venue:</strong> ${settings.eventVenue}, ${settings.eventVenuePostcode}
     </div>
 
-    ${booking.managementToken ? `<div class="info-box" style="margin-top: 24px;">
-      <strong>Need to update attendee details?</strong><br>
-      You can add or update attendee information at any time using your personal management link below.
-      Keep this link safe — anyone with it can update your attendee details.<br>
-      <a href="${process.env.APP_BASE_URL || "https://hranalyticssummit.com/register"}/manage/${booking.managementToken}" style="color:#E74F3E;word-break:break-all;">${process.env.APP_BASE_URL || "https://hranalyticssummit.com/register"}/manage/${booking.managementToken}</a>
+    ${booking.managementToken ? `<div style="margin-top: 24px; border-left: 4px solid #E74F3E; padding: 16px 20px; background: #fdf8f7;">
+      <p style="margin: 0 0 10px; font-size: 15px; font-weight: bold; color: #1a1a1a;">Manage Your Attendees Online</p>
+      <p style="margin: 0 0 10px; font-size: 14px; color: #444; line-height: 1.6;">
+        Use your personal management link to fill in or update attendee details at any time — no login or account required. Simply visit the link and make your changes.
+      </p>
+      <p style="margin: 0 0 6px; font-size: 14px; color: #444;"><strong>With this link you can:</strong></p>
+      <ul style="margin: 0 0 12px; padding-left: 20px; font-size: 14px; color: #444; line-height: 1.8;">
+        <li>Fill in details for any placeholder (TBC) attendee seats</li>
+        <li>Update names, job titles, companies, and email addresses</li>
+        <li>Add dietary or accessibility requirements</li>
+        <li>Forward the link to colleagues so they can enter their own details directly</li>
+      </ul>
+      <p style="margin: 0 0 8px; font-size: 14px; color: #1a1a1a;"><strong>Your attendee management link:</strong></p>
+      <a href="${process.env.APP_BASE_URL || "https://hranalyticssummit.com/register"}/manage/${booking.managementToken}" style="color:#E74F3E;word-break:break-all;font-family:monospace;font-size:13px;">${process.env.APP_BASE_URL || "https://hranalyticssummit.com/register"}/manage/${booking.managementToken}</a>
+      <p style="margin: 12px 0 0; font-size: 12px; color: #888;">Keep this link safe — anyone who has it can view and update the attendee details for your booking.</p>
     </div>` : ""}
 
     <p>A PDF VAT receipt is attached to this email for your records.</p>
@@ -479,11 +489,21 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
       <strong>Venue:</strong> ${settings.eventVenue}, ${settings.eventVenuePostcode}
     </div>
 
-    ${booking.managementToken ? `<div class="info-box" style="margin-top: 24px;">
-      <strong>Need to update attendee details?</strong><br>
-      You can add or update attendee information at any time using your personal management link below.
-      Keep this link safe — anyone with it can update your attendee details.<br>
-      <a href="${process.env.APP_BASE_URL || "https://hranalyticssummit.com/register"}/manage/${booking.managementToken}" style="color:#E74F3E;word-break:break-all;">${process.env.APP_BASE_URL || "https://hranalyticssummit.com/register"}/manage/${booking.managementToken}</a>
+    ${booking.managementToken ? `<div style="margin-top: 24px; border-left: 4px solid #E74F3E; padding: 16px 20px; background: #fdf8f7;">
+      <p style="margin: 0 0 10px; font-size: 15px; font-weight: bold; color: #1a1a1a;">Manage Your Attendees Online</p>
+      <p style="margin: 0 0 10px; font-size: 14px; color: #444; line-height: 1.6;">
+        Use your personal management link to fill in or update attendee details at any time — no login or account required. Simply visit the link and make your changes.
+      </p>
+      <p style="margin: 0 0 6px; font-size: 14px; color: #444;"><strong>With this link you can:</strong></p>
+      <ul style="margin: 0 0 12px; padding-left: 20px; font-size: 14px; color: #444; line-height: 1.8;">
+        <li>Fill in details for any placeholder (TBC) attendee seats</li>
+        <li>Update names, job titles, companies, and email addresses</li>
+        <li>Add dietary or accessibility requirements</li>
+        <li>Forward the link to colleagues so they can enter their own details directly</li>
+      </ul>
+      <p style="margin: 0 0 8px; font-size: 14px; color: #1a1a1a;"><strong>Your attendee management link:</strong></p>
+      <a href="${process.env.APP_BASE_URL || "https://hranalyticssummit.com/register"}/manage/${booking.managementToken}" style="color:#E74F3E;word-break:break-all;font-family:monospace;font-size:13px;">${process.env.APP_BASE_URL || "https://hranalyticssummit.com/register"}/manage/${booking.managementToken}</a>
+      <p style="margin: 12px 0 0; font-size: 12px; color: #888;">Keep this link safe — anyone who has it can view and update the attendee details for your booking.</p>
     </div>` : ""}
 
     <p>A PDF VAT receipt is attached to this email for your records.</p>
