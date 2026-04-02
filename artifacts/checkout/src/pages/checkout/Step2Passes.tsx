@@ -205,7 +205,7 @@ function UpsellNudge({ tiers, passType, quantity, unitLabel }: UpsellNudgeProps)
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -4 }}
-      className="flex items-start gap-2.5 border-l-4 border-secondary bg-secondary/20 px-3 py-2.5 text-xs text-white"
+      className="flex items-start gap-2.5 border-l-4 border-secondary bg-secondary/10 px-3 py-2.5 text-xs text-foreground"
     >
       <TrendingUp className="w-3.5 h-3.5 shrink-0 mt-0.5 text-secondary" />
       <span>
@@ -290,7 +290,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
           {/* ── Premium header band ── */}
           <div
             className="px-6 md:px-8 py-5 flex items-center justify-between gap-4 flex-wrap"
-            style={{ background: "linear-gradient(135deg, hsl(222,47%,14%) 0%, hsl(222,47%,22%) 55%, hsl(4,55%,18%) 100%)" }}
+            style={{ background: "linear-gradient(135deg, hsl(4,70%,22%) 0%, hsl(0,12%,10%) 100%)" }}
           >
             <div>
               <p className="text-xs uppercase tracking-widest text-white/50 mb-1 font-semibold">HR Analytics Summit · 3 Sep 2026, London</p>
@@ -309,7 +309,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
             </div>
           </div>
 
-          <div className="flex flex-col md:flex-row md:items-stretch">
+          <div className="flex flex-col md:flex-row md:items-start">
 
             {/* ── Left column: Benefits ── */}
             <div className="flex-1 p-6 md:p-8">
@@ -326,11 +326,11 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
             </div>
 
             {/* Column separator */}
-            <div className="hidden md:block w-px bg-premium/20" />
+            <div className="hidden md:block w-px bg-border self-stretch" />
 
-            {/* ── Right column: Quantity picker (dark panel) ── */}
-            <div className="md:w-72 shrink-0 p-6 bg-premium text-premium-foreground space-y-4">
-              <p className="text-xs font-bold uppercase tracking-widest text-white/50">
+            {/* ── Right column: Quantity picker (warm panel) ── */}
+            <div className="md:w-72 shrink-0 p-6 bg-muted space-y-4">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                 How many tickets?
               </p>
 
@@ -338,10 +338,10 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
               <button
                 type="button"
                 onClick={() => setQuantity(3)}
-                className={`w-full flex items-center justify-between gap-2 px-4 py-3 text-sm font-bold transition-all border-2 ${
+                className={`w-full flex items-center justify-between gap-2 px-4 py-3 text-sm font-bold transition-all ${
                   quantity === 3
-                    ? "bg-white text-primary border-white shadow-inner"
-                    : "border-transparent text-white shadow-md hover:shadow-lg hover:scale-[1.01]"
+                    ? "bg-primary text-white shadow-md"
+                    : "text-white shadow-md hover:shadow-lg hover:scale-[1.01]"
                 }`}
                 style={
                   quantity !== 3
@@ -353,25 +353,25 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                   <Users className="w-4 h-4" />
                   3 tickets — Most Popular
                 </span>
-                {quantity === 3 && <Check className="w-4 h-4 text-primary" />}
+                {quantity === 3 && <Check className="w-4 h-4" />}
               </button>
 
               {/* Custom stepper */}
-              <div className="flex items-stretch border border-white/20 bg-white/10 overflow-hidden">
+              <div className="flex items-stretch border border-border bg-white overflow-hidden">
                 <button
                   type="button"
-                  className="flex-none w-11 flex items-center justify-center text-white/50 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-20"
+                  className="flex-none w-11 flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-30"
                   onClick={() => setQuantity(q => Math.max(1, q - 1))}
                   disabled={quantity <= 1}
                 >
                   <Minus className="w-4 h-4" />
                 </button>
-                <div className="flex-1 text-center font-bold text-2xl py-2.5 text-white border-x border-white/20">
+                <div className="flex-1 text-center font-bold text-2xl py-2.5 text-foreground border-x border-border">
                   {quantity}
                 </div>
                 <button
                   type="button"
-                  className="flex-none w-11 flex items-center justify-center text-white/50 hover:bg-white/10 hover:text-white transition-colors"
+                  className="flex-none w-11 flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                   onClick={() => setQuantity(q => Math.min(20, q + 1))}
                 >
                   <Plus className="w-4 h-4" />
@@ -396,15 +396,15 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                     className={`flex justify-between px-2 py-1.5 transition-all ${
                       active
                         ? isSpecial
-                          ? "border-l-4 border-accent bg-white/10 text-white font-semibold pl-2"
-                          : "border-l-4 border-secondary bg-white/10 text-white font-semibold pl-2"
-                        : "text-white/35 pl-[6px]"
+                          ? "border-l-4 border-secondary bg-secondary/10 text-foreground font-semibold pl-2"
+                          : "border-l-4 border-primary bg-primary/10 text-foreground font-semibold pl-2"
+                        : "text-muted-foreground pl-[6px]"
                     }`}
                   >
                     <span>{label}</span>
                     <span className={
-                      active && isSpecial ? "text-accent font-bold" :
-                      active ? "text-secondary font-bold" : ""
+                      active && isSpecial ? "text-secondary font-bold" :
+                      active ? "text-primary font-bold" : ""
                     }>
                       {note}
                     </span>
@@ -414,7 +414,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
 
               {/* Discount applied indicator */}
               {discountLabel && (
-                <div className="flex items-center gap-2 border-l-4 border-secondary bg-secondary/20 px-3 py-2 text-sm font-bold text-secondary">
+                <div className="flex items-center gap-2 border-l-4 border-primary bg-primary/10 px-3 py-2 text-sm font-bold text-primary">
                   <Check className="w-4 h-4 shrink-0" />
                   {discountLabel} group discount applied
                 </div>
@@ -430,7 +430,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
           {/* ── Premium header band ── */}
           <div
             className="px-6 md:px-8 py-5 flex items-center justify-between gap-4 flex-wrap"
-            style={{ background: "linear-gradient(135deg, hsl(222,47%,14%) 0%, hsl(222,47%,22%) 55%, hsl(4,55%,18%) 100%)" }}
+            style={{ background: "linear-gradient(135deg, hsl(4,70%,22%) 0%, hsl(0,12%,10%) 100%)" }}
           >
             <div>
               <p className="text-xs uppercase tracking-widest text-white/50 mb-1 font-semibold">HR Analytics Summit · 3 Sep 2026 · Consultants &amp; Vendors</p>
@@ -449,7 +449,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
             </div>
           </div>
 
-          <div className="flex flex-col md:flex-row md:items-stretch">
+          <div className="flex flex-col md:flex-row md:items-start">
 
             {/* ── Left column: Benefits ── */}
             <div className="flex-1 p-6 md:p-8">
@@ -477,30 +477,30 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
             </div>
 
             {/* Column separator */}
-            <div className="hidden md:block w-px bg-premium/20" />
+            <div className="hidden md:block w-px bg-border self-stretch" />
 
-            {/* ── Right column: Quantity picker (dark panel) ── */}
-            <div className="md:w-72 shrink-0 p-6 bg-premium text-premium-foreground space-y-4">
-              <p className="text-xs font-bold uppercase tracking-widest text-white/50">
+            {/* ── Right column: Quantity picker (warm panel) ── */}
+            <div className="md:w-72 shrink-0 p-6 bg-muted space-y-4">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                 How many passes?
               </p>
 
               {/* Custom stepper */}
-              <div className="flex items-stretch border border-white/20 bg-white/10 overflow-hidden">
+              <div className="flex items-stretch border border-border bg-white overflow-hidden">
                 <button
                   type="button"
-                  className="flex-none w-11 flex items-center justify-center text-white/50 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-20"
+                  className="flex-none w-11 flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-30"
                   onClick={() => setQuantity(q => Math.max(1, q - 1))}
                   disabled={quantity <= 1}
                 >
                   <Minus className="w-4 h-4" />
                 </button>
-                <div className="flex-1 text-center font-bold text-2xl py-2.5 text-white border-x border-white/20">
+                <div className="flex-1 text-center font-bold text-2xl py-2.5 text-foreground border-x border-border">
                   {quantity}
                 </div>
                 <button
                   type="button"
-                  className="flex-none w-11 flex items-center justify-center text-white/50 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-20"
+                  className="flex-none w-11 flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-30"
                   onClick={() => setQuantity(q => Math.min(10, q + 1))}
                   disabled={quantity >= 10}
                 >
@@ -525,19 +525,19 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                     key={key}
                     className={`flex justify-between px-2 py-1.5 transition-all ${
                       active
-                        ? "border-l-4 border-secondary bg-white/10 text-white font-semibold pl-2"
-                        : "text-white/35 pl-[6px]"
+                        ? "border-l-4 border-primary bg-primary/10 text-foreground font-semibold pl-2"
+                        : "text-muted-foreground pl-[6px]"
                     }`}
                   >
                     <span>{label}</span>
-                    <span className={active ? "text-secondary font-bold" : ""}>{note}</span>
+                    <span className={active ? "text-primary font-bold" : ""}>{note}</span>
                   </div>
                 ))}
               </div>
 
               {/* Discount applied indicator */}
               {discountLabel && (
-                <div className="flex items-center gap-2 border-l-4 border-secondary bg-secondary/20 px-3 py-2 text-sm font-bold text-secondary">
+                <div className="flex items-center gap-2 border-l-4 border-primary bg-primary/10 px-3 py-2 text-sm font-bold text-primary">
                   <Check className="w-4 h-4 shrink-0" />
                   {discountLabel} group discount applied
                 </div>
