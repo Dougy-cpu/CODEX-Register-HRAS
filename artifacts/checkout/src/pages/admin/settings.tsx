@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import AdminLayout from "@/components/layout/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, Lock, Unlock, Settings2 } from "lucide-react";
+import { Check, Lock, Unlock, Settings2, Loader2 } from "lucide-react";
 
 interface EventSettings {
   eventName: string;
@@ -34,13 +34,31 @@ function adminFetch(path: string, init?: RequestInit) {
   });
 }
 
+async function saveLockSettings(locked: boolean, message: string | null): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await adminFetch("/api/admin/event-settings", {
+      method: "PUT",
+      body: JSON.stringify({
+        attendeeChangesLocked: locked,
+        attendeeChangesLockedMessage: message || DEFAULT_LOCKED_MESSAGE,
+      }),
+    });
+    if (res.ok) return { ok: true };
+    const body = await res.json().catch(() => ({}));
+    return { ok: false, error: body.error || "Failed to save" };
+  } catch {
+    return { ok: false, error: "Network error" };
+  }
+}
+
 export default function AdminSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+
   const [lockSaving, setLockSaving] = useState(false);
   const [lockSaved, setLockSaved] = useState(false);
-  const [error, setError] = useState("");
   const [lockError, setLockError] = useState("");
 
   const [form, setForm] = useState<EventSettings>({
@@ -57,12 +75,23 @@ export default function AdminSettings() {
     attendeeChangesLockedMessage: null,
   });
 
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestLockRef = useRef<{ locked: boolean; message: string | null }>({
+    locked: false,
+    message: null,
+  });
+
   useEffect(() => {
     setLoading(true);
     adminFetch("/api/admin/event-settings")
       .then(res => res.ok ? res.json() : null)
       .then((data: EventSettings | null) => {
         if (data) {
+          const lockState = {
+            locked: data.attendeeChangesLocked ?? false,
+            message: data.attendeeChangesLockedMessage ?? null,
+          };
+          latestLockRef.current = lockState;
           setForm({
             eventName: data.eventName,
             eventDate: data.eventDate,
@@ -73,13 +102,44 @@ export default function AdminSettings() {
             orgWebsite: data.orgWebsite,
             fromName: data.fromName,
             fromEmail: data.fromEmail,
-            attendeeChangesLocked: data.attendeeChangesLocked ?? false,
-            attendeeChangesLockedMessage: data.attendeeChangesLockedMessage ?? null,
+            attendeeChangesLocked: lockState.locked,
+            attendeeChangesLockedMessage: lockState.message,
           });
         }
       })
       .finally(() => setLoading(false));
   }, []);
+
+  const persistLock = useCallback(async (locked: boolean, message: string | null) => {
+    setLockSaving(true);
+    setLockError("");
+    const result = await saveLockSettings(locked, message);
+    setLockSaving(false);
+    if (result.ok) {
+      setLockSaved(true);
+      setTimeout(() => setLockSaved(false), 2500);
+    } else {
+      setLockError(result.error || "Failed to save");
+    }
+  }, []);
+
+  const handleToggleLock = (locked: boolean) => {
+    const message = form.attendeeChangesLockedMessage || DEFAULT_LOCKED_MESSAGE;
+    latestLockRef.current = { locked, message };
+    setForm(f => ({ ...f, attendeeChangesLocked: locked }));
+    persistLock(locked, message);
+  };
+
+  const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const message = e.target.value;
+    latestLockRef.current = { ...latestLockRef.current, message };
+    setForm(f => ({ ...f, attendeeChangesLockedMessage: message }));
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const { locked, message: msg } = latestLockRef.current;
+      persistLock(locked, msg);
+    }, 800);
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,38 +172,6 @@ export default function AdminSettings() {
     }
   };
 
-  const handleLockSave = async () => {
-    setLockError("");
-    setLockSaving(true);
-    try {
-      const res = await adminFetch("/api/admin/event-settings", {
-        method: "PUT",
-        body: JSON.stringify({
-          attendeeChangesLocked: form.attendeeChangesLocked,
-          attendeeChangesLockedMessage: form.attendeeChangesLockedMessage || DEFAULT_LOCKED_MESSAGE,
-        }),
-      });
-      if (res.ok) {
-        setLockSaved(true);
-        setTimeout(() => setLockSaved(false), 2500);
-      } else {
-        const body = await res.json().catch(() => ({}));
-        setLockError(body.error || "Failed to save");
-      }
-    } finally {
-      setLockSaving(false);
-    }
-  };
-
-  const toggleLock = (locked: boolean) => {
-    setForm(f => ({
-      ...f,
-      attendeeChangesLocked: locked,
-      attendeeChangesLockedMessage:
-        f.attendeeChangesLockedMessage || DEFAULT_LOCKED_MESSAGE,
-    }));
-  };
-
   return (
     <AdminLayout title="Settings">
       {loading ? (
@@ -153,7 +181,7 @@ export default function AdminSettings() {
       ) : (
         <div className="max-w-2xl space-y-8">
 
-          {/* ── Event Details ── */}
+          {/* ── Event & Org Details ── */}
           <form onSubmit={handleSave} className="bg-white border border-border">
             <div className="px-6 py-4 border-b border-border flex items-center gap-3">
               <Settings2 className="w-5 h-5 text-primary" />
@@ -230,20 +258,25 @@ export default function AdminSettings() {
                 <Unlock className="w-5 h-5 text-green-600" />
               )}
               <h2 className="font-bold text-base">Attendee Self-Service</h2>
-              <span className={`ml-auto text-xs font-semibold px-2.5 py-1 rounded-full ${form.attendeeChangesLocked ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
-                {form.attendeeChangesLocked ? "Locked" : "Open"}
-              </span>
+              <div className="ml-auto flex items-center gap-2">
+                {lockSaving && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+                {lockSaved && !lockSaving && <Check className="w-3.5 h-3.5 text-green-600" />}
+                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${form.attendeeChangesLocked ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
+                  {form.attendeeChangesLocked ? "Locked" : "Open"}
+                </span>
+              </div>
             </div>
             <div className="p-6 space-y-5">
               <p className="text-sm text-muted-foreground">
-                Control whether attendees can update their own details via the self-service management link. When locked, all <code className="text-xs bg-muted px-1 py-0.5 rounded">/manage/:token</code> links show a message instead of edit controls — attendee details remain visible but read-only.
+                Control whether attendees can update their own details via the self-service management link. When locked, all <code className="text-xs bg-muted px-1 py-0.5 rounded">/manage/:token</code> links show a message instead of edit controls. Changes save immediately.
               </p>
 
               <div className="flex items-center gap-4">
                 <button
                   type="button"
-                  onClick={() => toggleLock(false)}
-                  className={`flex-1 flex items-center gap-3 px-4 py-3 border-2 transition-all ${
+                  onClick={() => handleToggleLock(false)}
+                  disabled={!form.attendeeChangesLocked && !lockSaving}
+                  className={`flex-1 flex items-center gap-3 px-4 py-3 border-2 transition-all disabled:cursor-default ${
                     !form.attendeeChangesLocked
                       ? "border-green-500 bg-green-50"
                       : "border-border bg-white hover:border-muted-foreground"
@@ -259,8 +292,9 @@ export default function AdminSettings() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => toggleLock(true)}
-                  className={`flex-1 flex items-center gap-3 px-4 py-3 border-2 transition-all ${
+                  onClick={() => handleToggleLock(true)}
+                  disabled={form.attendeeChangesLocked && !lockSaving}
+                  className={`flex-1 flex items-center gap-3 px-4 py-3 border-2 transition-all disabled:cursor-default ${
                     form.attendeeChangesLocked
                       ? "border-red-400 bg-red-50"
                       : "border-border bg-white hover:border-muted-foreground"
@@ -283,27 +317,16 @@ export default function AdminSettings() {
                 <Textarea
                   rows={3}
                   value={form.attendeeChangesLockedMessage || DEFAULT_LOCKED_MESSAGE}
-                  onChange={e => setForm(f => ({ ...f, attendeeChangesLockedMessage: e.target.value }))}
+                  onChange={handleMessageChange}
                   className="text-sm resize-none"
                   placeholder={DEFAULT_LOCKED_MESSAGE}
                 />
-                <p className="text-xs text-muted-foreground mt-1">Displayed prominently on the attendee management page when the lock is active.</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Displayed prominently on the attendee management page when the lock is active. Saves automatically after you stop typing.
+                </p>
               </div>
 
               {lockError && <p className="text-sm text-destructive">{lockError}</p>}
-
-              <div className="flex justify-end">
-                <Button
-                  type="button"
-                  onClick={handleLockSave}
-                  disabled={lockSaving}
-                  className={`h-10 px-6 ${lockSaved ? "bg-green-600 hover:bg-green-700" : "bg-primary hover:bg-primary/90"} text-white`}
-                >
-                  {lockSaved ? (
-                    <span className="flex items-center gap-1.5"><Check className="w-4 h-4" /> Saved</span>
-                  ) : lockSaving ? "Saving…" : "Save Self-Service Settings"}
-                </Button>
-              </div>
             </div>
           </div>
 
