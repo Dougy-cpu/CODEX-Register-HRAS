@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { attendeesTable, bookingsTable } from "@workspace/db";
+import { attendeesTable, bookingsTable, eventSettingsTable } from "@workspace/db";
 import { deriveAdminToken, getAdminPassword } from "../middleware/admin-auth";
 
 const router: IRouter = Router();
@@ -206,6 +206,16 @@ router.patch("/attendees/:id/managed", async (req, res): Promise<void> => {
 
   if (booking.status !== "paid" && booking.status !== "invoiced") {
     res.status(400).json({ error: "Attendee details can only be updated on confirmed bookings" });
+    return;
+  }
+
+  // Enforce self-service lock — check event settings before allowing the update
+  const [eventSettings] = await db.select().from(eventSettingsTable).limit(1);
+  if (eventSettings?.attendeeChangesLocked) {
+    const msg =
+      eventSettings.attendeeChangesLockedMessage ||
+      "Attendee changes are now closed. Please contact the organiser if you need to make a change.";
+    res.status(423).json({ error: msg });
     return;
   }
 
