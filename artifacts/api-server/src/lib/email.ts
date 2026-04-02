@@ -316,6 +316,13 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
       <strong>Venue:</strong> ${settings.eventVenue}, ${settings.eventVenuePostcode}
     </div>
 
+    ${booking.managementToken ? `<div class="info-box" style="margin-top: 24px;">
+      <strong>Need to update attendee details?</strong><br>
+      You can add or update attendee information at any time using your personal management link below.
+      Keep this link safe — anyone with it can update your attendee details.<br>
+      <a href="${process.env.APP_BASE_URL || "https://hranalyticssummit.com/register"}/manage/${booking.managementToken}" style="color:#E74F3E;word-break:break-all;">${process.env.APP_BASE_URL || "https://hranalyticssummit.com/register"}/manage/${booking.managementToken}</a>
+    </div>` : ""}
+
     <p>A PDF VAT receipt is attached to this email for your records.</p>
     ${booking.stripeInvoicePaymentUrl ? `<p style="margin-top:16px;"><a href="${booking.stripeInvoicePaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;">Download Invoice/Pay Online →</a></p>` : ""}
     <p>We look forward to seeing you at the ${settings.eventName}!</p>
@@ -471,6 +478,14 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
       <strong>Date:</strong> ${settings.eventDate}<br>
       <strong>Venue:</strong> ${settings.eventVenue}, ${settings.eventVenuePostcode}
     </div>
+
+    ${booking.managementToken ? `<div class="info-box" style="margin-top: 24px;">
+      <strong>Need to update attendee details?</strong><br>
+      You can add or update attendee information at any time using your personal management link below.
+      Keep this link safe — anyone with it can update your attendee details.<br>
+      <a href="${process.env.APP_BASE_URL || "https://hranalyticssummit.com/register"}/manage/${booking.managementToken}" style="color:#E74F3E;word-break:break-all;">${process.env.APP_BASE_URL || "https://hranalyticssummit.com/register"}/manage/${booking.managementToken}</a>
+    </div>` : ""}
+
     <p>A PDF VAT receipt is attached to this email for your records.</p>
     ${booking.stripeInvoicePaymentUrl ? `<p style="margin-top:16px;"><a href="${booking.stripeInvoicePaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;">Download Invoice/Pay Online →</a></p>` : ""}
     <p>We look forward to seeing you at the ${settings.eventName}!</p>

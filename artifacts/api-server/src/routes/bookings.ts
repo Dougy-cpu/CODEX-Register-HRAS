@@ -95,6 +95,7 @@ router.post("/bookings", async (req, res): Promise<void> => {
       totalAmount: pricing.total.toString(),
       groupDiscountAmount: pricing.groupDiscountAmount > 0 ? pricing.groupDiscountAmount.toString() : null,
       currentStep,
+      managementToken: uuidv4(),
     })
     .returning();
 
@@ -110,6 +111,30 @@ router.get("/bookings/by-session/:sessionToken", async (req, res): Promise<void>
 
   if (!booking) {
     res.json(null);
+    return;
+  }
+
+  const attendees = await db
+    .select()
+    .from(attendeesTable)
+    .where(eq(attendeesTable.bookingId, booking.id));
+
+  res.json({
+    ...formatBooking(booking),
+    attendees: attendees.map(formatAttendee),
+  });
+});
+
+router.get("/bookings/by-management-token/:token", async (req, res): Promise<void> => {
+  const { token } = req.params;
+
+  const [booking] = await db
+    .select()
+    .from(bookingsTable)
+    .where(eq(bookingsTable.managementToken, token));
+
+  if (!booking) {
+    res.status(404).json({ error: "Booking not found" });
     return;
   }
 

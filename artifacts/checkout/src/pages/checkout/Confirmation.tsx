@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { CheckCircle2, FileText, Calendar, MapPin, Users } from "lucide-react";
+import { CheckCircle2, FileText, Calendar, MapPin, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { BookingWithAttendees } from "@/types/booking";
 
@@ -105,6 +105,27 @@ export default function Confirmation({ booking }: ConfirmationProps) {
           </div>
         </div>
       </div>
+
+      {booking.managementToken && (
+        <div className="bg-muted/40 border border-border rounded-sm p-5 text-left">
+          <div className="flex items-start gap-3">
+            <ExternalLink className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+            <div>
+              <h4 className="font-bold mb-1">Need to update attendee details?</h4>
+              <p className="text-sm text-muted-foreground mb-3">
+                You can add or update attendee names and contact information at any time — including TBC slots.
+                This link is also included in your confirmation email.
+              </p>
+              <a
+                href={`${import.meta.env.BASE_URL.replace(/\/$/, "")}/manage/${booking.managementToken}`}
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary underline underline-offset-2 hover:text-primary/80"
+              >
+                Manage attendees →
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="pt-8">
         <p className="text-muted-foreground mb-6">A confirmation email has been sent to the lead attendee.</p>

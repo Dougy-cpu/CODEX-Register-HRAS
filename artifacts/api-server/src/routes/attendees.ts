@@ -170,4 +170,66 @@ router.patch("/bookings/:bookingId/attendees/:attendeeId", async (req, res): Pro
   res.json(formatAttendee(updated));
 });
 
+// Management token-authenticated attendee update (no session required — token IS the auth)
+// Only allowed when booking status is paid or invoiced.
+router.patch("/attendees/:id/managed", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const attendeeId = parseInt(raw, 10);
+
+  const { managementToken, firstName, lastName, jobTitle, company, workEmail, phone, dietaryAccessibility } = req.body;
+
+  if (!managementToken) {
+    res.status(400).json({ error: "managementToken is required" });
+    return;
+  }
+
+  const [attendee] = await db.select().from(attendeesTable).where(eq(attendeesTable.id, attendeeId));
+  if (!attendee) {
+    res.status(404).json({ error: "Attendee not found" });
+    return;
+  }
+
+  const [booking] = await db
+    .select()
+    .from(bookingsTable)
+    .where(eq(bookingsTable.id, attendee.bookingId));
+
+  if (!booking) {
+    res.status(404).json({ error: "Booking not found" });
+    return;
+  }
+
+  if (booking.managementToken !== managementToken) {
+    res.status(403).json({ error: "Invalid management token" });
+    return;
+  }
+
+  if (booking.status !== "paid" && booking.status !== "invoiced") {
+    res.status(400).json({ error: "Attendee details can only be updated on confirmed bookings" });
+    return;
+  }
+
+  if (!firstName || !lastName || !jobTitle || !company || !workEmail) {
+    res.status(400).json({ error: "firstName, lastName, jobTitle, company, workEmail are required" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(attendeesTable)
+    .set({
+      firstName,
+      lastName,
+      jobTitle,
+      company,
+      workEmail,
+      phone: phone || null,
+      dietaryAccessibility: dietaryAccessibility || null,
+      isTbc: false,
+    })
+    .where(eq(attendeesTable.id, attendeeId))
+    .returning();
+
+  res.json(formatAttendee(updated));
+});
+
 export default router;
