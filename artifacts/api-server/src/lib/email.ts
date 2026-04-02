@@ -526,7 +526,7 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
     .from(notificationEmailsTable)
     .orderBy(notificationEmailsTable.createdAt);
 
-  const recipients: string[] = storedEmails.map((e) => e.email);
+  const recipients: string[] = storedEmails.filter(e => e.notifyComplete).map((e) => e.email);
   if (process.env.ORGANISER_EMAIL && !recipients.includes(process.env.ORGANISER_EMAIL.toLowerCase())) {
     recipients.push(process.env.ORGANISER_EMAIL);
   }
@@ -638,7 +638,7 @@ export async function sendIncompleteFormNotification(bookingId: number): Promise
     .from(notificationEmailsTable)
     .orderBy(notificationEmailsTable.createdAt);
 
-  const recipients: string[] = storedEmails.map((e) => e.email);
+  const recipients: string[] = storedEmails.filter(e => e.notifyIncomplete).map((e) => e.email);
   if (process.env.ORGANISER_EMAIL && !recipients.includes(process.env.ORGANISER_EMAIL.toLowerCase())) {
     recipients.push(process.env.ORGANISER_EMAIL);
   }

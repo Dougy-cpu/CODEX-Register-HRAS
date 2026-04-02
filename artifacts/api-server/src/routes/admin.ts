@@ -536,7 +536,7 @@ router.get("/admin/notification-emails", adminAuth, async (_req, res): Promise<v
 });
 
 router.post("/admin/notification-emails", adminAuth, async (req, res): Promise<void> => {
-  const { email, label } = req.body;
+  const { email, label, notifyComplete, notifyIncomplete } = req.body;
   if (!email || typeof email !== "string" || !email.includes("@")) {
     res.status(400).json({ error: "A valid email address is required" });
     return;
@@ -544,12 +544,39 @@ router.post("/admin/notification-emails", adminAuth, async (req, res): Promise<v
   try {
     const [inserted] = await db
       .insert(notificationEmailsTable)
-      .values({ email: email.trim().toLowerCase(), label: label?.trim() || null })
+      .values({
+        email: email.trim().toLowerCase(),
+        label: label?.trim() || null,
+        notifyComplete: notifyComplete !== false,
+        notifyIncomplete: notifyIncomplete !== false,
+      })
       .returning();
     res.status(201).json({ ...inserted, createdAt: inserted.createdAt.toISOString() });
   } catch {
     res.status(409).json({ error: "This email address is already in the list" });
   }
+});
+
+router.patch("/admin/notification-emails/:id", adminAuth, async (req, res): Promise<void> => {
+  const id = parseInt(req.params["id"] as string, 10);
+  const { notifyComplete, notifyIncomplete } = req.body;
+  const updates: Record<string, boolean> = {};
+  if (typeof notifyComplete === "boolean") updates.notifyComplete = notifyComplete;
+  if (typeof notifyIncomplete === "boolean") updates.notifyIncomplete = notifyIncomplete;
+  if (Object.keys(updates).length === 0) {
+    res.status(400).json({ error: "Nothing to update" });
+    return;
+  }
+  const [updated] = await db
+    .update(notificationEmailsTable)
+    .set(updates)
+    .where(eq(notificationEmailsTable.id, id))
+    .returning();
+  if (!updated) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  res.json({ ...updated, createdAt: updated.createdAt.toISOString() });
 });
 
 router.delete("/admin/notification-emails/:id", adminAuth, async (req, res): Promise<void> => {
