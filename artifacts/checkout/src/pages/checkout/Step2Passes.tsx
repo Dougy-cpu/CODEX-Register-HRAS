@@ -287,24 +287,21 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
       {/* HR: Single pass with quantity picker */}
       {isHR && (
         <Card className="relative border-2 border-primary overflow-hidden p-0 shadow-lg">
-          {/* ── Premium header band ── */}
-          <div
-            className="px-6 md:px-8 py-5 flex items-center justify-between gap-4 flex-wrap"
-            style={{ background: "linear-gradient(135deg, hsl(4,70%,22%) 0%, hsl(0,12%,10%) 100%)" }}
-          >
+          {/* ── Header band ── */}
+          <div className="px-6 md:px-8 py-5 flex items-center justify-between gap-4 flex-wrap border-b border-border">
             <div>
-              <p className="text-xs uppercase tracking-widest text-white/50 mb-1 font-semibold">HR Analytics Summit · 3 Sep 2026, London</p>
-              <h3 className="text-2xl font-bold text-white font-display leading-tight">HR Professional Pass</h3>
+              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 font-semibold">HR Analytics Summit · 3 Sep 2026, London</p>
+              <h3 className="text-2xl font-bold text-primary font-display leading-tight">HR Professional Pass</h3>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
               <InventoryBadge remaining={inventory.single} />
               <div className="text-right">
                 <div className="flex items-baseline gap-2 justify-end flex-wrap">
-                  <span className="text-3xl font-bold text-white">£199</span>
-                  <span className="text-sm text-white/40 line-through">£429</span>
+                  <span className="text-3xl font-bold text-foreground">£199</span>
+                  <span className="text-sm text-muted-foreground line-through">£429</span>
                   <span className="badge-shine text-xs font-bold px-3 py-1 rounded-full inline-block">54% off</span>
                 </div>
-                <p className="text-xs text-white/50 mt-0.5">Per ticket, ex VAT · Early-bird price</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Per ticket, ex VAT · Early-bird price</p>
               </div>
             </div>
           </div>
@@ -338,10 +335,10 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
               <button
                 type="button"
                 onClick={() => setQuantity(3)}
-                className={`w-full flex items-center justify-between gap-2 px-4 py-3 text-sm font-bold transition-all ${
+                className={`w-full flex items-center justify-between gap-2 px-4 py-3 text-sm font-bold transition-colors ${
                   quantity === 3
                     ? "bg-primary text-white shadow-md"
-                    : "text-white shadow-md hover:shadow-lg hover:scale-[1.01]"
+                    : "text-white shadow-md hover:shadow-lg"
                 }`}
                 style={
                   quantity !== 3
@@ -350,10 +347,10 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                 }
               >
                 <span className="flex items-center gap-2">
-                  <Users className="w-4 h-4" />
+                  <Users className="w-4 h-4 shrink-0" />
                   3 tickets — Most Popular
                 </span>
-                {quantity === 3 && <Check className="w-4 h-4" />}
+                <Check className={`w-4 h-4 shrink-0 transition-opacity ${quantity === 3 ? "opacity-100" : "opacity-0"}`} />
               </button>
 
               {/* Custom stepper */}
@@ -378,15 +375,17 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                 </button>
               </div>
 
-              {/* Upsell nudge */}
-              <AnimatePresence>
-                <UpsellNudge
-                  tiers={allTiers}
-                  passType="single"
-                  quantity={quantity}
-                  unitLabel="ticket"
-                />
-              </AnimatePresence>
+              {/* Upsell nudge — fixed-height container prevents layout shift */}
+              <div className="min-h-[56px]">
+                <AnimatePresence>
+                  <UpsellNudge
+                    tiers={allTiers}
+                    passType="single"
+                    quantity={quantity}
+                    unitLabel="ticket"
+                  />
+                </AnimatePresence>
+              </div>
 
               {/* Tier table */}
               <div className="space-y-1 text-xs">
@@ -422,24 +421,21 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
       {/* Vendor: Business Pass with quantity + discounts */}
       {isVendor && (
         <Card className="relative border-2 border-primary overflow-hidden p-0 shadow-lg">
-          {/* ── Premium header band ── */}
-          <div
-            className="px-6 md:px-8 py-5 flex items-center justify-between gap-4 flex-wrap"
-            style={{ background: "linear-gradient(135deg, hsl(4,70%,22%) 0%, hsl(0,12%,10%) 100%)" }}
-          >
+          {/* ── Header band ── */}
+          <div className="px-6 md:px-8 py-5 flex items-center justify-between gap-4 flex-wrap border-b border-border">
             <div>
-              <p className="text-xs uppercase tracking-widest text-white/50 mb-1 font-semibold">HR Analytics Summit · 3 Sep 2026 · Consultants &amp; Vendors</p>
-              <h3 className="text-2xl font-bold text-white font-display leading-tight">Business Pass</h3>
+              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 font-semibold">HR Analytics Summit · 3 Sep 2026 · Consultants &amp; Vendors</p>
+              <h3 className="text-2xl font-bold text-primary font-display leading-tight">Business Pass</h3>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
               <InventoryBadge remaining={inventory.business} />
               <div className="text-right">
                 <div className="flex items-baseline gap-2 justify-end flex-wrap">
-                  <span className="text-3xl font-bold text-white">£599</span>
-                  <span className="text-sm text-white/40 line-through">£999</span>
+                  <span className="text-3xl font-bold text-foreground">£599</span>
+                  <span className="text-sm text-muted-foreground line-through">£999</span>
                   <span className="badge-shine text-xs font-bold px-3 py-1 rounded-full inline-block">40% off</span>
                 </div>
-                <p className="text-xs text-white/50 mt-0.5">Per pass, ex VAT · Group discounts apply</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Per pass, ex VAT · Group discounts apply</p>
               </div>
             </div>
           </div>
@@ -503,15 +499,17 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                 </button>
               </div>
 
-              {/* Upsell nudge */}
-              <AnimatePresence>
-                <UpsellNudge
-                  tiers={allTiers}
-                  passType="business"
-                  quantity={quantity}
-                  unitLabel="pass"
-                />
-              </AnimatePresence>
+              {/* Upsell nudge — fixed-height container prevents layout shift */}
+              <div className="min-h-[56px]">
+                <AnimatePresence>
+                  <UpsellNudge
+                    tiers={allTiers}
+                    passType="business"
+                    quantity={quantity}
+                    unitLabel="pass"
+                  />
+                </AnimatePresence>
+              </div>
 
               {/* Business discount tiers */}
               <div className="space-y-1 text-xs">
