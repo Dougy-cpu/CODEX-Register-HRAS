@@ -287,26 +287,34 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
       {/* HR: Single pass with quantity picker */}
       {isHR && (
         <Card className="relative border-2 border-primary overflow-hidden p-0 shadow-lg">
+          {/* ── Premium header band ── */}
+          <div
+            className="px-6 md:px-8 py-5 flex items-center justify-between gap-4 flex-wrap"
+            style={{ background: "linear-gradient(135deg, hsl(222,47%,14%) 0%, hsl(222,47%,22%) 55%, hsl(4,55%,18%) 100%)" }}
+          >
+            <div>
+              <p className="text-xs uppercase tracking-widest text-white/50 mb-1 font-semibold">HR Analytics Summit · 3 Sep 2026, London</p>
+              <h3 className="text-2xl font-bold text-white font-display leading-tight">HR Professional Pass</h3>
+            </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <InventoryBadge remaining={inventory.single} />
+              <div className="text-right">
+                <div className="flex items-baseline gap-2 justify-end flex-wrap">
+                  <span className="text-3xl font-bold text-white">£199</span>
+                  <span className="text-sm text-white/40 line-through">£429</span>
+                  <span className="badge-shine text-xs font-bold px-3 py-1 rounded-full inline-block">54% off</span>
+                </div>
+                <p className="text-xs text-white/50 mt-0.5">Per ticket, ex VAT · Early-bird price</p>
+              </div>
+            </div>
+          </div>
+
           <div className="flex flex-col md:flex-row md:items-stretch">
 
             {/* ── Left column: Benefits ── */}
             <div className="flex-1 p-6 md:p-8">
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <h3 className="text-2xl font-bold leading-tight">HR Professional Pass</h3>
-                <InventoryBadge remaining={inventory.single} />
-              </div>
-
-              {/* Price + badge */}
-              <div className="flex items-baseline gap-3 mb-1 flex-wrap">
-                <span className="text-4xl font-bold">£199</span>
-                <span className="text-base text-muted-foreground line-through">£429</span>
-                <span className="badge-shine text-xs font-bold px-3 py-1 rounded-full inline-block">
-                  54% off
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground mb-5">Per ticket, ex VAT · Early-bird price</p>
-
               {/* Benefits grid */}
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">What's included</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4">
                 {SINGLE_BENEFITS.map((b) => (
                   <div key={b} className="flex items-start gap-2 text-sm">
@@ -419,29 +427,34 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
       {/* Vendor: Business Pass with quantity + discounts */}
       {isVendor && (
         <Card className="relative border-2 border-primary overflow-hidden p-0 shadow-lg">
+          {/* ── Premium header band ── */}
+          <div
+            className="px-6 md:px-8 py-5 flex items-center justify-between gap-4 flex-wrap"
+            style={{ background: "linear-gradient(135deg, hsl(222,47%,14%) 0%, hsl(222,47%,22%) 55%, hsl(4,55%,18%) 100%)" }}
+          >
+            <div>
+              <p className="text-xs uppercase tracking-widest text-white/50 mb-1 font-semibold">HR Analytics Summit · 3 Sep 2026 · Consultants &amp; Vendors</p>
+              <h3 className="text-2xl font-bold text-white font-display leading-tight">Business Pass</h3>
+            </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <InventoryBadge remaining={inventory.business} />
+              <div className="text-right">
+                <div className="flex items-baseline gap-2 justify-end flex-wrap">
+                  <span className="text-3xl font-bold text-white">£599</span>
+                  <span className="text-sm text-white/40 line-through">£999</span>
+                  <span className="badge-shine text-xs font-bold px-3 py-1 rounded-full inline-block">40% off</span>
+                </div>
+                <p className="text-xs text-white/50 mt-0.5">Per pass, ex VAT · Group discounts apply</p>
+              </div>
+            </div>
+          </div>
+
           <div className="flex flex-col md:flex-row md:items-stretch">
 
             {/* ── Left column: Benefits ── */}
             <div className="flex-1 p-6 md:p-8">
-              <div className="flex items-start justify-between gap-3 mb-1">
-                <div>
-                  <h3 className="text-2xl font-bold">Business Pass</h3>
-                  <p className="text-sm text-muted-foreground mt-0.5">For Consultants &amp; Vendors</p>
-                </div>
-                <InventoryBadge remaining={inventory.business} />
-              </div>
-
-              {/* Price + badge */}
-              <div className="flex items-baseline gap-3 mb-1 mt-3 flex-wrap">
-                <span className="text-4xl font-bold">£599</span>
-                <span className="text-base text-muted-foreground line-through">£999</span>
-                <span className="badge-shine text-xs font-bold px-3 py-1 rounded-full inline-block">
-                  40% off
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground mb-5">Per pass, ex VAT · Group discounts apply for multiple</p>
-
               {/* Standard benefits */}
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">What's included</p>
               <div className="space-y-2 mb-4">
                 {SINGLE_BENEFITS.map((b) => (
                   <div key={b} className="flex items-start gap-2 text-sm">
