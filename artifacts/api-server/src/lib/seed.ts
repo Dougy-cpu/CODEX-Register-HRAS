@@ -30,6 +30,18 @@ const DEFAULT_WELCOME_BODY = `
 
 <p>Your conference pass and receipt are included in the accompanying email. Please bring a digital or printed copy for check-in.</p>
 
+<div style="background: #fff8f7; border: 2px solid #E74F3E; border-radius: 6px; padding: 20px; margin: 24px 0;">
+  <p style="margin: 0 0 12px; font-weight: 700; color: #E74F3E; font-size: 15px;">📋 Manage Your Attendee Details Online</p>
+  <p style="margin: 0 0 12px; color: #444; line-height: 1.6;">You have access to a secure self-service link where you can fill in or update attendee details at any time — <strong>no login required</strong>. You can:</p>
+  <ul style="margin: 0 0 12px; padding-left: 20px; color: #444; line-height: 1.8;">
+    <li>Fill in details for any placeholder (TBC) attendee seats</li>
+    <li>Update names, job titles, companies, and email addresses</li>
+    <li>Add dietary or accessibility requirements</li>
+    <li>Forward the link to colleagues so they can enter their own details directly</li>
+  </ul>
+  <p style="margin: 0; color: #666; font-size: 14px;"><em>Your unique management link is included in the accompanying booking confirmation email — look for the red "Manage Attendees" section.</em></p>
+</div>
+
 <p>If you have any questions before the event, please don't hesitate to reach out to us at <a href="mailto:info@hranalyticssummit.com">info@hranalyticssummit.com</a>.</p>
 
 <p>We look forward to seeing you there!</p>
