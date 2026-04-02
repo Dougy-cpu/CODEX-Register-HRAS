@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronDown, ChevronRight, Search, Download, Trash2, AlertTriangle, Send, Check, Clock } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, Download, Trash2, AlertTriangle, Send, Check, Clock, Pencil, X, Loader2 } from "lucide-react";
 
 const STATUS_OPTIONS = [
   { value: "paid", label: "Paid" },
@@ -32,6 +32,16 @@ const statusBadge = (status: string) => {
   );
 };
 
+interface AttendeeEditForm {
+  firstName: string;
+  lastName: string;
+  jobTitle: string;
+  company: string;
+  workEmail: string;
+  phone: string;
+  dietaryAccessibility: string;
+}
+
 function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onStatusChanged: () => void }) {
   const { data, isLoading, refetch } = useGetRegistration(id, {
     query: { queryKey: ["registration", id] }
@@ -39,6 +49,70 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [reminderState, setReminderState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [reminderError, setReminderError] = useState<string | null>(null);
+  const [editingAttendeeId, setEditingAttendeeId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState<AttendeeEditForm>({ firstName: "", lastName: "", jobTitle: "", company: "", workEmail: "", phone: "", dietaryAccessibility: "" });
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const startEditing = (a: NonNullable<typeof data>["attendees"][number]) => {
+    setEditingAttendeeId(a.id);
+    setEditForm({
+      firstName: a.isTbc ? "" : a.firstName,
+      lastName: a.isTbc ? "" : a.lastName,
+      jobTitle: a.isTbc ? "" : (a.jobTitle ?? ""),
+      company: a.isTbc ? "" : (a.company ?? ""),
+      workEmail: a.isTbc ? "" : a.workEmail,
+      phone: a.phone ?? "",
+      dietaryAccessibility: a.dietaryAccessibility ?? "",
+    });
+    setSaveState("idle");
+    setSaveError(null);
+  };
+
+  const cancelEditing = () => {
+    setEditingAttendeeId(null);
+    setSaveState("idle");
+    setSaveError(null);
+  };
+
+  const handleSaveAttendee = async (attendeeId: number) => {
+    if (!editForm.firstName || !editForm.lastName || !editForm.jobTitle || !editForm.company || !editForm.workEmail) {
+      setSaveError("First name, last name, job title, company, and email are required.");
+      return;
+    }
+    setSaveState("saving");
+    setSaveError(null);
+    try {
+      const token = localStorage.getItem("admin_token") || "";
+      const res = await fetch(`/api/bookings/${id}/attendees/${attendeeId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-admin-token": token },
+        body: JSON.stringify({
+          firstName: editForm.firstName,
+          lastName: editForm.lastName,
+          jobTitle: editForm.jobTitle,
+          company: editForm.company,
+          workEmail: editForm.workEmail,
+          phone: editForm.phone || null,
+          dietaryAccessibility: editForm.dietaryAccessibility || null,
+          isTbc: false,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error || "Save failed");
+      }
+      setSaveState("success");
+      await refetch();
+      setTimeout(() => {
+        setEditingAttendeeId(null);
+        setSaveState("idle");
+      }, 1200);
+    } catch (err: any) {
+      setSaveError(err?.message || "Failed to save. Please try again.");
+      setSaveState("error");
+    }
+  };
 
   const invoiceDueDate = data?.invoiceDueDate ? new Date(data.invoiceDueDate) : null;
   const isInvoiceOverdue = data?.status === "invoiced" && !!invoiceDueDate && invoiceDueDate < new Date();
@@ -276,7 +350,7 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
         <h4 className="font-bold mb-3 uppercase text-xs tracking-wider text-muted-foreground">
           All Attendees ({data?.attendees?.length ?? 0})
         </h4>
-        <div className="border border-border overflow-hidden">
+        <div className="border border-border overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-muted/50">
               <tr>
@@ -288,6 +362,7 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
                 <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">Phone</th>
                 <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">Dietary / Access</th>
                 <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">GDPR</th>
+                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground w-16"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -295,46 +370,177 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
                 ?.slice()
                 .sort((a, b) => (a.seatIndex ?? 0) - (b.seatIndex ?? 0))
                 .map((a) => (
-                  <tr key={a.seatIndex ?? a.id} className={a.isLead ? "bg-primary/5" : "bg-white"}>
-                    <td className="p-3 text-muted-foreground">{(a.seatIndex ?? 0) + 1}</td>
-                    <td className="p-3">
-                      {a.isTbc ? (
-                        <span className="inline-flex items-center gap-1.5 text-amber-700 font-medium italic">
-                          TBC — pending
-                        </span>
-                      ) : (
-                        <div className="flex items-center gap-1.5">
-                          {a.isLead && isGroup && (
-                            <span className="text-primary font-bold text-base leading-none" title="Lead attendee">★</span>
-                          )}
-                          <span className="font-medium">{a.firstName} {a.lastName}</span>
-                          {a.isLead && !isGroup && (
-                            <span className="text-[10px] font-bold bg-primary text-white px-1.5 py-0.5 uppercase tracking-wider">Lead</span>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                    <td className="p-3 text-muted-foreground">{a.isTbc ? "—" : (a.jobTitle || "—")}</td>
-                    <td className="p-3 text-muted-foreground">{a.isTbc ? "—" : (a.company || "—")}</td>
-                    <td className="p-3 text-muted-foreground">{a.isTbc ? "—" : (a.workEmail || "—")}</td>
-                    <td className="p-3 text-muted-foreground">{a.isTbc ? "—" : (a.phone || "—")}</td>
-                    <td className="p-3 text-muted-foreground max-w-[200px]">
-                      {a.isTbc ? "—" : (a.dietaryAccessibility || "—")}
-                    </td>
-                    <td className="p-3">
-                      {a.isTbc ? (
-                        <span className="text-muted-foreground">—</span>
-                      ) : a.gdprConsent ? (
-                        <span className="text-[10px] font-bold bg-green-100 text-green-800 px-1.5 py-0.5 uppercase">✓ Yes</span>
-                      ) : (
-                        <span className="text-[10px] font-bold bg-red-100 text-red-800 px-1.5 py-0.5 uppercase">No</span>
-                      )}
-                    </td>
-                  </tr>
+                  <Fragment key={a.id}>
+                    {/* Display row */}
+                    <tr className={`${a.isLead ? "bg-primary/5" : "bg-white"} ${editingAttendeeId === a.id ? "border-b-0" : ""}`}>
+                      <td className="p-3 text-muted-foreground">{(a.seatIndex ?? 0) + 1}</td>
+                      <td className="p-3">
+                        {a.isTbc && editingAttendeeId !== a.id ? (
+                          <span className="inline-flex items-center gap-1.5 text-amber-700 font-medium italic">
+                            <Clock className="w-3.5 h-3.5" /> TBC — pending
+                          </span>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            {a.isLead && isGroup && (
+                              <span className="text-primary font-bold text-base leading-none" title="Lead attendee">★</span>
+                            )}
+                            <span className="font-medium">{a.firstName} {a.lastName}</span>
+                            {a.isLead && !isGroup && (
+                              <span className="text-[10px] font-bold bg-primary text-white px-1.5 py-0.5 uppercase tracking-wider">Lead</span>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-3 text-muted-foreground">{a.isTbc ? "—" : (a.jobTitle || "—")}</td>
+                      <td className="p-3 text-muted-foreground">{a.isTbc ? "—" : (a.company || "—")}</td>
+                      <td className="p-3 text-muted-foreground">{a.isTbc ? "—" : (a.workEmail || "—")}</td>
+                      <td className="p-3 text-muted-foreground">{a.isTbc ? "—" : (a.phone || "—")}</td>
+                      <td className="p-3 text-muted-foreground max-w-[180px] truncate">
+                        {a.isTbc ? "—" : (a.dietaryAccessibility || "—")}
+                      </td>
+                      <td className="p-3">
+                        {a.isTbc ? (
+                          <span className="text-muted-foreground">—</span>
+                        ) : a.gdprConsent ? (
+                          <span className="text-[10px] font-bold bg-green-100 text-green-800 px-1.5 py-0.5 uppercase">✓ Yes</span>
+                        ) : (
+                          <span className="text-[10px] font-bold bg-red-100 text-red-800 px-1.5 py-0.5 uppercase">No</span>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        {editingAttendeeId === a.id ? (
+                          <button
+                            onClick={cancelEditing}
+                            className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                            title="Cancel editing"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => startEditing(a)}
+                            className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-primary transition-colors"
+                            title="Edit attendee"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+
+                    {/* Inline edit row */}
+                    {editingAttendeeId === a.id && (
+                      <tr className={a.isLead ? "bg-primary/5" : "bg-white"}>
+                        <td colSpan={9} className="px-4 pb-4 pt-0">
+                          <div className="border border-primary/20 bg-white rounded-sm p-4 space-y-3">
+                            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                              Editing: Attendee {(a.seatIndex ?? 0) + 1}{a.isLead ? " (Lead)" : ""}
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                              <div>
+                                <label className="block text-xs font-semibold text-muted-foreground mb-1">First Name *</label>
+                                <Input
+                                  value={editForm.firstName}
+                                  onChange={e => setEditForm(f => ({ ...f, firstName: e.target.value }))}
+                                  placeholder="Jane"
+                                  className="h-8 text-sm"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-muted-foreground mb-1">Last Name *</label>
+                                <Input
+                                  value={editForm.lastName}
+                                  onChange={e => setEditForm(f => ({ ...f, lastName: e.target.value }))}
+                                  placeholder="Smith"
+                                  className="h-8 text-sm"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-muted-foreground mb-1">Job Title *</label>
+                                <Input
+                                  value={editForm.jobTitle}
+                                  onChange={e => setEditForm(f => ({ ...f, jobTitle: e.target.value }))}
+                                  placeholder="Chief People Officer"
+                                  className="h-8 text-sm"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-muted-foreground mb-1">Company *</label>
+                                <Input
+                                  value={editForm.company}
+                                  onChange={e => setEditForm(f => ({ ...f, company: e.target.value }))}
+                                  placeholder="Acme Ltd"
+                                  className="h-8 text-sm"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-muted-foreground mb-1">Work Email *</label>
+                                <Input
+                                  type="email"
+                                  value={editForm.workEmail}
+                                  onChange={e => setEditForm(f => ({ ...f, workEmail: e.target.value }))}
+                                  placeholder="jane@acme.com"
+                                  className="h-8 text-sm"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-muted-foreground mb-1">Phone</label>
+                                <Input
+                                  type="tel"
+                                  value={editForm.phone}
+                                  onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))}
+                                  placeholder="+44 7700 900 000"
+                                  className="h-8 text-sm"
+                                />
+                              </div>
+                              <div className="sm:col-span-2 lg:col-span-3">
+                                <label className="block text-xs font-semibold text-muted-foreground mb-1">Dietary / Accessibility</label>
+                                <Input
+                                  value={editForm.dietaryAccessibility}
+                                  onChange={e => setEditForm(f => ({ ...f, dietaryAccessibility: e.target.value }))}
+                                  placeholder="e.g. vegetarian, wheelchair access"
+                                  className="h-8 text-sm"
+                                />
+                              </div>
+                            </div>
+                            {saveError && (
+                              <p className="text-xs text-red-600 flex items-center gap-1.5">
+                                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                                {saveError}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-3 pt-1">
+                              <button
+                                onClick={() => handleSaveAttendee(a.id)}
+                                disabled={saveState === "saving" || saveState === "success"}
+                                className={`inline-flex items-center gap-2 text-sm font-semibold px-4 py-1.5 rounded transition-all ${
+                                  saveState === "success"
+                                    ? "bg-green-100 text-green-700 cursor-not-allowed"
+                                    : saveState === "saving"
+                                    ? "bg-primary/60 text-white cursor-not-allowed"
+                                    : "bg-primary text-white hover:bg-primary/90"
+                                }`}
+                              >
+                                {saveState === "saving" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                                {saveState === "success" && <Check className="w-3.5 h-3.5" />}
+                                {saveState === "saving" ? "Saving…" : saveState === "success" ? "Saved!" : "Save Changes"}
+                              </button>
+                              <button
+                                onClick={cancelEditing}
+                                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               {(!data?.attendees || data.attendees.length === 0) && (
                 <tr>
-                  <td colSpan={8} className="p-6 text-center text-muted-foreground">No attendees recorded yet.</td>
+                  <td colSpan={9} className="p-6 text-center text-muted-foreground">No attendees recorded yet.</td>
                 </tr>
               )}
             </tbody>
