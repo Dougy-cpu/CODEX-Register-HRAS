@@ -265,7 +265,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
 
   const activeTier = getActiveTier(allTiers, selectedPass, quantity);
   const discountLabel = activeTier ? `${activeTier.discountPercent}% off` : null;
-  const isMostPopular = isHR && quantity === 3;
+  const isMostPopular = isHR && quantity === 3 && !activeTier;
 
   const hrTierRows = buildHRTierRows(allTiers, quantity, 199);
   const businessTierRows = buildBusinessTierRows(allTiers, quantity, 599);
