@@ -3,6 +3,7 @@ import { eq, and } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { attendeesTable, bookingsTable, eventSettingsTable } from "@workspace/db";
 import { deriveAdminToken, getAdminPassword } from "../middleware/admin-auth";
+import { sendAttendeeChangeNotification } from "../lib/email";
 
 const router: IRouter = Router();
 
@@ -240,6 +241,9 @@ router.patch("/attendees/:id/managed", async (req, res): Promise<void> => {
     .returning();
 
   res.json(formatAttendee(updated));
+
+  // Fire and forget — notify organisers that an attendee updated their details
+  sendAttendeeChangeNotification(booking.id, attendeeId, { firstName, lastName, jobTitle, company, workEmail }).catch(() => {});
 });
 
 export default router;

@@ -318,22 +318,7 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
       <strong>Venue:</strong> ${settings.eventVenue}, ${settings.eventVenuePostcode}
     </div>
 
-    ${booking.managementToken ? `<div style="margin-top: 24px; border-left: 4px solid #E74F3E; padding: 16px 20px; background: #fdf8f7;">
-      <p style="margin: 0 0 10px; font-size: 15px; font-weight: bold; color: #1a1a1a;">Manage Your Attendees Online</p>
-      <p style="margin: 0 0 10px; font-size: 14px; color: #444; line-height: 1.6;">
-        Use your personal management link to fill in or update attendee details at any time — no login or account required. Simply visit the link and make your changes.
-      </p>
-      <p style="margin: 0 0 6px; font-size: 14px; color: #444;"><strong>With this link you can:</strong></p>
-      <ul style="margin: 0 0 12px; padding-left: 20px; font-size: 14px; color: #444; line-height: 1.8;">
-        <li>Fill in details for any placeholder (TBC) attendee seats</li>
-        <li>Update names, job titles, companies, and email addresses</li>
-        <li>Add dietary or accessibility requirements</li>
-        <li>Forward the link to colleagues so they can enter their own details directly</li>
-      </ul>
-      <p style="margin: 0 0 8px; font-size: 14px; color: #1a1a1a;"><strong>Your attendee management link:</strong></p>
-      <a href="${process.env.APP_BASE_URL || "https://hranalyticssummit.com/register"}/manage/${booking.managementToken}" style="color:#E74F3E;word-break:break-all;font-family:monospace;font-size:13px;">${process.env.APP_BASE_URL || "https://hranalyticssummit.com/register"}/manage/${booking.managementToken}</a>
-      <p style="margin: 12px 0 0; font-size: 12px; color: #888;">Keep this link safe — anyone who has it can view and update the attendee details for your booking.</p>
-    </div>` : ""}
+    ${booking.managementToken ? buildManageLinkSection(`${process.env.APP_BASE_URL || "https://hranalyticssummit.com/register"}/manage/${booking.managementToken}`) : ""}
 
     <p>A PDF VAT receipt is attached to this email for your records.</p>
     ${booking.stripeInvoicePaymentUrl ? `<p style="margin-top:16px;"><a href="${booking.stripeInvoicePaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;">Download Invoice/Pay Online →</a></p>` : ""}
@@ -491,22 +476,7 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
       <strong>Venue:</strong> ${settings.eventVenue}, ${settings.eventVenuePostcode}
     </div>
 
-    ${booking.managementToken ? `<div style="margin-top: 24px; border-left: 4px solid #E74F3E; padding: 16px 20px; background: #fdf8f7;">
-      <p style="margin: 0 0 10px; font-size: 15px; font-weight: bold; color: #1a1a1a;">Manage Your Attendees Online</p>
-      <p style="margin: 0 0 10px; font-size: 14px; color: #444; line-height: 1.6;">
-        Use your personal management link to fill in or update attendee details at any time — no login or account required. Simply visit the link and make your changes.
-      </p>
-      <p style="margin: 0 0 6px; font-size: 14px; color: #444;"><strong>With this link you can:</strong></p>
-      <ul style="margin: 0 0 12px; padding-left: 20px; font-size: 14px; color: #444; line-height: 1.8;">
-        <li>Fill in details for any placeholder (TBC) attendee seats</li>
-        <li>Update names, job titles, companies, and email addresses</li>
-        <li>Add dietary or accessibility requirements</li>
-        <li>Forward the link to colleagues so they can enter their own details directly</li>
-      </ul>
-      <p style="margin: 0 0 8px; font-size: 14px; color: #1a1a1a;"><strong>Your attendee management link:</strong></p>
-      <a href="${process.env.APP_BASE_URL || "https://hranalyticssummit.com/register"}/manage/${booking.managementToken}" style="color:#E74F3E;word-break:break-all;font-family:monospace;font-size:13px;">${process.env.APP_BASE_URL || "https://hranalyticssummit.com/register"}/manage/${booking.managementToken}</a>
-      <p style="margin: 12px 0 0; font-size: 12px; color: #888;">Keep this link safe — anyone who has it can view and update the attendee details for your booking.</p>
-    </div>` : ""}
+    ${booking.managementToken ? buildManageLinkSection(`${process.env.APP_BASE_URL || "https://hranalyticssummit.com/register"}/manage/${booking.managementToken}`) : ""}
 
     <p>A PDF VAT receipt is attached to this email for your records.</p>
     ${booking.stripeInvoicePaymentUrl ? `<p style="margin-top:16px;"><a href="${booking.stripeInvoicePaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;">Download Invoice/Pay Online →</a></p>` : ""}
@@ -801,6 +771,52 @@ export async function sendIncompleteFormNotification(bookingId: number): Promise
   logger.info({ bookingId, sentCount, total: recipients.length }, "Incomplete form notifications sent");
 }
 
+async function getOrganiserEmails(): Promise<string[]> {
+  const storedEmails = await db
+    .select()
+    .from(notificationEmailsTable)
+    .orderBy(notificationEmailsTable.createdAt);
+  const recipients: string[] = storedEmails.filter(e => e.notifyComplete).map((e) => e.email);
+  if (process.env.ORGANISER_EMAIL && !recipients.includes(process.env.ORGANISER_EMAIL.toLowerCase())) {
+    recipients.push(process.env.ORGANISER_EMAIL);
+  }
+  return recipients;
+}
+
+function buildManageLinkSection(manageUrl: string): string {
+  return `
+    <div style="margin: 28px 0; background: #fff8f7; border: 2px solid #E74F3E; border-radius: 6px; overflow: hidden;">
+      <div style="background: #E74F3E; padding: 14px 24px;">
+        <p style="margin: 0; font-size: 15px; font-weight: 700; color: #fff; letter-spacing: -0.01em;">
+          Manage Your Attendee Details Online
+        </p>
+      </div>
+      <div style="padding: 20px 24px;">
+        <p style="margin: 0 0 12px; font-size: 14px; color: #444; line-height: 1.6;">
+          Your booking comes with a secure self-service link that lets you fill in or update attendee details at any time — <strong>no login or account needed</strong>. Use it to:
+        </p>
+        <ul style="margin: 0 0 16px; padding-left: 20px; font-size: 14px; color: #444; line-height: 2;">
+          <li>Fill in details for any placeholder (TBC) attendee seats</li>
+          <li>Update names, job titles, companies, and email addresses</li>
+          <li>Add dietary or accessibility requirements</li>
+          <li>Forward the link to colleagues so they can enter their own details directly</li>
+        </ul>
+        <p style="text-align: center; margin: 20px 0 16px;">
+          <a href="${manageUrl}" style="display: inline-block; background: #E74F3E; color: #fff; padding: 13px 32px; border-radius: 300px; text-decoration: none; font-weight: 700; font-size: 15px;">
+            Manage Attendees →
+          </a>
+        </p>
+        <p style="margin: 0 0 6px; font-size: 13px; color: #888; text-align: center;">Or copy this link:</p>
+        <p style="margin: 0; text-align: center;">
+          <a href="${manageUrl}" style="font-size: 12px; color: #E74F3E; word-break: break-all; font-family: monospace;">${manageUrl}</a>
+        </p>
+        <p style="margin: 14px 0 0; font-size: 12px; color: #aaa; text-align: center;">
+          Keep this link safe — anyone with it can view and update attendee details for your booking.
+        </p>
+      </div>
+    </div>`;
+}
+
 export async function sendWelcomeEmail(
   bookingId: number | null,
   firstName: string,
@@ -818,12 +834,21 @@ export async function sendWelcomeEmail(
     }
 
     const settings = await getEventSettings();
+    const appBaseUrl = process.env.APP_BASE_URL || "https://hranalyticssummit.com/register";
+
+    let manageLinkSection = "";
+    if (bookingId) {
+      const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
+      if (booking?.managementToken) {
+        manageLinkSection = buildManageLinkSection(`${appBaseUrl}/manage/${booking.managementToken}`);
+      }
+    }
 
     const personalised = template.htmlBody
       .replace(/\{\{firstName\}\}/g, firstName)
       .replace(/\{\{name\}\}/g, firstName);
 
-    const html = wrapInBrandedLayout(personalised, settings);
+    const html = wrapInBrandedLayout(personalised + manageLinkSection, settings);
 
     const sent = await sendMail({
       to: toEmail,
@@ -842,6 +867,110 @@ export async function sendWelcomeEmail(
     );
   } catch (err) {
     logger.error({ err }, "Failed to send welcome email");
+  }
+}
+
+export async function sendAttendeeChangeNotification(
+  bookingId: number,
+  attendeeId: number,
+  updatedData: { firstName: string; lastName: string; jobTitle?: string; company?: string; workEmail: string }
+): Promise<void> {
+  try {
+    const recipients = await getOrganiserEmails();
+    if (recipients.length === 0) {
+      logger.info({ bookingId, attendeeId }, "No notification recipients — skipping attendee change notification");
+      return;
+    }
+
+    const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
+    if (!booking) return;
+
+    const settings = await getEventSettings();
+    const orderRef = booking.orderReference || `HRAS26-${6541 + bookingId}`;
+    const changedAt = new Date().toLocaleString("en-GB", {
+      timeZone: "Europe/London",
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZoneName: "short",
+    });
+
+    const subject = `Attendee Details Updated — ${orderRef} — ${updatedData.firstName} ${updatedData.lastName}`;
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Helvetica Neue',Arial,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
+          <tr>
+            <td style="background:#1e293b;padding:32px 32px 24px;border-radius:4px 4px 0 0">
+              <h1 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#f8fafc;letter-spacing:-0.02em">
+                Attendee Details Updated
+              </h1>
+              <p style="margin:0;font-size:14px;color:#64748b">
+                HR Analytics Summit &mdash; Self-Service Change Notification
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background:#166534;padding:12px 32px">
+              <p style="margin:0;font-size:14px;color:#dcfce7">
+                An attendee updated their details via the self-service management link at <strong style="color:#bbf7d0">${changedAt}</strong>.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background:#1e293b;padding:0">
+              <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
+                ${[
+                  ["Order Reference", orderRef],
+                  ["Attendee ID", String(attendeeId)],
+                  ["First Name", updatedData.firstName],
+                  ["Last Name", updatedData.lastName],
+                  ["Job Title", updatedData.jobTitle || "—"],
+                  ["Company", updatedData.company || "—"],
+                  ["Work Email", updatedData.workEmail],
+                  ["Changed At", changedAt],
+                ].map(([label, value], i) => `
+                  <tr style="background:${i % 2 === 0 ? "#1e293b" : "#263548"}">
+                    <td style="padding:11px 16px;font-weight:bold;color:#94a3b8;font-size:13px;width:160px;border-bottom:1px solid #334155">${label}</td>
+                    <td style="padding:11px 16px;color:#f1f5f9;font-size:13px;border-bottom:1px solid #334155">${value}</td>
+                  </tr>`).join("")}
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="background:#0f172a;padding:20px 32px;border-top:1px solid #1e293b;border-radius:0 0 4px 4px">
+              <p style="margin:0;font-size:12px;color:#475569">
+                HR Analytics Summit &bull; ${settings.orgName} &bull; Internal organiser notification
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    let sentCount = 0;
+    for (const to of recipients) {
+      try {
+        await sendMail({ to, subject, html });
+        sentCount++;
+      } catch (err) {
+        logger.error({ err, bookingId, attendeeId, to }, "Failed to send attendee change notification");
+      }
+    }
+    logger.info({ bookingId, attendeeId, sentCount }, "Attendee change notifications sent");
+  } catch (err) {
+    logger.error({ err }, "Failed to send attendee change notification");
   }
 }
 
