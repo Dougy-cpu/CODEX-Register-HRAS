@@ -195,7 +195,9 @@ function UpsellNudge({ tiers, passType, quantity, pricePerUnit, unitLabel }: Ups
 
   const currentTier = getActiveTier(tiers, passType, quantity);
   const currentDiscountPct = currentTier?.discountPercent ?? 0;
-  const uplift = Math.round(quantity * pricePerUnit * (nextTier.discountPercent - currentDiscountPct) / 100);
+  const uplift = Math.round(
+    nextTier.minQuantity * pricePerUnit * (nextTier.discountPercent - currentDiscountPct) / 100
+  );
 
   return (
     <motion.div
