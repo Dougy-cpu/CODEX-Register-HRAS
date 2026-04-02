@@ -73,7 +73,7 @@ const TEMPLATE_LABELS: Record<TemplateType, string> = {
 const TEMPLATE_VARIABLES: Record<TemplateType, string[]> = {
   welcome: ["{{firstName}}", "{{name}}"],
   confirmation: ["{{firstName}}", "{{orderReference}}", "{{passType}}", "{{quantity}}", "{{total}}"],
-  invoice_reminder: ["{{firstName}}", "{{recipientName}}", "{{orderReference}}", "{{dueDate}}"],
+  invoice_reminder: ["{{firstName}}", "{{recipientName}}", "{{orderReference}}", "{{dueDate}}", "{{payOnlineButton}}"],
 };
 
 const TEMPLATE_DESCRIPTIONS: Record<TemplateType, string> = {

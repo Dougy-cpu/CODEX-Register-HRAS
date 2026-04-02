@@ -108,7 +108,7 @@ router.get("/email-templates/:type", async (req, res): Promise<void> => {
       },
       invoice_reminder: {
         subject: "Invoice Reminder — {{orderReference}} — HR Analytics Summit 2026",
-        htmlBody: "<p>Dear {{recipientName}},</p><p>This is a friendly reminder that invoice <strong>{{orderReference}}</strong> for your registration to the <strong>HR Analytics Summit 2026</strong> is due on <strong>{{dueDate}}</strong>.</p><p>Please arrange payment at your earliest convenience using the bank transfer details below, or click the button in this email to pay online. A copy of the invoice PDF is attached for your reference.</p><p>If you have already arranged payment, please disregard this email. For any queries, please contact <a href=\"mailto:douglas@dynamicbusinessleaders.co.uk\">douglas@dynamicbusinessleaders.co.uk</a>.</p>",
+        htmlBody: "<p>Dear {{recipientName}},</p><p>This is a friendly reminder that invoice <strong>{{orderReference}}</strong> for your registration to the <strong>HR Analytics Summit 2026</strong> is due on <strong>{{dueDate}}</strong>.</p><p>Please arrange payment at your earliest convenience using the bank transfer details below. A copy of the invoice PDF is attached for your reference.</p>{{payOnlineButton}}<p>If you have already arranged payment, please disregard this email. For any queries, please contact <a href=\"mailto:douglas@dynamicbusinessleaders.co.uk\">douglas@dynamicbusinessleaders.co.uk</a>.</p>",
       },
     };
     const def = defaults[type];
@@ -192,6 +192,8 @@ router.post("/email-templates/:type/test-send", adminAuth, async (req, res): Pro
       "{{recipientName}}": toName || "Test User",
       "{{orderReference}}": "HRAS26-TEST-001",
       "{{dueDate}}": "30 April 2026",
+      "{{payOnlineButton}}": `<p style="margin:24px 0;text-align:center;"><a href="#" style="display:inline-block;background:#E74F3E;color:#fff;padding:14px 32px;text-decoration:none;font-weight:bold;font-size:15px;border-radius:4px;">Pay Invoice Online →</a></p>`,
+      "{{payOnlineUrl}}": "#",
     } : {
       "{{firstName}}": toName || "Test User",
       "{{name}}": toName || "Test User",

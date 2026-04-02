@@ -6,7 +6,6 @@ import { z } from "zod";
 import { 
   useUpdateBooking, 
   useCalculatePricing, 
-  useValidatePromoCode,
   useCreateStripeCheckoutSession,
   useCreateStripeInvoice
 } from "@workspace/api-client-react";
@@ -27,6 +26,7 @@ const invoiceSchema = z.object({
   billingRegion: z.string().optional(),
   billingPostcode: z.string().min(1, "Postcode is required"),
   billingCountry: z.string().min(1, "Country is required"),
+  billingVatNumber: z.string().optional(),
 });
 
 interface Step4PaymentProps {
@@ -36,13 +36,10 @@ interface Step4PaymentProps {
 export default function Step4Payment({ booking }: Step4PaymentProps) {
   const queryClient = useQueryClient();
   const updateBooking = useUpdateBooking();
-  const validatePromoCode = useValidatePromoCode();
   const createStripeSession = useCreateStripeCheckoutSession();
   const createInvoice = useCreateStripeInvoice();
 
   const [paymentMethod, setPaymentMethod] = useState<"card" | "invoice">("card");
-  const [promoCode, setPromoCode] = useState(booking.promoCode || "");
-  const [promoError, setPromoError] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
@@ -53,36 +50,12 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
       data: {
         passType: booking.passType,
         quantity: booking.quantity,
-        promoCode: promoCode || undefined,
+        promoCode: booking.promoCode || undefined,
       }
     });
-  }, [booking.passType, booking.quantity, promoCode]);
+  }, [booking.passType, booking.quantity]);
 
   const currentPricing = calculatePricingMutation.data;
-
-  const handleApplyPromo = async () => {
-    if (!promoCode) return;
-    try {
-      const result = await validatePromoCode.mutateAsync({
-        data: {
-          code: promoCode,
-          passType: booking.passType as "single" | "team" | "business",
-          quantity: booking.quantity
-        }
-      });
-      if (!result.valid) {
-        setPromoError(result.message || "Invalid promo code");
-      } else {
-        setPromoError("");
-        await updateBooking.mutateAsync({
-          id: booking.id,
-          data: { promoCode }
-        });
-      }
-    } catch {
-      setPromoError("Invalid promo code");
-    }
-  };
 
   const form = useForm<z.infer<typeof invoiceSchema>>({
     resolver: zodResolver(invoiceSchema),
@@ -96,6 +69,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
       billingRegion: booking.billingRegion || "",
       billingPostcode: booking.billingPostcode || "",
       billingCountry: booking.billingCountry || "United Kingdom",
+      billingVatNumber: booking.billingVatNumber || "",
     }
   });
 
@@ -117,6 +91,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
             billingRegion: data.billingRegion || null,
             billingPostcode: data.billingPostcode,
             billingCountry: data.billingCountry,
+            billingVatNumber: data.billingVatNumber || null,
           } : {})
         }
       });
@@ -306,6 +281,19 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                     )}
                   />
                 </div>
+                <FormField
+                  control={form.control}
+                  name="billingVatNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>VAT Number <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="e.g. GB123456789" className="h-12 bg-white" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </form>
             </Form>
           </div>
@@ -382,19 +370,6 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
           )}
         </div>
 
-        <div className="bg-white p-6 border border-border">
-          <h4 className="font-bold mb-3">Promo Code</h4>
-          <div className="flex gap-2">
-            <Input 
-              value={promoCode} 
-              onChange={(e) => setPromoCode(e.target.value)} 
-              placeholder="Enter code" 
-              className="bg-white rounded-none"
-            />
-            <Button variant="secondary" onClick={handleApplyPromo} className="rounded-[300px]">Apply</Button>
-          </div>
-          {promoError && <p className="text-sm text-destructive mt-2">{promoError}</p>}
-        </div>
       </div>
     </div>
   );

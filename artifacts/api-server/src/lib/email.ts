@@ -598,6 +598,7 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
         }
         return (booking.billingAddress || "—").replace(/\n/g, "<br>");
       })()}</td></tr>
+      ${booking.billingVatNumber ? `<tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">VAT Number</td><td style="border-bottom:1px solid #f0f0f0">${booking.billingVatNumber}</td></tr>` : ""}
     </table>
     ` : ""}
 
@@ -1033,12 +1034,20 @@ export async function sendInvoiceReminder(bookingId: number): Promise<void> {
 
   // Load editable template (intro body + subject) from DB, falling back to defaults
   const [storedTemplate] = await db.select().from(emailTemplatesTable).where(eq(emailTemplatesTable.type, "invoice_reminder"));
+  const payOnlineButton = booking.stripeInvoicePaymentUrl
+    ? `<p style="margin:24px 0;text-align:center;"><a href="${booking.stripeInvoicePaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:14px 32px;text-decoration:none;font-weight:bold;font-size:15px;border-radius:4px;">Pay Invoice Online →</a></p>`
+    : "";
+
   const templateVars: Record<string, string> = {
     "{{firstName}}": lead.firstName || recipientName,
     "{{recipientName}}": recipientName,
     "{{orderReference}}": orderRef,
     "{{dueDate}}": dueDateStr,
+    "{{payOnlineButton}}": payOnlineButton,
+    "{{payOnlineUrl}}": booking.stripeInvoicePaymentUrl || "",
   };
+  const templateHasPayButton = !!storedTemplate?.htmlBody.includes("{{payOnlineButton}}");
+
   let introHtml: string;
   if (storedTemplate) {
     introHtml = storedTemplate.htmlBody;
@@ -1086,11 +1095,7 @@ export async function sendInvoiceReminder(bookingId: number): Promise<void> {
       </table>
     </div>
 
-    ${booking.stripeInvoicePaymentUrl ? `
-    <p style="margin:24px 0;text-align:center;">
-      <a href="${booking.stripeInvoicePaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:14px 32px;text-decoration:none;font-weight:bold;font-size:15px;border-radius:4px;">Pay Invoice Online →</a>
-    </p>
-    ` : ""}
+    ${!templateHasPayButton ? payOnlineButton : ""}
 
     <div class="info-box" style="margin-bottom:24px;">
       <strong>Bank Transfer Details</strong><br><br>
