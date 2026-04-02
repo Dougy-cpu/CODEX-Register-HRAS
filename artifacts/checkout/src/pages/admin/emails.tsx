@@ -82,6 +82,12 @@ const TEMPLATE_DESCRIPTIONS: Record<TemplateType, string> = {
   invoice_reminder: "Sent manually from the Registrations panel when clicking 'Send Reminder' on an invoiced booking. The order summary table, payment button, and bank transfer details are automatically appended — edit only the intro message here. The subject supports {{orderReference}}.",
 };
 
+const TEMPLATE_ATTACHMENTS: Record<TemplateType, string[]> = {
+  welcome: [],
+  confirmation: ["PDF VAT receipt (covers all attendees on the booking)"],
+  invoice_reminder: ["Invoice PDF (itemised, with bank transfer and company details)"],
+};
+
 function TemplateEditor({ type, settings }: { type: TemplateType; settings: EventSettingsData | null }) {
   const { toast } = useToast();
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -223,9 +229,24 @@ function TemplateEditor({ type, settings }: { type: TemplateType; settings: Even
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 border border-border shadow-sm space-y-6">
-        <div>
-          <h3 className="text-lg font-bold mb-1">{TEMPLATE_LABELS[type]}</h3>
-          <p className="text-sm text-muted-foreground">{TEMPLATE_DESCRIPTIONS[type]}</p>
+        <div className="space-y-3">
+          <div>
+            <h3 className="text-lg font-bold mb-1">{TEMPLATE_LABELS[type]}</h3>
+            <p className="text-sm text-muted-foreground">{TEMPLATE_DESCRIPTIONS[type]}</p>
+          </div>
+          {TEMPLATE_ATTACHMENTS[type].length > 0 && (
+            <div className="flex items-start gap-2 text-sm bg-amber-50 border border-amber-200 rounded px-3 py-2">
+              <span className="text-amber-600 mt-0.5">📎</span>
+              <div>
+                <span className="font-semibold text-amber-800">Attachments sent with this email:</span>
+                <ul className="mt-0.5 space-y-0.5 text-amber-700 list-disc list-inside">
+                  {TEMPLATE_ATTACHMENTS[type].map(a => (
+                    <li key={a}>{a}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="space-y-4">
