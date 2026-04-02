@@ -93,7 +93,7 @@ function buildHRTierRows(tiers: DiscountTier[], qty: number, pricePerTicket: num
     const tier = relevant[i];
     const nextTier = relevant[i + 1];
     const maxQty = nextTier ? nextTier.minQuantity - 1 : null;
-    const savingPerTicket = Math.round(pricePerTicket * tier.discountPercent / 100);
+    const savingPerTicket = (pricePerTicket * tier.discountPercent / 100).toFixed(2);
     const rangeLabel = maxQty
       ? `${tier.minQuantity}–${maxQty} tickets`
       : `${tier.minQuantity}+ tickets`;
@@ -136,7 +136,7 @@ function buildBusinessTierRows(tiers: DiscountTier[], qty: number, pricePerPass:
     const tier = relevant[i];
     const nextTier = relevant[i + 1];
     const maxQty = nextTier ? nextTier.minQuantity - 1 : null;
-    const savingPerPass = Math.round(pricePerPass * tier.discountPercent / 100);
+    const savingPerPass = (pricePerPass * tier.discountPercent / 100).toFixed(2);
     const rangeLabel = maxQty
       ? `${tier.minQuantity}–${maxQty} pass${maxQty > 1 ? "es" : ""}`
       : `${tier.minQuantity}+ passes`;
@@ -195,9 +195,8 @@ function UpsellNudge({ tiers, passType, quantity, pricePerUnit, unitLabel }: Ups
 
   const currentTier = getActiveTier(tiers, passType, quantity);
   const currentDiscountPct = currentTier?.discountPercent ?? 0;
-  const uplift = Math.round(
-    nextTier.minQuantity * pricePerUnit * (nextTier.discountPercent - currentDiscountPct) / 100
-  );
+  const upliftValue = nextTier.minQuantity * pricePerUnit * (nextTier.discountPercent - currentDiscountPct) / 100;
+  const uplift = upliftValue.toFixed(2);
 
   return (
     <motion.div
@@ -210,7 +209,7 @@ function UpsellNudge({ tiers, passType, quantity, pricePerUnit, unitLabel }: Ups
       <span>
         <span className="font-bold">Add {needed} more {unitLabel}{needed > 1 ? "s" : ""}</span> to unlock{" "}
         <span className="font-bold">{nextTier.discountPercent}% off</span>
-        {uplift > 0 && (
+        {upliftValue > 0 && (
           <span> — save an extra <span className="font-bold">£{uplift}</span> on your order</span>
         )}
         !
