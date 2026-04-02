@@ -148,7 +148,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                 <RadioGroupItem value="invoice" />
                 <span className="font-bold text-xl">Pay by Invoice</span>
               </div>
-              <p className="ml-7 mt-2 text-muted-foreground">We'll email you an invoice to pay via bank transfer within 14 days.</p>
+              <p className="ml-7 mt-2 text-muted-foreground">We'll email you an invoice to pay by card or bank transfer within 14 days.</p>
             </div>
           </RadioGroup>
         </div>
