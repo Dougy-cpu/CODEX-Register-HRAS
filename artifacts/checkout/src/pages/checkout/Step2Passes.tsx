@@ -536,7 +536,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
               {currentPricing.savedAmount > 0 && (
                 <div className="flex justify-between text-sm font-semibold text-primary bg-primary/10 rounded-sm px-3 py-2 -mx-1 mt-1">
                   <span>You're saving</span>
-                  <span>£{(currentPricing.savedAmount * 1.2).toFixed(2)}</span>
+                  <span>£{(currentPricing.savedAmount * (1 + currentPricing.vatRate)).toFixed(2)}</span>
                 </div>
               )}
             </div>
