@@ -153,6 +153,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
       }
     } catch (e: any) {
       console.error(e);
+      isSubmittingPaymentRef.current = false;
       const message = e?.data?.error || e?.message || "Something went wrong. Please try again or contact us.";
       setPaymentError(message);
       setIsProcessing(false);
