@@ -51,6 +51,7 @@ export const bookingsTable = pgTable("bookings", {
   billingRegion: text("billing_region"),
   billingPostcode: text("billing_postcode"),
   billingCountry: text("billing_country"),
+  billingPhone: text("billing_phone"),
   billingVatNumber: text("billing_vat_number"),
   invoiceDueDate: timestamp("invoice_due_date", { withTimezone: true }),
   partialNotificationSent: boolean("partial_notification_sent").notNull().default(false),

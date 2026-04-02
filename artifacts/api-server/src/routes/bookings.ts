@@ -189,6 +189,7 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
     billingRegion,
     billingPostcode,
     billingCountry,
+    billingPhone,
     billingVatNumber,
     // status is admin/webhook-only — excluded from public PATCH body
     status,
@@ -226,6 +227,7 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
   if (billingRegion !== undefined) updateData.billingRegion = billingRegion;
   if (billingPostcode !== undefined) updateData.billingPostcode = billingPostcode;
   if (billingCountry !== undefined) updateData.billingCountry = billingCountry;
+  if (billingPhone !== undefined) updateData.billingPhone = billingPhone || null;
   if (billingVatNumber !== undefined) updateData.billingVatNumber = billingVatNumber || null;
 
   // Only admin requests may mutate status
@@ -242,27 +244,34 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
     .where(eq(bookingsTable.id, id))
     .returning();
 
-  // Fire incomplete-registration notification when the user first arrives at the payment
-  // screen (Step 4). Atomic: claim the flag with a conditional UPDATE first, then send
-  // the email only when the claim succeeds. This prevents duplicate emails.
-  if (currentStep === 4 && updated.status === "partial" && !existing.partialNotificationSent) {
-    try {
-      const claimed = await db
-        .update(bookingsTable)
-        .set({ partialNotificationSent: true })
-        .where(and(eq(bookingsTable.id, id), eq(bookingsTable.partialNotificationSent, false)))
-        .returning({ id: bookingsTable.id });
-
-      if (claimed.length > 0) {
-        await sendIncompleteFormNotification(id);
-      }
-    } catch (err) {
-      // Non-fatal — log but don't affect the response
-      logger.error({ err, bookingId: id }, "Failed to send incomplete form notification");
-    }
-  }
-
   res.json(formatBooking(updated));
+});
+
+// Fire-and-forget endpoint called by the frontend via sendBeacon or setTimeout when the
+// user leaves Step 4 without completing payment. Uses the same atomic partialNotificationSent
+// flag to guarantee the notification is sent at most once.
+router.post("/bookings/:id/incomplete-ping", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+
+  res.status(202).json({ ok: true }); // Respond immediately — processing continues async
+
+  try {
+    const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, id));
+    if (!booking || booking.status !== "partial" || booking.partialNotificationSent) return;
+
+    const claimed = await db
+      .update(bookingsTable)
+      .set({ partialNotificationSent: true })
+      .where(and(eq(bookingsTable.id, id), eq(bookingsTable.partialNotificationSent, false)))
+      .returning({ id: bookingsTable.id });
+
+    if (claimed.length > 0) {
+      await sendIncompleteFormNotification(id);
+    }
+  } catch (err) {
+    logger.error({ err, bookingId: id }, "Failed to process incomplete-ping");
+  }
 });
 
 router.get("/bookings/:id/pricing", async (req, res): Promise<void> => {

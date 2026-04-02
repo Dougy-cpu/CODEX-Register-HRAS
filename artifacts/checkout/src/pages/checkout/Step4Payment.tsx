@@ -26,6 +26,7 @@ const invoiceSchema = z.object({
   billingRegion: z.string().optional(),
   billingPostcode: z.string().min(1, "Postcode is required"),
   billingCountry: z.string().min(1, "Country is required"),
+  billingPhone: z.string().min(1, "Contact number is required"),
   billingVatNumber: z.string().optional(),
 });
 
@@ -55,6 +56,31 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
     });
   }, [booking.passType, booking.quantity]);
 
+  // Abandonment detection: fire incomplete-ping when the user leaves without paying.
+  // Two triggers: (1) beforeunload via sendBeacon for tab close / navigation away,
+  // (2) a 20-minute setTimeout as a fallback for users who stay but then leave.
+  // Both are no-ops if the booking has already been paid/invoiced.
+  useEffect(() => {
+    if (booking.status !== "partial") return;
+
+    const pingUrl = `/api/bookings/${booking.id}/incomplete-ping`;
+
+    const handleBeforeUnload = () => {
+      navigator.sendBeacon(pingUrl, "");
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    const timer = setTimeout(() => {
+      void fetch(pingUrl, { method: "POST" });
+    }, 20 * 60 * 1000);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      clearTimeout(timer);
+    };
+  }, [booking.id, booking.status]);
+
   const currentPricing = calculatePricingMutation.data;
 
   const form = useForm<z.infer<typeof invoiceSchema>>({
@@ -69,6 +95,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
       billingRegion: booking.billingRegion || "",
       billingPostcode: booking.billingPostcode || "",
       billingCountry: booking.billingCountry || "United Kingdom",
+      billingPhone: (booking as any).billingPhone || "",
       billingVatNumber: booking.billingVatNumber || "",
     }
   });
@@ -91,6 +118,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
             billingRegion: data.billingRegion || null,
             billingPostcode: data.billingPostcode,
             billingCountry: data.billingCountry,
+            billingPhone: data.billingPhone,
             billingVatNumber: data.billingVatNumber || null,
           } : {})
         }
@@ -194,6 +222,19 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                       <FormLabel>Invoice Email Address *</FormLabel>
                       <FormControl>
                         <Input type="email" {...field} className="h-12 bg-white" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="billingPhone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Purchaser Contact Number *</FormLabel>
+                      <FormControl>
+                        <Input type="tel" {...field} className="h-12 bg-white" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

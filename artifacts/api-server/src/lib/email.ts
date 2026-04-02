@@ -272,6 +272,7 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
       <td style="padding: 8px 4px; border-bottom: 1px solid #eee;">${a.jobTitle}</td>
       <td style="padding: 8px 4px; border-bottom: 1px solid #eee;">${a.company}</td>
       <td style="padding: 8px 4px; border-bottom: 1px solid #eee;">${a.workEmail}</td>
+      <td style="padding: 8px 4px; border-bottom: 1px solid #eee;">${a.phone || "—"}</td>
     </tr>`
     )
     .join("");
@@ -296,6 +297,7 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
           <th style="padding: 8px 4px; text-align: left;">Job Title</th>
           <th style="padding: 8px 4px; text-align: left;">Company</th>
           <th style="padding: 8px 4px; text-align: left;">Email</th>
+          <th style="padding: 8px 4px; text-align: left;">Phone</th>
         </tr>
       </thead>
       <tbody>${attendeeRows}</tbody>
@@ -376,6 +378,12 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
   }
 
   await sendWelcomeEmail(bookingId, lead.firstName, lead.workEmail);
+
+  // Send welcome email to every other confirmed (non-TBC) attendee
+  const additionalAttendees = attendees.filter((a) => !a.isLead && !a.isTbc);
+  for (const attendee of additionalAttendees) {
+    await sendWelcomeEmail(bookingId, attendee.firstName, attendee.workEmail);
+  }
 }
 
 export async function resendConfirmationAndReceipt(bookingId: number): Promise<void> {
@@ -426,6 +434,7 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
       <td style="padding: 8px 4px; border-bottom: 1px solid #eee;">${a.jobTitle}</td>
       <td style="padding: 8px 4px; border-bottom: 1px solid #eee;">${a.company}</td>
       <td style="padding: 8px 4px; border-bottom: 1px solid #eee;">${a.workEmail}</td>
+      <td style="padding: 8px 4px; border-bottom: 1px solid #eee;">${a.phone || "—"}</td>
     </tr>`
     )
     .join("");
@@ -447,6 +456,7 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
         <th style="padding: 8px 4px; text-align: left;">Job Title</th>
         <th style="padding: 8px 4px; text-align: left;">Company</th>
         <th style="padding: 8px 4px; text-align: left;">Email</th>
+        <th style="padding: 8px 4px; text-align: left;">Phone</th>
       </tr></thead>
       <tbody>${attendeeRows}</tbody>
     </table>
@@ -555,6 +565,7 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
     <tr style="background:${i % 2 === 0 ? "#f9f9f9" : "#fff"}">
       <td style="padding:8px 10px;border:1px solid #e5e5e5">${a.firstName} ${a.lastName}${a.isLead ? ' <span style="font-size:11px;color:#E74F3E;font-weight:bold">(Buyer)</span>' : ""}</td>
       <td style="padding:8px 10px;border:1px solid #e5e5e5">${a.workEmail}</td>
+      <td style="padding:8px 10px;border:1px solid #e5e5e5">${a.phone || "—"}</td>
       <td style="padding:8px 10px;border:1px solid #e5e5e5">${a.jobTitle || "—"}</td>
       <td style="padding:8px 10px;border:1px solid #e5e5e5">${a.company || "—"}</td>
     </tr>
@@ -598,6 +609,7 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
         }
         return (booking.billingAddress || "—").replace(/\n/g, "<br>");
       })()}</td></tr>
+      ${(booking as any).billingPhone ? `<tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Contact Phone</td><td style="border-bottom:1px solid #f0f0f0">${(booking as any).billingPhone}</td></tr>` : ""}
       ${booking.billingVatNumber ? `<tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">VAT Number</td><td style="border-bottom:1px solid #f0f0f0">${booking.billingVatNumber}</td></tr>` : ""}
     </table>
     ` : ""}
@@ -608,12 +620,13 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
         <tr style="background:#1e293b;color:#fff">
           <th style="padding:9px 10px;text-align:left;border:1px solid #1e293b">Name</th>
           <th style="padding:9px 10px;text-align:left;border:1px solid #1e293b">Work Email</th>
+          <th style="padding:9px 10px;text-align:left;border:1px solid #1e293b">Phone</th>
           <th style="padding:9px 10px;text-align:left;border:1px solid #1e293b">Job Title</th>
           <th style="padding:9px 10px;text-align:left;border:1px solid #1e293b">Company</th>
         </tr>
       </thead>
       <tbody>
-        ${attendeeRows || '<tr><td colspan="4" style="padding:10px;border:1px solid #e5e5e5;color:#888">No attendee details recorded yet</td></tr>'}
+        ${attendeeRows || '<tr><td colspan="5" style="padding:10px;border:1px solid #e5e5e5;color:#888">No attendee details recorded yet</td></tr>'}
       </tbody>
     </table>
   `);

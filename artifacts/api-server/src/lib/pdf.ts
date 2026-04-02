@@ -22,6 +22,7 @@ interface BookingForPdf {
   billingRegion?: string | null;
   billingPostcode?: string | null;
   billingCountry?: string | null;
+  billingPhone?: string | null;
   billingVatNumber?: string | null;
   createdAt: Date;
 }
@@ -131,6 +132,9 @@ export function generatePdfReceipt(
       if (booking.billingCountry) doc.text(booking.billingCountry);
     } else if (booking.billingAddress) {
       doc.text(booking.billingAddress);
+    }
+    if (booking.billingPhone) {
+      doc.text(`Tel: ${booking.billingPhone}`);
     }
     if (booking.billingVatNumber) {
       doc.text(`VAT No: ${booking.billingVatNumber}`);
