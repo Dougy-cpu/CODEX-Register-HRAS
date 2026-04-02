@@ -267,8 +267,10 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
   const discountLabel = activeTier ? `${activeTier.discountPercent}% off` : null;
   const isMostPopular = isHR && quantity === 3 && !activeTier;
 
-  const hrTierRows = buildHRTierRows(allTiers, quantity, 199);
-  const businessTierRows = buildBusinessTierRows(allTiers, quantity, 599);
+  const hrUnitPrice = currentPricing?.pricePerHead ?? 199;
+  const businessUnitPrice = currentPricing?.pricePerHead ?? 599;
+  const hrTierRows = buildHRTierRows(allTiers, quantity, hrUnitPrice);
+  const businessTierRows = buildBusinessTierRows(allTiers, quantity, businessUnitPrice);
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -356,7 +358,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                 tiers={allTiers}
                 passType="single"
                 quantity={quantity}
-                pricePerUnit={199}
+                pricePerUnit={hrUnitPrice}
                 unitLabel="ticket"
               />
 
@@ -451,7 +453,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                 tiers={allTiers}
                 passType="business"
                 quantity={quantity}
-                pricePerUnit={599}
+                pricePerUnit={businessUnitPrice}
                 unitLabel="pass"
               />
 
