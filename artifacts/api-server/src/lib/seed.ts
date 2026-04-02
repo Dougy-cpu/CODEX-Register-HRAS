@@ -3,6 +3,41 @@ import { emailTemplatesTable, discountTiersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 
+const DEFAULT_CONFIRMATION_SUBJECT = "Booking Confirmed — {{orderReference}} — HR Analytics Summit 2026";
+
+const DEFAULT_CONFIRMATION_BODY = `
+<h2>Booking Confirmed!</h2>
+<p>Dear {{firstName}},</p>
+<p>Thank you for registering for the <strong>HR Analytics Summit 2026</strong>. Your booking is confirmed.</p>
+
+<div class="info-box">
+  <strong>Order Reference:</strong> {{orderReference}}<br>
+  <strong>Pass Type:</strong> {{passLabel}}<br>
+  <strong>Quantity:</strong> {{quantity}} {{quantityLabel}}
+</div>
+
+<h3>Registered Attendees</h3>
+{{attendeesTable}}
+
+<h3>Price Summary</h3>
+{{priceSummary}}
+
+<div class="info-box" style="margin-top: 24px;">
+  <strong>Event Details</strong><br>
+  <strong>Date:</strong> {{eventDate}}<br>
+  <strong>Venue:</strong> {{eventVenue}}, {{eventVenuePostcode}}
+</div>
+
+<h3 style="margin-top: 28px; margin-bottom: 12px; color: #000;">Update Attendee Details Anytime</h3>
+<p style="margin: 0 0 16px; color: #444; line-height: 1.6;">You have a secure self-service link to manage all your attendee information. You can fill in placeholder seats, update existing details, add dietary requirements — all without logging in. Need to share registration with colleagues? Forward them the link to enter their own details.</p>
+
+{{managementLink}}
+
+<p>A PDF VAT receipt is attached to this email for your records.</p>
+{{invoicePaymentButton}}
+<p>We look forward to seeing you at the HR Analytics Summit!</p>
+`;
+
 const DEFAULT_WELCOME_SUBJECT = "Welcome to HR Analytics Summit 2026 — We Can't Wait to See You!";
 
 const DEFAULT_WELCOME_BODY = `
@@ -82,6 +117,30 @@ export async function seed() {
         })
         .where(eq(emailTemplatesTable.type, "welcome"));
       logger.info("Updated welcome email template");
+    }
+
+    // Seed/update confirmation email template
+    const existingConfirmation = await db
+      .select()
+      .from(emailTemplatesTable)
+      .where(eq(emailTemplatesTable.type, "confirmation"));
+
+    if (existingConfirmation.length === 0) {
+      await db.insert(emailTemplatesTable).values({
+        type: "confirmation",
+        subject: DEFAULT_CONFIRMATION_SUBJECT,
+        htmlBody: DEFAULT_CONFIRMATION_BODY,
+      });
+      logger.info("Seeded confirmation email template");
+    } else {
+      await db
+        .update(emailTemplatesTable)
+        .set({
+          subject: DEFAULT_CONFIRMATION_SUBJECT,
+          htmlBody: DEFAULT_CONFIRMATION_BODY,
+        })
+        .where(eq(emailTemplatesTable.type, "confirmation"));
+      logger.info("Updated confirmation email template");
     }
 
     const existingTiers = await db.select().from(discountTiersTable);
