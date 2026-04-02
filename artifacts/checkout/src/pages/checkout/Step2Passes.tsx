@@ -182,11 +182,10 @@ interface UpsellNudgeProps {
   tiers: DiscountTier[];
   passType: string;
   quantity: number;
-  pricePerUnit: number;
   unitLabel: string;
 }
 
-function UpsellNudge({ tiers, passType, quantity, pricePerUnit, unitLabel }: UpsellNudgeProps) {
+function UpsellNudge({ tiers, passType, quantity, unitLabel }: UpsellNudgeProps) {
   const nextTier = getNextTier(tiers, passType, quantity);
   if (!nextTier) return null;
 
@@ -195,7 +194,10 @@ function UpsellNudge({ tiers, passType, quantity, pricePerUnit, unitLabel }: Ups
 
   const currentTier = getActiveTier(tiers, passType, quantity);
   const currentDiscountPct = currentTier?.discountPercent ?? 0;
-  const upliftValue = nextTier.minQuantity * pricePerUnit * (nextTier.discountPercent - currentDiscountPct) / 100;
+  const basePrice = passType === "business" ? 599 : 199;
+  const upliftValue =
+    nextTier.minQuantity * basePrice * nextTier.discountPercent / 100 -
+    quantity * basePrice * currentDiscountPct / 100;
   const uplift = upliftValue.toFixed(2);
 
   return (
@@ -203,9 +205,9 @@ function UpsellNudge({ tiers, passType, quantity, pricePerUnit, unitLabel }: Ups
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
-      className="flex items-start gap-2 bg-amber-50 border border-amber-300 rounded-sm px-3 py-2.5 text-xs text-amber-900"
+      className="flex items-start gap-2 bg-accent/20 border border-accent rounded-sm px-3 py-2.5 text-xs text-foreground"
     >
-      <TrendingUp className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-600" />
+      <TrendingUp className="w-3.5 h-3.5 shrink-0 mt-0.5 text-foreground" />
       <span>
         <span className="font-bold">Add {needed} more {unitLabel}{needed > 1 ? "s" : ""}</span> to unlock{" "}
         <span className="font-bold">{nextTier.discountPercent}% off</span>
@@ -320,7 +322,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                 className={`w-full flex items-center justify-between gap-2 px-4 py-3 rounded-sm border-2 text-sm font-semibold transition-all ${
                   quantity === 3
                     ? "border-primary bg-primary text-white"
-                    : "border-primary/40 bg-primary/5 text-primary hover:border-primary hover:bg-primary/10"
+                    : "border-secondary/50 bg-secondary/10 text-secondary hover:border-secondary hover:bg-secondary/20"
                 }`}
               >
                 <span className="flex items-center gap-2">
@@ -357,7 +359,6 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                 tiers={allTiers}
                 passType="single"
                 quantity={quantity}
-                pricePerUnit={hrUnitPrice}
                 unitLabel="ticket"
               />
 
@@ -369,13 +370,13 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                     className={`flex justify-between px-2 py-1.5 rounded-sm transition-colors ${
                       active
                         ? isSpecial
-                          ? "bg-accent/60 text-foreground font-semibold"
+                          ? "bg-accent/40 border border-accent/60 text-foreground font-semibold"
                           : "bg-primary/10 border border-primary/20 text-foreground font-semibold"
                         : "text-muted-foreground"
                     }`}
                   >
                     <span>{label}</span>
-                    <span className={isSpecial && active ? "text-primary font-bold" : active && !isSpecial ? "text-primary" : ""}>
+                    <span className={isSpecial && active ? "text-secondary font-bold" : active && !isSpecial ? "text-primary" : ""}>
                       {note}
                     </span>
                   </div>
@@ -452,7 +453,6 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                 tiers={allTiers}
                 passType="business"
                 quantity={quantity}
-                pricePerUnit={businessUnitPrice}
                 unitLabel="pass"
               />
 
