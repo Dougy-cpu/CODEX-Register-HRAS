@@ -609,7 +609,7 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
         }
         return (booking.billingAddress || "—").replace(/\n/g, "<br>");
       })()}</td></tr>
-      ${(booking as any).billingPhone ? `<tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Contact Phone</td><td style="border-bottom:1px solid #f0f0f0">${(booking as any).billingPhone}</td></tr>` : ""}
+      ${booking.billingPhone ? `<tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Contact Phone</td><td style="border-bottom:1px solid #f0f0f0">${booking.billingPhone}</td></tr>` : ""}
       ${booking.billingVatNumber ? `<tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">VAT Number</td><td style="border-bottom:1px solid #f0f0f0">${booking.billingVatNumber}</td></tr>` : ""}
     </table>
     ` : ""}

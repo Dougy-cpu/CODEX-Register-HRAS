@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -43,6 +43,9 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
   const [paymentMethod, setPaymentMethod] = useState<"card" | "invoice">("card");
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  // Set to true just before intentional navigation (Stripe redirect / invoice success)
+  // so the beforeunload handler does NOT fire a false incomplete-ping.
+  const isSubmittingPaymentRef = useRef(false);
 
   const calculatePricingMutation = useCalculatePricing();
 
@@ -66,6 +69,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
     const pingUrl = `/api/bookings/${booking.id}/incomplete-ping`;
 
     const handleBeforeUnload = () => {
+      if (isSubmittingPaymentRef.current) return;
       navigator.sendBeacon(pingUrl, "");
     };
 
@@ -95,7 +99,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
       billingRegion: booking.billingRegion || "",
       billingPostcode: booking.billingPostcode || "",
       billingCountry: booking.billingCountry || "United Kingdom",
-      billingPhone: (booking as any).billingPhone || "",
+      billingPhone: booking.billingPhone || "",
       billingVatNumber: booking.billingVatNumber || "",
     }
   });
@@ -134,12 +138,14 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
           }
         });
         if (session?.url) {
+          isSubmittingPaymentRef.current = true;
           window.location.href = session.url;
         } else {
           setPaymentError("No redirect URL received from payment provider. Please try again or contact us.");
           setIsProcessing(false);
         }
       } else {
+        isSubmittingPaymentRef.current = true;
         await createInvoice.mutateAsync({
           data: { bookingId: booking.id }
         });

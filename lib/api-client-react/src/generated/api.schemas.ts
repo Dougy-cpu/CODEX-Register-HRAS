@@ -109,6 +109,8 @@ export interface Booking {
   /** @nullable */
   billingCountry?: string | null;
   /** @nullable */
+  billingPhone?: string | null;
+  /** @nullable */
   billingVatNumber?: string | null;
   /** @nullable */
   invoiceDueDate?: string | null;
@@ -235,6 +237,8 @@ export interface UpdateBookingBody {
   billingPostcode?: string | null;
   /** @nullable */
   billingCountry?: string | null;
+  /** @nullable */
+  billingPhone?: string | null;
   /** @nullable */
   billingVatNumber?: string | null;
   /** @nullable */
