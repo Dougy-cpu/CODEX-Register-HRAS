@@ -36,7 +36,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
     { href: "/admin/discount-tiers", label: "Discounts", icon: Percent },
     { href: "/admin/emails", label: "Emails", icon: Mail },
     { href: "/admin/notifications", label: "Notifications", icon: Bell },
-    { href: "/admin/passes", label: "Pass Availability", icon: Ticket },
+    { href: "/admin/passes", label: "Tickets", icon: Ticket },
   ];
 
   const handleLogout = () => {

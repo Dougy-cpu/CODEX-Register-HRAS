@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { calculatePricing } from "../lib/pricing";
 import { db } from "@workspace/db";
-import { passInventoryTable } from "@workspace/db";
+import { passInventoryTable, passConfigTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
@@ -22,6 +22,15 @@ router.get("/passes/inventory", async (_req, res): Promise<void> => {
   const result: Record<string, number | null> = { single: null, business: null };
   for (const row of rows) {
     result[row.passType] = row.remaining;
+  }
+  res.json(result);
+});
+
+router.get("/passes/config", async (_req, res): Promise<void> => {
+  const rows = await db.select().from(passConfigTable);
+  const result: Record<string, typeof rows[0] | null> = { single: null, business: null };
+  for (const row of rows) {
+    result[row.passType] = row;
   }
   res.json(result);
 });

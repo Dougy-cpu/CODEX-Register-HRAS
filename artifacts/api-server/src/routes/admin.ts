@@ -9,6 +9,7 @@ import {
   discountTiersTable,
   notificationEmailsTable,
   passInventoryTable,
+  passConfigTable,
 } from "@workspace/db";
 import { adminAuth, deriveAdminToken, getAdminPassword } from "../middleware/admin-auth";
 
@@ -583,6 +584,58 @@ router.delete("/admin/notification-emails/:id", adminAuth, async (req, res): Pro
   const id = parseInt(req.params["id"] as string, 10);
   await db.delete(notificationEmailsTable).where(eq(notificationEmailsTable.id, id));
   res.status(204).end();
+});
+
+router.get("/admin/passes/config", adminAuth, async (_req, res): Promise<void> => {
+  const rows = await db.select().from(passConfigTable);
+  const result: Record<string, typeof rows[0] | null> = { single: null, business: null };
+  for (const row of rows) {
+    result[row.passType] = row;
+  }
+  res.json(result);
+});
+
+router.put("/admin/passes/config/:passType", adminAuth, async (req, res): Promise<void> => {
+  const { passType } = req.params as { passType: string };
+  if (!["single", "business"].includes(passType)) {
+    res.status(400).json({ error: "Invalid pass type" });
+    return;
+  }
+  const { currentPrice, originalPrice, pricingPeriodName, benefits, extraBenefits } = req.body;
+
+  if (currentPrice !== undefined && (isNaN(parseFloat(currentPrice)) || parseFloat(currentPrice) < 0)) {
+    res.status(400).json({ error: "Invalid current price" });
+    return;
+  }
+  if (originalPrice !== undefined && (isNaN(parseFloat(originalPrice)) || parseFloat(originalPrice) < 0)) {
+    res.status(400).json({ error: "Invalid original price" });
+    return;
+  }
+
+  const updates: Partial<typeof passConfigTable.$inferInsert> = {};
+  if (currentPrice !== undefined) updates.currentPrice = parseFloat(currentPrice).toFixed(2);
+  if (originalPrice !== undefined) updates.originalPrice = parseFloat(originalPrice).toFixed(2);
+  if (pricingPeriodName !== undefined) updates.pricingPeriodName = String(pricingPeriodName).trim();
+  if (benefits !== undefined) updates.benefits = Array.isArray(benefits) ? benefits : [];
+  if (extraBenefits !== undefined) updates.extraBenefits = Array.isArray(extraBenefits) ? extraBenefits : [];
+
+  const [row] = await db
+    .insert(passConfigTable)
+    .values({
+      passType,
+      currentPrice: updates.currentPrice ?? "199",
+      originalPrice: updates.originalPrice ?? "429",
+      pricingPeriodName: updates.pricingPeriodName ?? "Early Bird",
+      benefits: updates.benefits ?? [],
+      extraBenefits: updates.extraBenefits ?? [],
+    })
+    .onConflictDoUpdate({
+      target: passConfigTable.passType,
+      set: updates,
+    })
+    .returning();
+
+  res.json(row);
 });
 
 export default router;

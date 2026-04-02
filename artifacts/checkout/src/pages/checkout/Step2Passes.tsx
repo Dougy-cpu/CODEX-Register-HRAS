@@ -11,7 +11,7 @@ interface Step2PassesProps {
   booking: BookingWithAttendees;
 }
 
-const SINGLE_BENEFITS = [
+const DEFAULT_SINGLE_BENEFITS = [
   "Conference Sessions",
   "Networking Sessions",
   "Happy Hour with Entertainment",
@@ -23,10 +23,19 @@ const SINGLE_BENEFITS = [
   "Post-Event Content",
 ];
 
-const BUSINESS_EXTRA_BENEFITS = [
+const DEFAULT_BUSINESS_EXTRA_BENEFITS = [
   "Exclusive Attendee Report",
   "Company Branding at the Summit",
 ];
+
+interface PassConfig {
+  passType: string;
+  currentPrice: string;
+  originalPrice: string;
+  pricingPeriodName: string;
+  benefits: string[];
+  extraBenefits: string[];
+}
 
 function getActiveTier(tiers: DiscountTier[], passType: string, qty: number): DiscountTier | null {
   const relevant = tiers
@@ -235,6 +244,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
   const [selectedPass] = useState<PricingRequestPassType>(resolveInitialPass);
   const [quantity, setQuantity] = useState<number>(() => booking.quantity || 1);
   const [inventory, setInventory] = useState<Record<string, number | null>>({ single: null, business: null });
+  const [passConfig, setPassConfig] = useState<Record<string, PassConfig | null>>({ single: null, business: null });
 
   const calculatePricingMutation = useCalculatePricing();
   const queryClient = useQueryClient();
@@ -245,6 +255,10 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
     fetch("/api/passes/inventory")
       .then(res => res.ok ? res.json() : {})
       .then(data => setInventory(data))
+      .catch(() => {});
+    fetch("/api/passes/config")
+      .then(res => res.ok ? res.json() : {})
+      .then(data => setPassConfig(data))
       .catch(() => {});
   }, []);
 
@@ -273,6 +287,26 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
   const hrTierRows = buildHRTierRows(allTiers, quantity, hrUnitPrice);
   const businessTierRows = buildBusinessTierRows(allTiers, quantity, businessUnitPrice);
 
+  const singleCfg = passConfig.single;
+  const businessCfg = passConfig.business;
+
+  const singleCurrentPrice = singleCfg ? parseFloat(singleCfg.currentPrice) : 199;
+  const singleOriginalPrice = singleCfg ? parseFloat(singleCfg.originalPrice) : 429;
+  const singlePeriodName = singleCfg?.pricingPeriodName ?? "Early Bird";
+  const singleDiscountPct = singleOriginalPrice > singleCurrentPrice
+    ? Math.round(((singleOriginalPrice - singleCurrentPrice) / singleOriginalPrice) * 100)
+    : null;
+  const singleBenefits = singleCfg && singleCfg.benefits.length > 0 ? singleCfg.benefits : DEFAULT_SINGLE_BENEFITS;
+
+  const businessCurrentPrice = businessCfg ? parseFloat(businessCfg.currentPrice) : 599;
+  const businessOriginalPrice = businessCfg ? parseFloat(businessCfg.originalPrice) : 999;
+  const businessPeriodName = businessCfg?.pricingPeriodName ?? "Early Bird";
+  const businessDiscountPct = businessOriginalPrice > businessCurrentPrice
+    ? Math.round(((businessOriginalPrice - businessCurrentPrice) / businessOriginalPrice) * 100)
+    : null;
+  const businessBenefits = businessCfg && businessCfg.benefits.length > 0 ? businessCfg.benefits : DEFAULT_SINGLE_BENEFITS;
+  const businessExtraBenefits = businessCfg && businessCfg.extraBenefits.length > 0 ? businessCfg.extraBenefits : DEFAULT_BUSINESS_EXTRA_BENEFITS;
+
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div>
@@ -296,11 +330,15 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
               <InventoryBadge remaining={inventory.single} />
               <div className="text-right">
                 <div className="flex items-baseline gap-2 justify-end flex-wrap">
-                  <span className="text-3xl font-bold text-foreground">£199</span>
-                  <span className="text-sm text-muted-foreground line-through">£429</span>
-                  <span className="badge-shine text-xs font-bold px-3 py-1 rounded-full inline-block">54% off</span>
+                  <span className="text-3xl font-bold text-foreground">£{singleCurrentPrice.toFixed(0)}</span>
+                  {singleOriginalPrice > singleCurrentPrice && (
+                    <span className="text-sm text-muted-foreground line-through">£{singleOriginalPrice.toFixed(0)}</span>
+                  )}
+                  {singleDiscountPct !== null && (
+                    <span className="badge-shine text-xs font-bold px-3 py-1 rounded-full inline-block">{singleDiscountPct}% off</span>
+                  )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">Per ticket, ex VAT · Early-bird price</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Per ticket, ex VAT · {singlePeriodName}</p>
               </div>
             </div>
           </div>
@@ -312,7 +350,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
               {/* Benefits grid */}
               <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">What's included</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4">
-                {SINGLE_BENEFITS.map((b) => (
+                {singleBenefits.map((b) => (
                   <div key={b} className="flex items-start gap-2 text-sm">
                     <Check className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                     <span>{b}</span>
@@ -429,11 +467,15 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
               <InventoryBadge remaining={inventory.business} />
               <div className="text-right">
                 <div className="flex items-baseline gap-2 justify-end flex-wrap">
-                  <span className="text-3xl font-bold text-foreground">£599</span>
-                  <span className="text-sm text-muted-foreground line-through">£999</span>
-                  <span className="badge-shine text-xs font-bold px-3 py-1 rounded-full inline-block">40% off</span>
+                  <span className="text-3xl font-bold text-foreground">£{businessCurrentPrice.toFixed(0)}</span>
+                  {businessOriginalPrice > businessCurrentPrice && (
+                    <span className="text-sm text-muted-foreground line-through">£{businessOriginalPrice.toFixed(0)}</span>
+                  )}
+                  {businessDiscountPct !== null && (
+                    <span className="badge-shine text-xs font-bold px-3 py-1 rounded-full inline-block">{businessDiscountPct}% off</span>
+                  )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">Per pass, ex VAT · Group discounts apply</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Per pass, ex VAT · {businessPeriodName}</p>
               </div>
             </div>
           </div>
@@ -445,7 +487,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
               {/* Standard benefits */}
               <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">What's included</p>
               <div className="space-y-2 mb-4">
-                {SINGLE_BENEFITS.map((b) => (
+                {businessBenefits.map((b) => (
                   <div key={b} className="flex items-start gap-2 text-sm">
                     <Check className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                     <span>{b}</span>
@@ -454,15 +496,17 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
               </div>
 
               {/* Exclusive / premium benefits */}
-              <div className="border-t border-border pt-3 mt-3 space-y-2">
-                <p className="text-xs font-bold uppercase tracking-widest text-gold mb-2">Exclusive to Business Pass</p>
-                {BUSINESS_EXTRA_BENEFITS.map((b) => (
-                  <div key={b} className="flex items-start gap-2 text-sm font-semibold border-l-2 border-gold pl-2">
-                    <Star className="w-4 h-4 text-gold shrink-0 mt-0.5" />
-                    <span>{b}</span>
-                  </div>
-                ))}
-              </div>
+              {businessExtraBenefits.length > 0 && (
+                <div className="border-t border-border pt-3 mt-3 space-y-2">
+                  <p className="text-xs font-bold uppercase tracking-widest text-gold mb-2">Exclusive to Business Pass</p>
+                  {businessExtraBenefits.map((b) => (
+                    <div key={b} className="flex items-start gap-2 text-sm font-semibold border-l-2 border-gold pl-2">
+                      <Star className="w-4 h-4 text-gold shrink-0 mt-0.5" />
+                      <span>{b}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Column separator */}

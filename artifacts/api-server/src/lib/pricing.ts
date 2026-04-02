@@ -1,5 +1,5 @@
 import { db } from "@workspace/db";
-import { discountTiersTable, promoCodesTable } from "@workspace/db";
+import { discountTiersTable, promoCodesTable, passConfigTable } from "@workspace/db";
 import { eq, and, lte, gte, or, isNull } from "drizzle-orm";
 
 export const PASS_PRICES: Record<string, { price: number; originalPrice: number; seats: number }> = {
@@ -7,6 +7,23 @@ export const PASS_PRICES: Record<string, { price: number; originalPrice: number;
   team: { price: 499, originalPrice: 1200, seats: 3 },
   business: { price: 599, originalPrice: 999, seats: 1 },
 };
+
+const PASS_PRICE_DEFAULTS = PASS_PRICES;
+
+async function getPassPrices(): Promise<Record<string, { price: number; originalPrice: number; seats: number }>> {
+  const configs = await db.select().from(passConfigTable);
+  const result = { ...PASS_PRICE_DEFAULTS };
+  for (const config of configs) {
+    if (result[config.passType]) {
+      result[config.passType] = {
+        ...result[config.passType],
+        price: parseFloat(config.currentPrice.toString()),
+        originalPrice: parseFloat(config.originalPrice.toString()),
+      };
+    }
+  }
+  return result;
+}
 
 export const VAT_RATE = 0.20;
 
@@ -31,6 +48,7 @@ export async function calculatePricing(
   quantity: number,
   promoCode?: string | null
 ): Promise<PricingResult> {
+  const PASS_PRICES = await getPassPrices();
   const passInfo = PASS_PRICES[passType];
   if (!passInfo) throw new Error(`Unknown pass type: ${passType}`);
 
