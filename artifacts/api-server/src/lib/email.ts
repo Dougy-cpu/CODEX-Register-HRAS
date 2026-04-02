@@ -225,6 +225,145 @@ export function wrapInBrandedLayout(content: string, settingsOrTitle?: BrandingS
 </html>`;
 }
 
+async function buildConfirmationEmailHtml(
+  booking: typeof bookingsTable.$inferSelect,
+  attendees: Array<typeof attendeesTable.$inferSelect>,
+  lead: typeof attendeesTable.$inferSelect,
+  settings: EventSettings
+): Promise<{ html: string; subject: string }> {
+  const passLabels: Record<string, string> = {
+    single: "HR Professional Pass",
+    team: "Team Pass (3 seats)",
+    business: "Business Pass",
+  };
+  const passLabel = passLabels[booking.passType] || booking.passType;
+  const quantityLabel = booking.quantity === 1 ? "pass" : "passes";
+
+  const subtotal = parseFloat(booking.subtotalAmount?.toString() || "0");
+  const vat = parseFloat(booking.vatAmount?.toString() || "0");
+  const total = parseFloat(booking.totalAmount?.toString() || "0");
+  const promoDiscount = parseFloat(booking.promoDiscountAmount?.toString() || "0");
+  const groupDiscount = parseFloat(booking.groupDiscountAmount?.toString() || "0");
+  const formatCurrency = (n: number) =>
+    new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(n);
+
+  const attendeeRowsHtml = attendees
+    .map(
+      (a) => `<tr>
+      <td style="padding:8px 4px;border-bottom:1px solid #eee;">${a.isLead ? "✓ Lead" : ""}</td>
+      <td style="padding:8px 4px;border-bottom:1px solid #eee;">${a.firstName} ${a.lastName}</td>
+      <td style="padding:8px 4px;border-bottom:1px solid #eee;">${a.jobTitle}</td>
+      <td style="padding:8px 4px;border-bottom:1px solid #eee;">${a.company}</td>
+      <td style="padding:8px 4px;border-bottom:1px solid #eee;">${a.workEmail}</td>
+      <td style="padding:8px 4px;border-bottom:1px solid #eee;">${a.phone || "—"}</td>
+    </tr>`
+    )
+    .join("");
+
+  const attendeesTableHtml = `<table width="100%" cellspacing="0" cellpadding="0" style="font-size:14px;">
+    <thead><tr style="background:#f5f5f5;">
+      <th style="padding:8px 4px;text-align:left;">Lead</th>
+      <th style="padding:8px 4px;text-align:left;">Name</th>
+      <th style="padding:8px 4px;text-align:left;">Job Title</th>
+      <th style="padding:8px 4px;text-align:left;">Company</th>
+      <th style="padding:8px 4px;text-align:left;">Email</th>
+      <th style="padding:8px 4px;text-align:left;">Phone</th>
+    </tr></thead>
+    <tbody>${attendeeRowsHtml}</tbody>
+  </table>`;
+
+  const priceSummaryHtml = [
+    `<div class="price-row"><span>Subtotal (excl. VAT)</span><span>${formatCurrency(subtotal)}</span></div>`,
+    groupDiscount > 0 ? `<div class="price-row"><span>Group Discount</span><span>-${formatCurrency(groupDiscount)}</span></div>` : "",
+    promoDiscount > 0 ? `<div class="price-row"><span>Promo Code (${booking.promoCode})</span><span>-${formatCurrency(promoDiscount)}</span></div>` : "",
+    `<div class="price-row"><span>VAT (20%)</span><span>${formatCurrency(vat)}</span></div>`,
+    `<div class="price-total"><span>Total</span><span>${formatCurrency(total)}</span></div>`,
+  ].join("");
+
+  const manageUrl = booking.managementToken
+    ? `${process.env.APP_BASE_URL || "https://hranalyticssummit.com/register"}/manage/${booking.managementToken}`
+    : null;
+  const managementLinkHtml = manageUrl ? buildManageLinkSection(manageUrl) : "";
+
+  const invoicePaymentButtonHtml = booking.stripeInvoicePaymentUrl
+    ? `<p style="margin-top:16px;"><a href="${booking.stripeInvoicePaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;">Download Invoice / Pay Online →</a></p>`
+    : "";
+
+  const orderRef = booking.orderReference || `#${booking.id}`;
+
+  // Try to use the DB template
+  try {
+    const [dbTemplate] = await db
+      .select()
+      .from(emailTemplatesTable)
+      .where(eq(emailTemplatesTable.type, "confirmation"));
+
+    if (dbTemplate) {
+      const vars: Record<string, string> = {
+        "{{firstName}}": lead.firstName,
+        "{{orderReference}}": orderRef,
+        "{{passLabel}}": passLabel,
+        "{{quantity}}": String(booking.quantity),
+        "{{quantityLabel}}": quantityLabel,
+        "{{attendeesTable}}": attendeesTableHtml,
+        "{{priceSummary}}": priceSummaryHtml,
+        "{{eventDate}}": settings.eventDate || "Thursday, 3 September 2026",
+        "{{eventVenue}}": settings.eventVenue || "155 Bishopsgate, London",
+        "{{eventVenuePostcode}}": settings.eventVenuePostcode || "EC2M 3TQ",
+        "{{managementLink}}": managementLinkHtml,
+        "{{invoicePaymentButton}}": invoicePaymentButtonHtml,
+      };
+
+      let body = dbTemplate.htmlBody;
+      for (const [placeholder, value] of Object.entries(vars)) {
+        body = body.replaceAll(placeholder, value);
+      }
+
+      let subject = dbTemplate.subject;
+      for (const [placeholder, value] of Object.entries(vars)) {
+        subject = subject.replaceAll(placeholder, value);
+      }
+
+      return {
+        html: wrapInBrandedLayout(body, settings),
+        subject,
+      };
+    }
+  } catch (err) {
+    logger.warn({ err }, "Could not load confirmation template from DB — using hardcoded fallback");
+  }
+
+  // Fallback: hardcoded template
+  const fallbackBody = `
+    <h2>Booking Confirmed!</h2>
+    <p>Dear ${lead.firstName},</p>
+    <p>Thank you for registering for the <strong>${settings.eventName || "HR Analytics Summit 2026"}</strong>. Your booking is confirmed.</p>
+    <div class="info-box">
+      <strong>Order Reference:</strong> ${orderRef}<br>
+      <strong>Pass Type:</strong> ${passLabel}<br>
+      <strong>Quantity:</strong> ${booking.quantity} ${quantityLabel}
+    </div>
+    <h3>Registered Attendees</h3>${attendeesTableHtml}
+    <h3>Price Summary</h3>${priceSummaryHtml}
+    <div class="info-box" style="margin-top:24px;">
+      <strong>Event Details</strong><br>
+      <strong>Date:</strong> ${settings.eventDate}<br>
+      <strong>Venue:</strong> ${settings.eventVenue}, ${settings.eventVenuePostcode}
+    </div>
+    <h3 style="margin-top:28px;margin-bottom:12px;color:#000;">Update Attendee Details Anytime</h3>
+    <p style="margin:0 0 16px;color:#444;line-height:1.6;">You have a secure self-service link to manage all your attendee information. You can fill in placeholder seats, update existing details, add dietary requirements — all without logging in. Need to share registration with colleagues? Forward them the link to enter their own details.</p>
+    ${managementLinkHtml}
+    <p>A PDF VAT receipt is attached to this email for your records.</p>
+    ${invoicePaymentButtonHtml}
+    <p>We look forward to seeing you at the ${settings.eventName || "HR Analytics Summit"}!</p>
+  `;
+
+  return {
+    html: wrapInBrandedLayout(fallbackBody, settings),
+    subject: `Booking Confirmed — ${settings.eventName || "HR Analytics Summit"} (${orderRef})`,
+  };
+}
+
 export async function sendBookingEmails(bookingId: number): Promise<void> {
   const [booking] = await db
     .select()
@@ -249,84 +388,8 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
     return;
   }
 
-  const passLabels: Record<string, string> = {
-    single: "Single Pass",
-    team: "Team Pass (3 seats)",
-    business: "Business Pass",
-  };
-  const passLabel = passLabels[booking.passType] || booking.passType;
-
-  const subtotal = parseFloat(booking.subtotalAmount?.toString() || "0");
-  const vat = parseFloat(booking.vatAmount?.toString() || "0");
-  const total = parseFloat(booking.totalAmount?.toString() || "0");
-  const promoDiscount = parseFloat(booking.promoDiscountAmount?.toString() || "0");
-  const groupDiscount = parseFloat(booking.groupDiscountAmount?.toString() || "0");
-
-  const formatCurrency = (n: number) =>
-    new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(n);
-
-  const attendeeRows = attendees
-    .map(
-      (a) => `
-    <tr>
-      <td style="padding: 8px 4px; border-bottom: 1px solid #eee;">${a.isLead ? "✓ Lead" : ""}</td>
-      <td style="padding: 8px 4px; border-bottom: 1px solid #eee;">${a.firstName} ${a.lastName}</td>
-      <td style="padding: 8px 4px; border-bottom: 1px solid #eee;">${a.jobTitle}</td>
-      <td style="padding: 8px 4px; border-bottom: 1px solid #eee;">${a.company}</td>
-      <td style="padding: 8px 4px; border-bottom: 1px solid #eee;">${a.workEmail}</td>
-      <td style="padding: 8px 4px; border-bottom: 1px solid #eee;">${a.phone || "—"}</td>
-    </tr>`
-    )
-    .join("");
-
-  const confirmationHtml = wrapInBrandedLayout(`
-    <h2>Booking Confirmed!</h2>
-    <p>Dear ${lead.firstName},</p>
-    <p>Thank you for registering for the <strong>HR Analytics Summit 2026</strong>. Your booking is confirmed.</p>
-
-    <div class="info-box">
-      <strong>Order Reference:</strong> ${booking.orderReference || `#${bookingId}`}<br>
-      <strong>Pass Type:</strong> ${passLabel}<br>
-      <strong>Quantity:</strong> ${booking.quantity} ${booking.quantity === 1 ? "pass" : "passes"}
-    </div>
-
-    <h3>Registered Attendees</h3>
-    <table width="100%" cellspacing="0" cellpadding="0" style="font-size: 14px;">
-      <thead>
-        <tr style="background: #f5f5f5;">
-          <th style="padding: 8px 4px; text-align: left;">Lead</th>
-          <th style="padding: 8px 4px; text-align: left;">Name</th>
-          <th style="padding: 8px 4px; text-align: left;">Job Title</th>
-          <th style="padding: 8px 4px; text-align: left;">Company</th>
-          <th style="padding: 8px 4px; text-align: left;">Email</th>
-          <th style="padding: 8px 4px; text-align: left;">Phone</th>
-        </tr>
-      </thead>
-      <tbody>${attendeeRows}</tbody>
-    </table>
-
-    <h3>Price Summary</h3>
-    <div class="price-row"><span>Subtotal (excl. VAT)</span><span>${formatCurrency(subtotal)}</span></div>
-    ${groupDiscount > 0 ? `<div class="price-row"><span>Group Discount</span><span>-${formatCurrency(groupDiscount)}</span></div>` : ""}
-    ${promoDiscount > 0 ? `<div class="price-row"><span>Promo Code (${booking.promoCode})</span><span>-${formatCurrency(promoDiscount)}</span></div>` : ""}
-    <div class="price-row"><span>VAT (20%)</span><span>${formatCurrency(vat)}</span></div>
-    <div class="price-total"><span>Total</span><span>${formatCurrency(total)}</span></div>
-
-    <div class="info-box" style="margin-top: 24px;">
-      <strong>Event Details</strong><br>
-      <strong>Date:</strong> ${settings.eventDate}<br>
-      <strong>Venue:</strong> ${settings.eventVenue}, ${settings.eventVenuePostcode}
-    </div>
-
-    <h3 style="margin-top: 28px; margin-bottom: 12px; color: #000;">Update Attendee Details Anytime</h3>
-    <p style="margin: 0 0 16px; color: #444; line-height: 1.6;">You have a secure self-service link to manage all your attendee information. You can fill in placeholder seats, update existing details, add dietary requirements — all without logging in. Need to share registration with colleagues? Forward them the link to enter their own details.</p>
-
-    ${booking.managementToken ? buildManageLinkSection(`${process.env.APP_BASE_URL || "https://hranalyticssummit.com/register"}/manage/${booking.managementToken}`) : ""}
-
-    <p>A PDF VAT receipt is attached to this email for your records.</p>
-    ${booking.stripeInvoicePaymentUrl ? `<p style="margin-top:16px;"><a href="${booking.stripeInvoicePaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;">Download Invoice/Pay Online →</a></p>` : ""}
-    <p>We look forward to seeing you at the ${settings.eventName}!</p>
-  `, settings);
+  const { html: confirmationHtml, subject: confirmationSubject } =
+    await buildConfirmationEmailHtml(booking, attendees, lead, settings);
 
   // Prefer Stripe invoice PDF, then fall back to our custom receipt
   let pdfBuffer: Buffer | null = null;
@@ -365,7 +428,7 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
 
   const confirmSent = await sendMail({
     to: lead.workEmail,
-    subject: `Booking Confirmed — ${settings.eventName} (${booking.orderReference || `#${bookingId}`})`,
+    subject: confirmationSubject,
     html: confirmationHtml,
     attachments,
     fromName: settings.fromName,
@@ -417,77 +480,8 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
     return;
   }
 
-  const passLabels: Record<string, string> = {
-    single: "Single Pass",
-    team: "Team Pass (3 seats)",
-    business: "Business Pass",
-  };
-  const passLabel = passLabels[booking.passType] || booking.passType;
-
-  const subtotal = parseFloat(booking.subtotalAmount?.toString() || "0");
-  const vat = parseFloat(booking.vatAmount?.toString() || "0");
-  const total = parseFloat(booking.totalAmount?.toString() || "0");
-  const promoDiscount = parseFloat(booking.promoDiscountAmount?.toString() || "0");
-  const groupDiscount = parseFloat(booking.groupDiscountAmount?.toString() || "0");
-
-  const formatCurrency = (n: number) =>
-    new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(n);
-
-  const attendeeRows = attendees
-    .map(
-      (a) => `<tr>
-      <td style="padding: 8px 4px; border-bottom: 1px solid #eee;">${a.isLead ? "✓ Lead" : ""}</td>
-      <td style="padding: 8px 4px; border-bottom: 1px solid #eee;">${a.firstName} ${a.lastName}</td>
-      <td style="padding: 8px 4px; border-bottom: 1px solid #eee;">${a.jobTitle}</td>
-      <td style="padding: 8px 4px; border-bottom: 1px solid #eee;">${a.company}</td>
-      <td style="padding: 8px 4px; border-bottom: 1px solid #eee;">${a.workEmail}</td>
-      <td style="padding: 8px 4px; border-bottom: 1px solid #eee;">${a.phone || "—"}</td>
-    </tr>`
-    )
-    .join("");
-
-  const confirmationHtml = wrapInBrandedLayout(`
-    <h2>Booking Confirmed!</h2>
-    <p>Dear ${lead.firstName},</p>
-    <p>Thank you for registering for the <strong>${settings.eventName}</strong>. Your booking is confirmed.</p>
-    <div class="info-box">
-      <strong>Order Reference:</strong> ${booking.orderReference || `#${bookingId}`}<br>
-      <strong>Pass Type:</strong> ${passLabel}<br>
-      <strong>Quantity:</strong> ${booking.quantity} ${booking.quantity === 1 ? "pass" : "passes"}
-    </div>
-    <h3>Registered Attendees</h3>
-    <table width="100%" cellspacing="0" cellpadding="0" style="font-size: 14px;">
-      <thead><tr style="background: #f5f5f5;">
-        <th style="padding: 8px 4px; text-align: left;">Lead</th>
-        <th style="padding: 8px 4px; text-align: left;">Name</th>
-        <th style="padding: 8px 4px; text-align: left;">Job Title</th>
-        <th style="padding: 8px 4px; text-align: left;">Company</th>
-        <th style="padding: 8px 4px; text-align: left;">Email</th>
-        <th style="padding: 8px 4px; text-align: left;">Phone</th>
-      </tr></thead>
-      <tbody>${attendeeRows}</tbody>
-    </table>
-    <h3>Price Summary</h3>
-    <div class="price-row"><span>Subtotal (excl. VAT)</span><span>${formatCurrency(subtotal)}</span></div>
-    ${groupDiscount > 0 ? `<div class="price-row"><span>Group Discount</span><span>-${formatCurrency(groupDiscount)}</span></div>` : ""}
-    ${promoDiscount > 0 ? `<div class="price-row"><span>Promo Code (${booking.promoCode})</span><span>-${formatCurrency(promoDiscount)}</span></div>` : ""}
-    <div class="price-row"><span>VAT (20%)</span><span>${formatCurrency(vat)}</span></div>
-    <div class="price-total"><span>Total</span><span>${formatCurrency(total)}</span></div>
-    <div class="info-box" style="margin-top: 24px;">
-      <strong>Event Details</strong><br>
-      <strong>Date:</strong> ${settings.eventDate}<br>
-      <strong>Venue:</strong> ${settings.eventVenue}, ${settings.eventVenuePostcode}
-    </div>
-
-    <h3 style="margin-top: 28px; margin-bottom: 12px; color: #000;">Update Attendee Details Anytime</h3>
-    <p style="margin: 0 0 16px; color: #444; line-height: 1.6;">You have a secure self-service link to manage all your attendee information. You can fill in placeholder seats, update existing details, add dietary requirements — all without logging in. Need to share registration with colleagues? Forward them the link to enter their own details.</p>
-
-    ${booking.managementToken ? buildManageLinkSection(`${process.env.APP_BASE_URL || "https://hranalyticssummit.com/register"}/manage/${booking.managementToken}`) : ""}
-
-    <p>A PDF VAT receipt is attached to this email for your records.</p>
-    ${booking.stripeInvoicePaymentUrl ? `<p style="margin-top:16px;"><a href="${booking.stripeInvoicePaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;">Download Invoice/Pay Online →</a></p>` : ""}
-    <p>We look forward to seeing you at the ${settings.eventName}!</p>
-  `, settings);
+  const { html: confirmationHtml, subject: confirmationSubject } =
+    await buildConfirmationEmailHtml(booking, attendees, lead, settings);
 
   // Prefer Stripe invoice PDF, then fall back to custom receipt
   let pdfBuffer: Buffer | null = null;
@@ -526,7 +520,7 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
 
   const sent = await sendMail({
     to: lead.workEmail,
-    subject: `Booking Confirmed — ${settings.eventName} (${booking.orderReference || `#${bookingId}`})`,
+    subject: confirmationSubject,
     html: confirmationHtml,
     attachments,
     fromName: settings.fromName,

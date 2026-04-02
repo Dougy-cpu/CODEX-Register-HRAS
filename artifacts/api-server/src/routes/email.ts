@@ -192,6 +192,42 @@ router.post("/email-templates/:type/test-send", adminAuth, async (req, res): Pro
     const settings = await getEventSettings();
     const { sendMail, wrapInBrandedLayout: wrap } = await import("../lib/email");
 
+    const sampleAttendeeRows = `
+      <tr>
+        <td style="padding:8px 4px;border-bottom:1px solid #eee;">✓ Lead</td>
+        <td style="padding:8px 4px;border-bottom:1px solid #eee;">${toName || "Test User"}</td>
+        <td style="padding:8px 4px;border-bottom:1px solid #eee;">Head of People Analytics</td>
+        <td style="padding:8px 4px;border-bottom:1px solid #eee;">Acme Corp Ltd</td>
+        <td style="padding:8px 4px;border-bottom:1px solid #eee;">${toEmail}</td>
+        <td style="padding:8px 4px;border-bottom:1px solid #eee;">—</td>
+      </tr>`;
+
+    const sampleAttendeesTable = `<table width="100%" cellspacing="0" cellpadding="0" style="font-size:14px;">
+      <thead><tr style="background:#f5f5f5;">
+        <th style="padding:8px 4px;text-align:left;">Lead</th>
+        <th style="padding:8px 4px;text-align:left;">Name</th>
+        <th style="padding:8px 4px;text-align:left;">Job Title</th>
+        <th style="padding:8px 4px;text-align:left;">Company</th>
+        <th style="padding:8px 4px;text-align:left;">Email</th>
+        <th style="padding:8px 4px;text-align:left;">Phone</th>
+      </tr></thead>
+      <tbody>${sampleAttendeeRows}</tbody>
+    </table>`;
+
+    const samplePriceSummary = `
+      <div class="price-row"><span>Subtotal (excl. VAT)</span><span>£199.00</span></div>
+      <div class="price-row"><span>VAT (20%)</span><span>£39.80</span></div>
+      <div class="price-total"><span>Total</span><span>£238.80</span></div>`;
+
+    const sampleManagementLink = `<div style="background:#fff8f7;border:2px solid #E74F3E;border-radius:6px;padding:20px;margin:24px 0;">
+      <p style="margin:0 0 12px;font-weight:700;color:#E74F3E;font-size:15px;">📋 Your Attendee Management Link</p>
+      <ul style="margin:0 0 12px;padding-left:20px;color:#444;line-height:1.8;">
+        <li>Fill in or update any attendee details</li>
+        <li>No login required — just use the secure link</li>
+      </ul>
+      <p style="margin:0 0 12px;text-align:center;"><a href="#" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;border-radius:4px;">[SAMPLE LINK — not active in test]</a></p>
+    </div>`;
+
     const testVars: Record<string, string> = type === "invoice_reminder" ? {
       "{{firstName}}": toName?.split(" ")[0] || "Test",
       "{{recipientName}}": toName || "Test User",
@@ -200,11 +236,20 @@ router.post("/email-templates/:type/test-send", adminAuth, async (req, res): Pro
       "{{payOnlineButton}}": `<p style="margin:24px 0;text-align:center;"><a href="#" style="display:inline-block;background:#E74F3E;color:#fff;padding:14px 32px;text-decoration:none;font-weight:bold;font-size:15px;border-radius:4px;">Pay Invoice Online →</a></p>`,
       "{{payOnlineUrl}}": "#",
     } : {
-      "{{firstName}}": toName || "Test User",
+      "{{firstName}}": toName?.split(" ")[0] || toName || "Test",
       "{{name}}": toName || "Test User",
       "{{orderReference}}": "HRAS26-TEST-001",
-      "{{passType}}": "Single Pass",
+      "{{passLabel}}": "HR Professional Pass",
+      "{{passType}}": "HR Professional Pass",
       "{{quantity}}": "1",
+      "{{quantityLabel}}": "pass",
+      "{{attendeesTable}}": sampleAttendeesTable,
+      "{{priceSummary}}": samplePriceSummary,
+      "{{eventDate}}": settings.eventDate || "Thursday, 3 September 2026",
+      "{{eventVenue}}": settings.eventVenue || "155 Bishopsgate, London",
+      "{{eventVenuePostcode}}": settings.eventVenuePostcode || "EC2M 3TQ",
+      "{{managementLink}}": sampleManagementLink,
+      "{{invoicePaymentButton}}": "",
       "{{total}}": "£238.80",
     };
 
