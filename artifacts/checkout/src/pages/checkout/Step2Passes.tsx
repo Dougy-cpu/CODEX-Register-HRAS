@@ -325,7 +325,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
             <div className="hidden md:block w-px bg-border self-stretch" />
 
             {/* ── Right column: Quantity picker (warm panel) ── */}
-            <div className="md:w-64 shrink-0 p-6 bg-muted space-y-4 ml-[0px]">
+            <div className="md:w-80 shrink-0 p-6 bg-muted space-y-4">
               <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                 How many tickets?
               </p>
