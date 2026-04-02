@@ -72,6 +72,16 @@ export async function seed() {
         htmlBody: DEFAULT_WELCOME_BODY,
       });
       logger.info("Seeded welcome email template");
+    } else {
+      // Update existing template with latest content
+      await db
+        .update(emailTemplatesTable)
+        .set({
+          subject: DEFAULT_WELCOME_SUBJECT,
+          htmlBody: DEFAULT_WELCOME_BODY,
+        })
+        .where(eq(emailTemplatesTable.type, "welcome"));
+      logger.info("Updated welcome email template");
     }
 
     const existingTiers = await db.select().from(discountTiersTable);
