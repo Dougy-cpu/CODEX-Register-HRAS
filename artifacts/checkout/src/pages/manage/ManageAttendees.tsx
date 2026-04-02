@@ -2,10 +2,11 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import { z } from "zod";
-import { CheckCircle2, User, Clock, ChevronDown, ChevronUp, Loader2, AlertCircle } from "lucide-react";
+import { CheckCircle2, User, Clock, ChevronDown, ChevronUp, Loader2, AlertCircle, Calendar, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { customFetch } from "@workspace/api-client-react";
+import { useToast } from "@/hooks/use-toast";
 import type { Attendee, BookingWithAttendees } from "@/types/booking";
 
 const attendeeSchema = z.object({
@@ -37,6 +38,7 @@ function AttendeeCard({
   token: string;
   onSaved: () => void;
 }) {
+  const { toast } = useToast();
   const [expanded, setExpanded] = useState(attendee.isTbc ?? false);
   const [saved, setSaved] = useState(false);
   const [form, setForm] = useState<AttendeeFormData>({
@@ -62,6 +64,10 @@ function AttendeeCard({
       setSaved(true);
       setExpanded(false);
       onSaved();
+      toast({
+        title: "Attendee details saved",
+        description: `${form.firstName} ${form.lastName}'s details have been updated.`,
+      });
     },
   });
 
@@ -91,48 +97,51 @@ function AttendeeCard({
 
   return (
     <div className={`bg-white border rounded-sm overflow-hidden transition-all ${isTbc ? "border-amber-300" : "border-border"}`}>
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center justify-between p-5 text-left hover:bg-muted/30 transition-colors"
-      >
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between p-5 gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           {saved || (!attendee.isTbc) ? (
-            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
               <User className="w-4 h-4 text-primary" />
             </div>
           ) : (
-            <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
               <Clock className="w-4 h-4 text-amber-600" />
             </div>
           )}
-          <div>
+          <div className="min-w-0">
             {saved ? (
-              <p className="font-bold">{form.firstName} {form.lastName}</p>
+              <>
+                <p className="font-bold truncate">{form.firstName} {form.lastName}</p>
+                <p className="text-xs text-green-600 font-medium flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> Details saved
+                </p>
+              </>
             ) : attendee.isTbc ? (
-              <p className="font-bold text-amber-700">Attendee {attendee.seatIndex} — Details Needed</p>
+              <>
+                <p className="font-bold text-amber-700">Attendee {attendee.seatIndex} — Details Needed</p>
+                <p className="text-xs text-amber-600 font-medium">No details entered yet</p>
+              </>
             ) : (
-              <p className="font-bold">{attendee.firstName} {attendee.lastName}</p>
-            )}
-            {!attendee.isTbc && !saved && (
-              <p className="text-sm text-muted-foreground">{attendee.workEmail}</p>
-            )}
-            {(attendee.isTbc && !saved) && (
-              <p className="text-xs text-amber-600 font-medium">Click to fill in attendee details</p>
-            )}
-            {saved && (
-              <p className="text-xs text-green-600 font-medium flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> Details saved
-              </p>
+              <>
+                <p className="font-bold truncate">{attendee.firstName} {attendee.lastName}</p>
+                <p className="text-sm text-muted-foreground truncate">{attendee.workEmail}</p>
+              </>
             )}
           </div>
         </div>
-        {expanded ? (
-          <ChevronUp className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-        ) : (
-          <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-        )}
-      </button>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className={`flex-shrink-0 flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded border transition-colors ${
+            isTbc
+              ? "border-amber-400 text-amber-700 bg-amber-50 hover:bg-amber-100"
+              : "border-border text-muted-foreground hover:text-foreground hover:bg-muted/30"
+          }`}
+        >
+          {isTbc ? "Fill in Details" : saved ? "Edit" : "Edit Details"}
+          {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+        </button>
+      </div>
 
       {expanded && (
         <div className="border-t border-border p-5">
@@ -324,10 +333,19 @@ export default function ManageAttendees() {
       <main className="max-w-2xl mx-auto px-4 py-10">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Manage Attendees</h1>
-          <p className="text-muted-foreground">
-            Order reference: <span className="font-mono font-bold text-foreground">{booking.orderReference || "PENDING"}</span>
-          </p>
-          <p className="text-sm text-muted-foreground mt-1">
+          <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground mt-1 mb-3">
+            <span className="flex items-center gap-1.5">
+              <Calendar className="w-4 h-4 text-primary flex-shrink-0" />
+              3 September 2026
+            </span>
+            <span className="flex items-center gap-1.5">
+              <MapPin className="w-4 h-4 text-primary flex-shrink-0" />
+              155 Bishopsgate, London
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Order reference: <span className="font-mono font-semibold text-foreground">{booking.orderReference || "PENDING"}</span>
+            {" · "}
             {booking.quantity} {booking.passType === "single" ? "Single Pass" : booking.passType === "team" ? "Team Pass" : "Business Pass"}{booking.quantity !== 1 ? "es" : ""}
           </p>
         </div>
