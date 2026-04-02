@@ -64,6 +64,8 @@ const defaultSettings: Omit<EventSettings, "id" | "updatedAt"> = {
   freeagentRefreshToken: null,
   freeagentAccessToken: null,
   freeagentTokenExpiresAt: null,
+  attendeeChangesLocked: false,
+  attendeeChangesLockedMessage: null,
 };
 
 export async function getEventSettings(): Promise<EventSettings> {
