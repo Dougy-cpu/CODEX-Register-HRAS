@@ -85,8 +85,8 @@ router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> =
 // ─── Generic Template Routes ──────────────────────────────────────────────────
 
 router.get("/email-templates/:type", async (req, res): Promise<void> => {
-  const type = req.params.type as "welcome" | "confirmation";
-  if (!["welcome", "confirmation"].includes(type)) {
+  const type = req.params.type as "welcome" | "confirmation" | "invoice_reminder";
+  if (!["welcome", "confirmation", "invoice_reminder"].includes(type)) {
     res.status(400).json({ error: "Invalid template type" });
     return;
   }
@@ -106,6 +106,10 @@ router.get("/email-templates/:type", async (req, res): Promise<void> => {
         subject: "Booking Confirmed — HR Analytics Summit 2026",
         htmlBody: "<h2>Booking Confirmed, {{firstName}}!</h2><p>Thank you for registering. Your order reference is <strong>{{orderReference}}</strong>.</p><p>You have booked <strong>{{quantity}}</strong> {{passType}} pass(es). A full VAT receipt is attached to this email.</p><p>We look forward to seeing you at the HR Analytics Summit!</p>",
       },
+      invoice_reminder: {
+        subject: "Invoice Reminder — {{orderReference}} — HR Analytics Summit 2026",
+        htmlBody: "<p>Dear {{recipientName}},</p><p>This is a friendly reminder that invoice <strong>{{orderReference}}</strong> for your registration to the <strong>HR Analytics Summit 2026</strong> is due on <strong>{{dueDate}}</strong>.</p><p>Please arrange payment at your earliest convenience using the bank transfer details below, or click the button in this email to pay online. A copy of the invoice PDF is attached for your reference.</p><p>If you have already arranged payment, please disregard this email. For any queries, please contact <a href=\"mailto:douglas@dynamicbusinessleaders.co.uk\">douglas@dynamicbusinessleaders.co.uk</a>.</p>",
+      },
     };
     const def = defaults[type];
     if (!def) {
@@ -114,7 +118,7 @@ router.get("/email-templates/:type", async (req, res): Promise<void> => {
     }
     [template] = await db
       .insert(emailTemplatesTable)
-      .values({ type: type as "welcome" | "confirmation", subject: def.subject, htmlBody: def.htmlBody })
+      .values({ type, subject: def.subject, htmlBody: def.htmlBody })
       .returning();
   }
 
@@ -122,8 +126,8 @@ router.get("/email-templates/:type", async (req, res): Promise<void> => {
 });
 
 router.put("/email-templates/:type", adminAuth, async (req, res): Promise<void> => {
-  const type = req.params.type as "welcome" | "confirmation";
-  if (!["welcome", "confirmation"].includes(type)) {
+  const type = req.params.type as "welcome" | "confirmation" | "invoice_reminder";
+  if (!["welcome", "confirmation", "invoice_reminder"].includes(type)) {
     res.status(400).json({ error: "Invalid template type" });
     return;
   }
@@ -158,7 +162,7 @@ router.put("/email-templates/:type", adminAuth, async (req, res): Promise<void> 
 });
 
 router.post("/email-templates/:type/test-send", adminAuth, async (req, res): Promise<void> => {
-  const type = req.params.type as "welcome" | "confirmation";
+  const type = req.params.type as "welcome" | "confirmation" | "invoice_reminder";
   const { toEmail, toName } = req.body;
 
   if (!toEmail) {
@@ -181,20 +185,41 @@ router.post("/email-templates/:type/test-send", adminAuth, async (req, res): Pro
     }
 
     const settings = await getEventSettings();
+    const { sendMail, wrapInBrandedLayout: wrap } = await import("../lib/email");
 
-    const { sendMail } = await import("../lib/email");
-    const personalised = template.htmlBody
-      .replace(/\{\{firstName\}\}/g, toName || "Test User")
-      .replace(/\{\{name\}\}/g, toName || "Test User")
-      .replace(/\{\{orderReference\}\}/g, "HRS-2026-TEST")
-      .replace(/\{\{passType\}\}/g, "Single Pass")
-      .replace(/\{\{quantity\}\}/g, "1")
-      .replace(/\{\{total\}\}/g, "£238.80");
+    const testVars: Record<string, string> = type === "invoice_reminder" ? {
+      "{{firstName}}": toName?.split(" ")[0] || "Test",
+      "{{recipientName}}": toName || "Test User",
+      "{{orderReference}}": "HRAS26-TEST-001",
+      "{{dueDate}}": "30 April 2026",
+    } : {
+      "{{firstName}}": toName || "Test User",
+      "{{name}}": toName || "Test User",
+      "{{orderReference}}": "HRAS26-TEST-001",
+      "{{passType}}": "Single Pass",
+      "{{quantity}}": "1",
+      "{{total}}": "£238.80",
+    };
 
-    const html = wrapInBrandedLayout(personalised, settings);
+    let personalised = template.htmlBody;
+    for (const [key, val] of Object.entries(testVars)) {
+      personalised = personalised.replaceAll(key, val);
+    }
+
+    const subjectVars: Record<string, string> = {
+      "{{orderReference}}": "HRAS26-TEST-001",
+      "{{recipientName}}": toName || "Test User",
+      "{{firstName}}": toName?.split(" ")[0] || "Test",
+    };
+    let subject = template.subject;
+    for (const [key, val] of Object.entries(subjectVars)) {
+      subject = subject.replaceAll(key, val);
+    }
+
+    const html = wrap(personalised, settings);
     await sendMail({
       to: toEmail,
-      subject: `[TEST] ${template.subject}`,
+      subject: `[TEST] ${subject}`,
       html,
       fromName: settings.fromName,
       fromEmail: settings.fromEmail,

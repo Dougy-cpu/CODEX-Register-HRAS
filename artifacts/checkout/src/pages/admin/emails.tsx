@@ -62,21 +62,24 @@ function TipTapToolbar({ editor, onImageUpload }: { editor: ReturnType<typeof us
 
 // ─── Template Editor ──────────────────────────────────────────────────────────
 
-type TemplateType = "welcome" | "confirmation";
+type TemplateType = "welcome" | "confirmation" | "invoice_reminder";
 
 const TEMPLATE_LABELS: Record<TemplateType, string> = {
   welcome: "Welcome Email",
   confirmation: "Booking Confirmation",
+  invoice_reminder: "Invoice Reminder",
 };
 
 const TEMPLATE_VARIABLES: Record<TemplateType, string[]> = {
   welcome: ["{{firstName}}", "{{name}}"],
   confirmation: ["{{firstName}}", "{{orderReference}}", "{{passType}}", "{{quantity}}", "{{total}}"],
+  invoice_reminder: ["{{firstName}}", "{{recipientName}}", "{{orderReference}}", "{{dueDate}}"],
 };
 
 const TEMPLATE_DESCRIPTIONS: Record<TemplateType, string> = {
   welcome: "Sent as a personal follow-up after registration. Use this for a warm welcome message.",
   confirmation: "Sent automatically after every successful booking (card or invoice). Contains the attendee's order details.",
+  invoice_reminder: "Sent manually from the Registrations panel when clicking 'Send Reminder' on an invoiced booking. The order summary table, payment button, and bank transfer details are automatically appended — edit only the intro message here. The subject supports {{orderReference}}.",
 };
 
 function TemplateEditor({ type, settings }: { type: TemplateType; settings: EventSettingsData | null }) {
@@ -512,6 +515,7 @@ export default function AdminEmails() {
           <TabsTrigger value="branding" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-6 rounded-none whitespace-nowrap">Branding & Settings</TabsTrigger>
           <TabsTrigger value="welcome" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-6 rounded-none whitespace-nowrap">Welcome Email</TabsTrigger>
           <TabsTrigger value="confirmation" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-6 rounded-none whitespace-nowrap">Booking Confirmation</TabsTrigger>
+          <TabsTrigger value="invoice_reminder" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-6 rounded-none whitespace-nowrap">Invoice Reminder</TabsTrigger>
           <TabsTrigger value="logs" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-6 rounded-none whitespace-nowrap">Email Logs</TabsTrigger>
         </TabsList>
 
@@ -525,6 +529,10 @@ export default function AdminEmails() {
 
         <TabsContent value="confirmation">
           <TemplateEditor type="confirmation" settings={eventSettings} />
+        </TabsContent>
+
+        <TabsContent value="invoice_reminder">
+          <TemplateEditor type="invoice_reminder" settings={eventSettings} />
         </TabsContent>
 
         <TabsContent value="logs">

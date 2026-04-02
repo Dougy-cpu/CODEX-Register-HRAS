@@ -1029,23 +1029,45 @@ export async function sendInvoiceReminder(bookingId: number): Promise<void> {
   const promoDiscount = parseFloat(booking.promoDiscountAmount?.toString() || "0");
   const baseAmount = subtotalAfterDiscounts + groupDiscount + promoDiscount;
 
-  const subject = isOverdue
-    ? `Overdue Invoice — ${orderRef} — HR Analytics Summit 2026`
-    : `Invoice Reminder — ${orderRef} — HR Analytics Summit 2026`;
-
   const recipientName = booking.billingName || `${lead.firstName} ${lead.lastName}`;
+
+  // Load editable template (intro body + subject) from DB, falling back to defaults
+  const [storedTemplate] = await db.select().from(emailTemplatesTable).where(eq(emailTemplatesTable.type, "invoice_reminder"));
+  const templateVars: Record<string, string> = {
+    "{{firstName}}": lead.firstName || recipientName,
+    "{{recipientName}}": recipientName,
+    "{{orderReference}}": orderRef,
+    "{{dueDate}}": dueDateStr,
+  };
+  let introHtml: string;
+  if (storedTemplate) {
+    introHtml = storedTemplate.htmlBody;
+    for (const [key, val] of Object.entries(templateVars)) {
+      introHtml = introHtml.replaceAll(key, val);
+    }
+  } else {
+    introHtml = `<p>Dear ${recipientName},</p>
+    <p>${isOverdue
+      ? `We are writing to remind you that invoice <strong>${orderRef}</strong> for your registration to the <strong>HR Analytics Summit 2026</strong> was due on <strong>${dueDateStr}</strong> and remains unpaid.`
+      : `This is a friendly reminder that invoice <strong>${orderRef}</strong> for your registration to the <strong>HR Analytics Summit 2026</strong> is due on <strong>${dueDateStr}</strong>.`
+    }</p>
+    <p>Please arrange payment at your earliest convenience using the details below. A copy of the invoice PDF is attached to this email for your reference.</p>`;
+  }
+
+  let rawSubject = storedTemplate?.subject || (isOverdue
+    ? `Overdue Invoice — {{orderReference}} — HR Analytics Summit 2026`
+    : `Invoice Reminder — {{orderReference}} — HR Analytics Summit 2026`);
+  for (const [key, val] of Object.entries(templateVars)) {
+    rawSubject = rawSubject.replaceAll(key, val);
+  }
+  const subject = isOverdue ? rawSubject.replace(/^Invoice Reminder/, "Overdue Invoice") : rawSubject;
 
   const html = wrapInBrandedLayout(`
     <div style="background:${isOverdue ? "#fff3cd" : "#e8f4fd"};border-left:4px solid ${isOverdue ? "#E74F3E" : "#F48847"};padding:16px 20px;border-radius:4px;margin-bottom:24px;">
       <strong style="color:${isOverdue ? "#E74F3E" : "#F48847"};font-size:15px;">${isOverdue ? "⚠️ Invoice Overdue" : "📋 Invoice Reminder"}</strong>
     </div>
 
-    <p>Dear ${recipientName},</p>
-    <p>${isOverdue
-      ? `We are writing to remind you that invoice <strong>${orderRef}</strong> for your registration to the <strong>HR Analytics Summit 2026</strong> was due on <strong>${dueDateStr}</strong> and remains unpaid.`
-      : `This is a friendly reminder that invoice <strong>${orderRef}</strong> for your registration to the <strong>HR Analytics Summit 2026</strong> is due on <strong>${dueDateStr}</strong>.`
-    }</p>
-    <p>Please arrange payment at your earliest convenience using the details below. A copy of the invoice PDF is attached to this email for your reference.</p>
+    ${introHtml}
 
     <div class="info-box" style="margin-bottom:24px;">
       <strong>Order Details</strong><br><br>
