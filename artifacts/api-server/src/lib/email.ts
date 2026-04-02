@@ -318,6 +318,9 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
       <strong>Venue:</strong> ${settings.eventVenue}, ${settings.eventVenuePostcode}
     </div>
 
+    <h3 style="margin-top: 28px; margin-bottom: 12px; color: #000;">Update Attendee Details Anytime</h3>
+    <p style="margin: 0 0 16px; color: #444; line-height: 1.6;">You have a secure self-service link to manage all your attendee information. You can fill in placeholder seats, update existing details, add dietary requirements — all without logging in. Need to share registration with colleagues? Forward them the link to enter their own details.</p>
+
     ${booking.managementToken ? buildManageLinkSection(`${process.env.APP_BASE_URL || "https://hranalyticssummit.com/register"}/manage/${booking.managementToken}`) : ""}
 
     <p>A PDF VAT receipt is attached to this email for your records.</p>
@@ -475,6 +478,9 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
       <strong>Date:</strong> ${settings.eventDate}<br>
       <strong>Venue:</strong> ${settings.eventVenue}, ${settings.eventVenuePostcode}
     </div>
+
+    <h3 style="margin-top: 28px; margin-bottom: 12px; color: #000;">Update Attendee Details Anytime</h3>
+    <p style="margin: 0 0 16px; color: #444; line-height: 1.6;">You have a secure self-service link to manage all your attendee information. You can fill in placeholder seats, update existing details, add dietary requirements — all without logging in. Need to share registration with colleagues? Forward them the link to enter their own details.</p>
 
     ${booking.managementToken ? buildManageLinkSection(`${process.env.APP_BASE_URL || "https://hranalyticssummit.com/register"}/manage/${booking.managementToken}`) : ""}
 
