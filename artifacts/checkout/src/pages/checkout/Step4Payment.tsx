@@ -87,12 +87,15 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
 
   const currentPricing = calculatePricingMutation.data;
 
+  const billingLead = booking.attendees?.find(a => a.isLead && !a.isTbc)
+    ?? booking.attendees?.find(a => !a.isTbc);
+
   const form = useForm<z.infer<typeof invoiceSchema>>({
     resolver: zodResolver(invoiceSchema),
     defaultValues: {
-      billingName: booking.billingName || booking.attendees?.[0]?.firstName + " " + booking.attendees?.[0]?.lastName || "",
-      billingCompany: booking.billingCompany || booking.attendees?.[0]?.company || "",
-      billingEmail: booking.billingEmail || booking.attendees?.[0]?.workEmail || "",
+      billingName: booking.billingName || (billingLead ? `${billingLead.firstName} ${billingLead.lastName}` : ""),
+      billingCompany: booking.billingCompany || billingLead?.company || "",
+      billingEmail: booking.billingEmail || billingLead?.workEmail || "",
       billingAddressLine1: booking.billingAddressLine1 || "",
       billingAddressLine2: booking.billingAddressLine2 || "",
       billingTown: booking.billingTown || "",
@@ -101,7 +104,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
       billingCountry: booking.billingCountry || "United Kingdom",
       billingPhone: booking.billingPhone || "",
       billingVatNumber: booking.billingVatNumber || "",
-    }
+    },
   });
 
   const onSubmit = async (data?: z.infer<typeof invoiceSchema>) => {
