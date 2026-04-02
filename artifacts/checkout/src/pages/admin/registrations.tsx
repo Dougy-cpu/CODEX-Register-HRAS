@@ -203,7 +203,7 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
             Self-Service Attendee Link
           </p>
           <div className="flex items-center gap-2">
-            <code className="flex-1 text-xs font-mono text-foreground bg-slate-50 border border-border px-2 py-1.5 truncate">
+            <code className="flex-1 text-xs font-mono text-foreground bg-slate-50 border border-border px-2 py-1.5 break-all">
               {`${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/manage/${data.managementToken}`}
             </code>
             <button
