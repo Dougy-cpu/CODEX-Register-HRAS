@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { bookingsTable, attendeesTable } from "@workspace/db";
+import { bookingsTable, attendeesTable, eventSettingsTable } from "@workspace/db";
 import { calculatePricing } from "../lib/pricing";
 import { v4 as uuidv4 } from "uuid";
 import { deriveAdminToken, getAdminPassword } from "../middleware/admin-auth";
@@ -138,14 +138,20 @@ router.get("/bookings/by-management-token/:token", async (req, res): Promise<voi
     return;
   }
 
-  const attendees = await db
-    .select()
-    .from(attendeesTable)
-    .where(eq(attendeesTable.bookingId, booking.id));
+  const [attendees, settingsRows] = await Promise.all([
+    db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, booking.id)),
+    db.select().from(eventSettingsTable).limit(1),
+  ]);
+
+  const settings = settingsRows[0];
+  const changesLocked = settings?.attendeeChangesLocked ?? false;
+  const lockedMessage = settings?.attendeeChangesLockedMessage ?? null;
 
   res.json({
     ...formatBooking(booking),
     attendees: attendees.map(formatAttendee),
+    changesLocked,
+    lockedMessage,
   });
 });
 

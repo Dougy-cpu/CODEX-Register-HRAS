@@ -1,7 +1,7 @@
 import { ReactNode, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import logoUrl from "@assets/logo.webp";
-import { LayoutDashboard, Users, Tag, Percent, Mail, Bell, Ticket, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, Tag, Percent, Mail, Bell, Ticket, Settings, LogOut } from "lucide-react";
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -37,6 +37,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
     { href: "/admin/emails", label: "Emails", icon: Mail },
     { href: "/admin/notifications", label: "Notifications", icon: Bell },
     { href: "/admin/passes", label: "Tickets", icon: Ticket },
+    { href: "/admin/settings", label: "Settings", icon: Settings },
   ];
 
   const handleLogout = () => {

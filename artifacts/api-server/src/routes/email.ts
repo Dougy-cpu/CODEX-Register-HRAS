@@ -36,6 +36,7 @@ router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> =
     eventName, eventDate, eventVenue, eventVenuePostcode,
     orgName, orgAddress, orgWebsite, logoDataUrl,
     fromName, fromEmail,
+    attendeeChangesLocked, attendeeChangesLockedMessage,
   } = req.body;
 
   const existing = await db.select().from(eventSettingsTable);
@@ -55,6 +56,8 @@ router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> =
         ...(logoDataUrl !== undefined && { logoDataUrl }),
         ...(fromName !== undefined && { fromName }),
         ...(fromEmail !== undefined && { fromEmail }),
+        ...(attendeeChangesLocked !== undefined && { attendeeChangesLocked: Boolean(attendeeChangesLocked) }),
+        ...(attendeeChangesLockedMessage !== undefined && { attendeeChangesLockedMessage: attendeeChangesLockedMessage || null }),
       })
       .where(eq(eventSettingsTable.id, existing[0].id))
       .returning());
@@ -72,6 +75,8 @@ router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> =
         logoDataUrl: logoDataUrl || null,
         fromName: fromName || "HR Analytics Summit",
         fromEmail: fromEmail || "noreply@hranalyticssummit.com",
+        attendeeChangesLocked: Boolean(attendeeChangesLocked) || false,
+        attendeeChangesLockedMessage: attendeeChangesLockedMessage || null,
       })
       .returning());
   }

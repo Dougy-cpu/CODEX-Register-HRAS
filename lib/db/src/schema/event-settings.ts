@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, boolean } from "drizzle-orm/pg-core";
 
 export const eventSettingsTable = pgTable("event_settings", {
   id: serial("id").primaryKey(),
@@ -15,6 +15,8 @@ export const eventSettingsTable = pgTable("event_settings", {
   freeagentRefreshToken: text("freeagent_refresh_token"),
   freeagentAccessToken: text("freeagent_access_token"),
   freeagentTokenExpiresAt: timestamp("freeagent_token_expires_at", { withTimezone: true }),
+  attendeeChangesLocked: boolean("attendee_changes_locked").notNull().default(false),
+  attendeeChangesLockedMessage: text("attendee_changes_locked_message"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
 

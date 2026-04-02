@@ -13,6 +13,7 @@ import AdminDiscountTiers from "@/pages/admin/discount-tiers";
 import AdminEmails from "@/pages/admin/emails";
 import AdminNotifications from "@/pages/admin/notifications";
 import AdminPasses from "@/pages/admin/passes";
+import AdminSettings from "@/pages/admin/settings";
 import ManageAttendees from "@/pages/manage/ManageAttendees";
 
 const queryClient = new QueryClient({
@@ -36,6 +37,7 @@ function Router() {
       <Route path="/admin/emails" component={AdminEmails} />
       <Route path="/admin/notifications" component={AdminNotifications} />
       <Route path="/admin/passes" component={AdminPasses} />
+      <Route path="/admin/settings" component={AdminSettings} />
       <Route path="/manage/:token" component={ManageAttendees} />
       <Route component={NotFound} />
     </Switch>

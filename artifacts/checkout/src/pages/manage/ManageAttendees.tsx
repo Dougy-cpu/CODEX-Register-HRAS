@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import { z } from "zod";
-import { CheckCircle2, User, Clock, ChevronDown, ChevronUp, Loader2, AlertCircle, Calendar, MapPin } from "lucide-react";
+import { CheckCircle2, User, Clock, ChevronDown, ChevronUp, Loader2, AlertCircle, Calendar, MapPin, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { customFetch } from "@workspace/api-client-react";
@@ -33,13 +33,15 @@ function AttendeeCard({
   attendee,
   token,
   onSaved,
+  locked,
 }: {
   attendee: Attendee;
   token: string;
   onSaved: () => void;
+  locked: boolean;
 }) {
   const { toast } = useToast();
-  const [expanded, setExpanded] = useState(attendee.isTbc ?? false);
+  const [expanded, setExpanded] = useState(!locked && (attendee.isTbc ?? false));
   const [saved, setSaved] = useState(false);
   const [form, setForm] = useState<AttendeeFormData>({
     firstName: attendee.isTbc ? "" : attendee.firstName,
@@ -129,21 +131,29 @@ function AttendeeCard({
             )}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className={`flex-shrink-0 flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded border transition-colors ${
-            isTbc
-              ? "border-amber-400 text-amber-700 bg-amber-50 hover:bg-amber-100"
-              : "border-border text-muted-foreground hover:text-foreground hover:bg-muted/30"
-          }`}
-        >
-          {isTbc ? "Fill in Details" : saved ? "Edit" : "Edit Details"}
-          {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-        </button>
+
+        {locked ? (
+          <span className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded border border-border text-muted-foreground bg-muted/40 select-none">
+            <Lock className="w-3.5 h-3.5" />
+            Read-only
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className={`flex-shrink-0 flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded border transition-colors ${
+              isTbc
+                ? "border-amber-400 text-amber-700 bg-amber-50 hover:bg-amber-100"
+                : "border-border text-muted-foreground hover:text-foreground hover:bg-muted/30"
+            }`}
+          >
+            {isTbc ? "Fill in Details" : saved ? "Edit" : "Edit Details"}
+            {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+        )}
       </div>
 
-      {expanded && (
+      {!locked && expanded && (
         <div className="border-t border-border p-5">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -263,15 +273,20 @@ function AttendeeCard({
   );
 }
 
+interface ManageBookingResponse extends BookingWithAttendees {
+  changesLocked?: boolean;
+  lockedMessage?: string | null;
+}
+
 export default function ManageAttendees() {
   const [, params] = useRoute("/manage/:token");
   const token = params?.token ?? "";
   const queryClient = useQueryClient();
 
-  const { data, isLoading, isError } = useQuery<BookingWithAttendees>({
+  const { data, isLoading, isError } = useQuery<ManageBookingResponse>({
     queryKey: ["booking-by-token", token],
     queryFn: () =>
-      customFetch<BookingWithAttendees>(`/api/bookings/by-management-token/${token}`),
+      customFetch<ManageBookingResponse>(`/api/bookings/by-management-token/${token}`),
     enabled: !!token,
     retry: false,
   });
@@ -316,6 +331,10 @@ export default function ManageAttendees() {
   const attendees = booking.attendees ?? [];
   const tbcCount = attendees.filter((a) => a.isTbc).length;
   const allFilled = tbcCount === 0;
+  const changesLocked = booking.changesLocked ?? false;
+  const lockedMessage =
+    booking.lockedMessage ||
+    "Attendee changes are now closed. If you need to make a change, please contact us at events@hranalyticssummit.com";
 
   return (
     <div className="min-h-screen bg-background">
@@ -350,7 +369,17 @@ export default function ManageAttendees() {
           </p>
         </div>
 
-        {!allFilled && (
+        {changesLocked && (
+          <div className="border border-red-200 bg-red-50 rounded-sm p-5 mb-6 flex items-start gap-4">
+            <Lock className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="font-semibold text-red-800 mb-1">Attendee changes are closed</p>
+              <p className="text-sm text-red-700">{lockedMessage}</p>
+            </div>
+          </div>
+        )}
+
+        {!changesLocked && !allFilled && (
           <div className="bg-amber-50 border border-amber-200 rounded-sm p-4 mb-6 flex items-start gap-3">
             <Clock className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
             <div>
@@ -364,7 +393,7 @@ export default function ManageAttendees() {
           </div>
         )}
 
-        {allFilled && (
+        {!changesLocked && allFilled && (
           <div className="bg-green-50 border border-green-200 rounded-sm p-4 mb-6 flex items-start gap-3">
             <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
             <div>
@@ -383,6 +412,7 @@ export default function ManageAttendees() {
               attendee={attendee}
               token={token}
               onSaved={handleSaved}
+              locked={changesLocked}
             />
           ))}
         </div>
