@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useUpdateBooking, useCalculatePricing, useListDiscountTiers, type PricingRequestPassType, type DiscountTier } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Check, Minus, Plus, Users, Flame, AlertCircle, TrendingUp } from "lucide-react";
+import { Check, Minus, Plus, Users, Flame, AlertCircle, TrendingUp, Star } from "lucide-react";
 import type { BookingWithAttendees } from "@/types/booking";
 
 interface Step2PassesProps {
@@ -204,15 +204,15 @@ function UpsellNudge({ tiers, passType, quantity, unitLabel }: UpsellNudgeProps)
     <motion.div
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0 }}
-      className="flex items-start gap-2 bg-accent/20 border border-accent rounded-sm px-3 py-2.5 text-xs text-foreground"
+      exit={{ opacity: 0, y: -4 }}
+      className="flex items-start gap-2.5 border-l-4 border-secondary bg-secondary/20 px-3 py-2.5 text-xs text-white"
     >
-      <TrendingUp className="w-3.5 h-3.5 shrink-0 mt-0.5 text-foreground" />
+      <TrendingUp className="w-3.5 h-3.5 shrink-0 mt-0.5 text-secondary" />
       <span>
         <span className="font-bold">Add {needed} more {unitLabel}{needed > 1 ? "s" : ""}</span> to unlock{" "}
-        <span className="font-bold">{nextTier.discountPercent}% off</span>
+        <span className="font-bold text-secondary">{nextTier.discountPercent}% off</span>
         {upliftValue > 0 && (
-          <span> — save an extra <span className="font-bold">£{uplift}</span> on your order</span>
+          <span> — save an extra <span className="font-bold text-secondary">£{uplift}</span> on your order</span>
         )}
         !
       </span>
@@ -286,22 +286,28 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
 
       {/* HR: Single pass with quantity picker */}
       {isHR && (
-        <Card className="relative p-6 border-2 border-primary bg-primary/5">
-          <div className="flex flex-col md:flex-row md:items-start gap-6">
-            {/* Pass details */}
-            <div className="flex-1">
-              <div className="flex items-start justify-between gap-3 mb-2">
-                <h3 className="text-2xl font-bold">HR Professional Pass</h3>
+        <Card className="relative border-2 border-primary overflow-hidden p-0 shadow-lg">
+          <div className="flex flex-col md:flex-row md:items-stretch">
+
+            {/* ── Left column: Benefits ── */}
+            <div className="flex-1 p-6 md:p-8">
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <h3 className="text-2xl font-bold leading-tight">HR Professional Pass</h3>
                 <InventoryBadge remaining={inventory.single} />
               </div>
-              <div className="flex items-baseline gap-2 mb-1">
-                <span className="text-3xl font-bold">£199</span>
-                <span className="text-sm text-muted-foreground line-through">£429</span>
-                <span className="text-sm font-bold text-primary">54% off</span>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">Per ticket, ex VAT</p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {/* Price + badge */}
+              <div className="flex items-baseline gap-3 mb-1 flex-wrap">
+                <span className="text-4xl font-bold">£199</span>
+                <span className="text-base text-muted-foreground line-through">£429</span>
+                <span className="badge-shine text-xs font-bold px-3 py-1 rounded-full inline-block">
+                  54% off
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground mb-5">Per ticket, ex VAT · Early-bird price</p>
+
+              {/* Benefits grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4">
                 {SINGLE_BENEFITS.map((b) => (
                   <div key={b} className="flex items-start gap-2 text-sm">
                     <Check className="w-4 h-4 text-primary shrink-0 mt-0.5" />
@@ -311,43 +317,53 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
               </div>
             </div>
 
-            {/* Quantity picker */}
-            <div className="md:w-64 shrink-0 space-y-3">
-              <p className="text-sm font-semibold">How many tickets?</p>
+            {/* Column separator */}
+            <div className="hidden md:block w-px bg-premium/20" />
+
+            {/* ── Right column: Quantity picker (dark panel) ── */}
+            <div className="md:w-72 shrink-0 p-6 bg-premium text-premium-foreground space-y-4">
+              <p className="text-xs font-bold uppercase tracking-widest text-white/50">
+                How many tickets?
+              </p>
 
               {/* 3 tickets shortcut */}
               <button
                 type="button"
                 onClick={() => setQuantity(3)}
-                className={`w-full flex items-center justify-between gap-2 px-4 py-3 rounded-sm border-2 text-sm font-semibold transition-all ${
+                className={`w-full flex items-center justify-between gap-2 px-4 py-3 text-sm font-bold transition-all border-2 ${
                   quantity === 3
-                    ? "border-primary bg-primary text-white"
-                    : "border-secondary/50 bg-secondary/10 text-secondary hover:border-secondary hover:bg-secondary/20"
+                    ? "bg-white text-primary border-white shadow-inner"
+                    : "border-transparent text-white shadow-md hover:shadow-lg hover:scale-[1.01]"
                 }`}
+                style={
+                  quantity !== 3
+                    ? { background: "linear-gradient(135deg, hsl(28,88%,62%) 0%, hsl(4,77%,57%) 100%)" }
+                    : undefined
+                }
               >
                 <span className="flex items-center gap-2">
                   <Users className="w-4 h-4" />
                   3 tickets — Most Popular
                 </span>
-                {quantity === 3 && <Check className="w-4 h-4" />}
+                {quantity === 3 && <Check className="w-4 h-4 text-primary" />}
               </button>
 
-              {/* Stepper */}
-              <div className="flex items-center border border-border bg-white rounded-sm overflow-hidden">
+              {/* Custom stepper */}
+              <div className="flex items-stretch border border-white/20 bg-white/10 overflow-hidden">
                 <button
                   type="button"
-                  className="flex-none w-11 h-11 flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors disabled:opacity-30"
+                  className="flex-none w-11 flex items-center justify-center text-white/50 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-20"
                   onClick={() => setQuantity(q => Math.max(1, q - 1))}
                   disabled={quantity <= 1}
                 >
                   <Minus className="w-4 h-4" />
                 </button>
-                <div className="flex-1 text-center font-bold text-lg py-3">
+                <div className="flex-1 text-center font-bold text-2xl py-2.5 text-white border-x border-white/20">
                   {quantity}
                 </div>
                 <button
                   type="button"
-                  className="flex-none w-11 h-11 flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
+                  className="flex-none w-11 flex items-center justify-center text-white/50 hover:bg-white/10 hover:text-white transition-colors"
                   onClick={() => setQuantity(q => Math.min(20, q + 1))}
                 >
                   <Plus className="w-4 h-4" />
@@ -355,126 +371,43 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
               </div>
 
               {/* Upsell nudge */}
-              <UpsellNudge
-                tiers={allTiers}
-                passType="single"
-                quantity={quantity}
-                unitLabel="ticket"
-              />
+              <AnimatePresence>
+                <UpsellNudge
+                  tiers={allTiers}
+                  passType="single"
+                  quantity={quantity}
+                  unitLabel="ticket"
+                />
+              </AnimatePresence>
 
               {/* Tier table */}
               <div className="space-y-1 text-xs">
                 {hrTierRows.map(({ key, label, note, active, isSpecial }) => (
                   <div
                     key={key}
-                    className={`flex justify-between px-2 py-1.5 rounded-sm transition-colors ${
+                    className={`flex justify-between px-2 py-1.5 transition-all ${
                       active
                         ? isSpecial
-                          ? "bg-accent/40 border border-accent/60 text-foreground font-semibold"
-                          : "bg-primary/10 border border-primary/20 text-foreground font-semibold"
-                        : "text-muted-foreground"
+                          ? "border-l-4 border-accent bg-white/10 text-white font-semibold pl-2"
+                          : "border-l-4 border-secondary bg-white/10 text-white font-semibold pl-2"
+                        : "text-white/35 pl-[6px]"
                     }`}
                   >
                     <span>{label}</span>
-                    <span className={isSpecial && active ? "text-secondary font-bold" : active && !isSpecial ? "text-primary" : ""}>
+                    <span className={
+                      active && isSpecial ? "text-accent font-bold" :
+                      active ? "text-secondary font-bold" : ""
+                    }>
                       {note}
                     </span>
                   </div>
                 ))}
               </div>
-            </div>
-          </div>
-        </Card>
-      )}
 
-      {/* Vendor: Business Pass with quantity + discounts */}
-      {isVendor && (
-        <Card className="relative p-6 border-2 border-primary bg-primary/5">
-          <div className="flex flex-col md:flex-row md:items-start gap-6">
-            {/* Pass details */}
-            <div className="flex-1">
-              <div className="flex items-start justify-between gap-3 mb-1">
-                <h3 className="text-2xl font-bold">Business Pass</h3>
-                <InventoryBadge remaining={inventory.business} />
-              </div>
-              <p className="text-sm text-muted-foreground mb-2">For Consultants &amp; Vendors</p>
-              <div className="flex items-baseline gap-2 mb-1">
-                <span className="text-3xl font-bold">£599</span>
-                <span className="text-sm text-muted-foreground line-through">£999</span>
-                <span className="text-sm font-bold text-primary">40% off</span>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">Per pass, ex VAT — group discounts apply for multiple</p>
-
-              <div className="space-y-2">
-                {SINGLE_BENEFITS.map((b) => (
-                  <div key={b} className="flex items-start gap-2 text-sm">
-                    <Check className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                    <span>{b}</span>
-                  </div>
-                ))}
-                {BUSINESS_EXTRA_BENEFITS.map((b) => (
-                  <div key={b} className="flex items-start gap-2 text-sm font-bold text-primary">
-                    <Check className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                    <span>{b}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Quantity picker */}
-            <div className="md:w-64 shrink-0 space-y-3">
-              <p className="text-sm font-semibold">How many passes?</p>
-
-              {/* Stepper */}
-              <div className="flex items-center border border-border bg-white rounded-sm overflow-hidden">
-                <button
-                  type="button"
-                  className="flex-none w-11 h-11 flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors disabled:opacity-30"
-                  onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                  disabled={quantity <= 1}
-                >
-                  <Minus className="w-4 h-4" />
-                </button>
-                <div className="flex-1 text-center font-bold text-lg py-3">
-                  {quantity}
-                </div>
-                <button
-                  type="button"
-                  className="flex-none w-11 h-11 flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors disabled:opacity-30"
-                  onClick={() => setQuantity(q => Math.min(10, q + 1))}
-                  disabled={quantity >= 10}
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Upsell nudge */}
-              <UpsellNudge
-                tiers={allTiers}
-                passType="business"
-                quantity={quantity}
-                unitLabel="pass"
-              />
-
-              {/* Business discount tiers */}
-              <div className="space-y-1 text-xs">
-                {businessTierRows.map(({ key, label, note, active }) => (
-                  <div
-                    key={key}
-                    className={`flex justify-between px-2 py-1.5 rounded-sm transition-colors ${
-                      active
-                        ? "bg-primary/10 border border-primary/20 text-foreground font-semibold"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    <span>{label}</span>
-                    <span className={active ? "text-primary" : ""}>{note}</span>
-                  </div>
-                ))}
-              </div>
-
+              {/* Discount applied indicator */}
               {discountLabel && (
-                <div className="bg-primary/10 border border-primary/20 rounded-sm px-3 py-2 text-sm font-semibold text-primary">
+                <div className="flex items-center gap-2 border-l-4 border-secondary bg-secondary/20 px-3 py-2 text-sm font-bold text-secondary">
+                  <Check className="w-4 h-4 shrink-0" />
                   {discountLabel} group discount applied
                 </div>
               )}
@@ -483,27 +416,148 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
         </Card>
       )}
 
-      {/* Order Summary */}
-      <div className="bg-white p-6 md:p-8 border border-border flex flex-col md:flex-row md:items-start justify-between gap-8">
-        <div className="space-y-1">
+      {/* Vendor: Business Pass with quantity + discounts */}
+      {isVendor && (
+        <Card className="relative border-2 border-primary overflow-hidden p-0 shadow-lg">
+          <div className="flex flex-col md:flex-row md:items-stretch">
+
+            {/* ── Left column: Benefits ── */}
+            <div className="flex-1 p-6 md:p-8">
+              <div className="flex items-start justify-between gap-3 mb-1">
+                <div>
+                  <h3 className="text-2xl font-bold">Business Pass</h3>
+                  <p className="text-sm text-muted-foreground mt-0.5">For Consultants &amp; Vendors</p>
+                </div>
+                <InventoryBadge remaining={inventory.business} />
+              </div>
+
+              {/* Price + badge */}
+              <div className="flex items-baseline gap-3 mb-1 mt-3 flex-wrap">
+                <span className="text-4xl font-bold">£599</span>
+                <span className="text-base text-muted-foreground line-through">£999</span>
+                <span className="badge-shine text-xs font-bold px-3 py-1 rounded-full inline-block">
+                  40% off
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground mb-5">Per pass, ex VAT · Group discounts apply for multiple</p>
+
+              {/* Standard benefits */}
+              <div className="space-y-2 mb-4">
+                {SINGLE_BENEFITS.map((b) => (
+                  <div key={b} className="flex items-start gap-2 text-sm">
+                    <Check className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                    <span>{b}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Exclusive / premium benefits */}
+              <div className="border-t border-border pt-3 mt-3 space-y-2">
+                <p className="text-xs font-bold uppercase tracking-widest text-gold mb-2">Exclusive to Business Pass</p>
+                {BUSINESS_EXTRA_BENEFITS.map((b) => (
+                  <div key={b} className="flex items-start gap-2 text-sm font-semibold border-l-2 border-gold pl-2">
+                    <Star className="w-4 h-4 text-gold shrink-0 mt-0.5" />
+                    <span>{b}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Column separator */}
+            <div className="hidden md:block w-px bg-premium/20" />
+
+            {/* ── Right column: Quantity picker (dark panel) ── */}
+            <div className="md:w-72 shrink-0 p-6 bg-premium text-premium-foreground space-y-4">
+              <p className="text-xs font-bold uppercase tracking-widest text-white/50">
+                How many passes?
+              </p>
+
+              {/* Custom stepper */}
+              <div className="flex items-stretch border border-white/20 bg-white/10 overflow-hidden">
+                <button
+                  type="button"
+                  className="flex-none w-11 flex items-center justify-center text-white/50 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-20"
+                  onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                  disabled={quantity <= 1}
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <div className="flex-1 text-center font-bold text-2xl py-2.5 text-white border-x border-white/20">
+                  {quantity}
+                </div>
+                <button
+                  type="button"
+                  className="flex-none w-11 flex items-center justify-center text-white/50 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-20"
+                  onClick={() => setQuantity(q => Math.min(10, q + 1))}
+                  disabled={quantity >= 10}
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Upsell nudge */}
+              <AnimatePresence>
+                <UpsellNudge
+                  tiers={allTiers}
+                  passType="business"
+                  quantity={quantity}
+                  unitLabel="pass"
+                />
+              </AnimatePresence>
+
+              {/* Business discount tiers */}
+              <div className="space-y-1 text-xs">
+                {businessTierRows.map(({ key, label, note, active }) => (
+                  <div
+                    key={key}
+                    className={`flex justify-between px-2 py-1.5 transition-all ${
+                      active
+                        ? "border-l-4 border-secondary bg-white/10 text-white font-semibold pl-2"
+                        : "text-white/35 pl-[6px]"
+                    }`}
+                  >
+                    <span>{label}</span>
+                    <span className={active ? "text-secondary font-bold" : ""}>{note}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Discount applied indicator */}
+              {discountLabel && (
+                <div className="flex items-center gap-2 border-l-4 border-secondary bg-secondary/20 px-3 py-2 text-sm font-bold text-secondary">
+                  <Check className="w-4 h-4 shrink-0" />
+                  {discountLabel} group discount applied
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* ── Order Summary ── */}
+      <div className="bg-white border border-border flex flex-col md:flex-row md:items-start justify-between gap-0 md:gap-8 overflow-hidden">
+
+        {/* Left: selection summary */}
+        <div className="flex-1 p-6 md:p-8 space-y-1">
           <h2 className="text-xl font-bold">
             {quantity} {isHR ? `ticket${quantity !== 1 ? "s" : ""}` : `pass${quantity !== 1 ? "es" : ""}`} selected
           </h2>
           {discountLabel && !isMostPopular && (
-            <p className="text-sm font-semibold text-primary">{discountLabel} group discount applied</p>
+            <p className="text-sm font-semibold text-secondary">{discountLabel} group discount applied</p>
           )}
           {isMostPopular && (
-            <p className="text-sm font-semibold text-primary">Most popular choice for teams</p>
+            <p className="text-sm font-semibold text-secondary">Most popular choice for teams</p>
           )}
           <p className="text-sm text-muted-foreground pt-1">
             You'll add attendee details in the next step.
           </p>
         </div>
 
-        <div className="bg-muted p-6 min-w-[280px]">
+        {/* Right: price breakdown */}
+        <div className="bg-muted p-6 md:p-8 min-w-[280px]">
           <h3 className="text-lg font-bold mb-4">Order Summary</h3>
           {currentPricing ? (
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <div className="flex justify-between text-sm">
                 <span>
                   {selectedPass === "business"
@@ -514,7 +568,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
               </div>
 
               {currentPricing.groupDiscountAmount > 0 && (
-                <div className="flex justify-between text-sm text-primary font-bold">
+                <div className="flex justify-between text-sm font-bold text-secondary">
                   <span>Group Discount ({currentPricing.groupDiscountPercent}%)</span>
                   <span>-£{currentPricing.groupDiscountAmount.toFixed(2)}</span>
                 </div>
@@ -529,16 +583,25 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                 <span>£{currentPricing.vatAmount.toFixed(2)}</span>
               </div>
 
-              <div className="pt-3 border-t border-border flex justify-between font-bold text-xl">
+              <div className="pt-3 border-t border-border flex justify-between font-bold text-2xl">
                 <span>Total</span>
                 <span>£{currentPricing.total.toFixed(2)}</span>
               </div>
 
               {currentPricing.savedAmount > 0 && (
-                <div className="flex justify-between text-sm font-semibold text-primary bg-primary/10 rounded-sm px-3 py-2 -mx-1 mt-1">
-                  <span>You're saving</span>
-                  <span>£{(currentPricing.savedAmount * (1 + currentPricing.vatRate)).toFixed(2)}</span>
-                </div>
+                <motion.div
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="savings-pulse flex justify-between items-center text-sm font-bold bg-success text-success-foreground px-4 py-2.5 -mx-2 mt-1"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Check className="w-4 h-4 shrink-0" />
+                    You're saving
+                  </span>
+                  <span className="text-lg font-bold">
+                    £{(currentPricing.savedAmount * (1 + currentPricing.vatRate)).toFixed(2)}
+                  </span>
+                </motion.div>
               )}
             </div>
           ) : (

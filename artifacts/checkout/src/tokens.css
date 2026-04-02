@@ -30,6 +30,13 @@
   --input: 30 7% 87%;
   --ring: 4 77% 57%;
   --radius: 0px;
+
+  --success: 142 71% 45%;
+  --success-foreground: 0 0% 100%;
+  --premium: 222 47% 18%;
+  --premium-foreground: 0 0% 100%;
+  --gold: 43 74% 49%;
+  --gold-foreground: 0 0% 0%;
 }
 
 .dark {
@@ -52,4 +59,11 @@
   --border: 0 0% 20%;
   --input: 0 0% 20%;
   --ring: 4 77% 57%;
+
+  --success: 142 71% 40%;
+  --success-foreground: 0 0% 100%;
+  --premium: 222 47% 25%;
+  --premium-foreground: 0 0% 100%;
+  --gold: 43 74% 55%;
+  --gold-foreground: 0 0% 0%;
 }
