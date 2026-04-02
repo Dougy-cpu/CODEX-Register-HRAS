@@ -205,7 +205,7 @@ function UpsellNudge({ tiers, passType, quantity, unitLabel }: UpsellNudgeProps)
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -4 }}
-      className="flex items-start gap-2.5 border-l-4 border-secondary bg-secondary/10 px-3 py-2.5 text-xs text-foreground"
+      className="flex items-start gap-2.5 bg-accent/20 border border-accent px-3 py-2.5 text-xs text-foreground"
     >
       <TrendingUp className="w-3.5 h-3.5 shrink-0 mt-0.5 text-secondary" />
       <span>
@@ -395,17 +395,12 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                     key={key}
                     className={`flex justify-between px-2 py-1.5 transition-all ${
                       active
-                        ? isSpecial
-                          ? "border-l-4 border-secondary bg-secondary/10 text-foreground font-semibold pl-2"
-                          : "border-l-4 border-primary bg-primary/10 text-foreground font-semibold pl-2"
+                        ? "border-l-4 border-primary bg-primary/10 text-foreground font-semibold pl-2"
                         : "text-muted-foreground pl-[6px]"
                     }`}
                   >
                     <span>{label}</span>
-                    <span className={
-                      active && isSpecial ? "text-secondary font-bold" :
-                      active ? "text-primary font-bold" : ""
-                    }>
+                    <span className={active ? "text-primary font-bold" : ""}>
                       {note}
                     </span>
                   </div>
