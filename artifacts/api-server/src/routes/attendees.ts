@@ -3,8 +3,6 @@ import { eq, and } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { attendeesTable, bookingsTable } from "@workspace/db";
 import { deriveAdminToken, getAdminPassword } from "../middleware/admin-auth";
-import { sendIncompleteFormNotification } from "../lib/email";
-import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -93,26 +91,6 @@ router.post("/bookings/:bookingId/attendees", async (req, res): Promise<void> =>
 
   res.status(existing ? 200 : 201).json(formatAttendee(attendee));
 
-  // Fire incomplete-form notification when the lead attendee is saved on a still-partial
-  // booking. Atomic: claim the flag first with a conditional UPDATE (only if it's still
-  // false), then send the email only when the claim succeeds. This prevents duplicate
-  // emails under concurrent requests.
-  if (isLead && booking.status === "partial" && !booking.partialNotificationSent) {
-    try {
-      const claimed = await db
-        .update(bookingsTable)
-        .set({ partialNotificationSent: true })
-        .where(and(eq(bookingsTable.id, bookingId), eq(bookingsTable.partialNotificationSent, false)))
-        .returning({ id: bookingsTable.id });
-
-      if (claimed.length > 0) {
-        await sendIncompleteFormNotification(bookingId);
-      }
-    } catch (err) {
-      // Non-fatal — log but don't affect the response
-      logger.error({ err, bookingId }, "Failed to send incomplete form notification");
-    }
-  }
 });
 
 router.patch("/bookings/:bookingId/attendees/:attendeeId", async (req, res): Promise<void> => {

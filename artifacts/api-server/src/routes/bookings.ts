@@ -1,10 +1,12 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { bookingsTable, attendeesTable } from "@workspace/db";
 import { calculatePricing } from "../lib/pricing";
 import { v4 as uuidv4 } from "uuid";
 import { deriveAdminToken, getAdminPassword } from "../middleware/admin-auth";
+import { sendIncompleteFormNotification } from "../lib/email";
+import { logger } from "../lib/logger";
 
 function isAdminRequest(req: import("express").Request): boolean {
   const token = req.headers["x-admin-token"] as string | undefined;
@@ -239,6 +241,26 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
     .set(updateData)
     .where(eq(bookingsTable.id, id))
     .returning();
+
+  // Fire incomplete-registration notification when the user first arrives at the payment
+  // screen (Step 4). Atomic: claim the flag with a conditional UPDATE first, then send
+  // the email only when the claim succeeds. This prevents duplicate emails.
+  if (currentStep === 4 && updated.status === "partial" && !existing.partialNotificationSent) {
+    try {
+      const claimed = await db
+        .update(bookingsTable)
+        .set({ partialNotificationSent: true })
+        .where(and(eq(bookingsTable.id, id), eq(bookingsTable.partialNotificationSent, false)))
+        .returning({ id: bookingsTable.id });
+
+      if (claimed.length > 0) {
+        await sendIncompleteFormNotification(id);
+      }
+    } catch (err) {
+      // Non-fatal — log but don't affect the response
+      logger.error({ err, bookingId: id }, "Failed to send incomplete form notification");
+    }
+  }
 
   res.json(formatBooking(updated));
 });
