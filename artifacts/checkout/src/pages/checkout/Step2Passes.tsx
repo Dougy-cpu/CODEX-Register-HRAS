@@ -283,7 +283,6 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
             : "Choose how many tickets you need. Group discounts apply automatically."}
         </p>
       </div>
-
       {/* HR: Single pass with quantity picker */}
       {isHR && (
         <Card className="relative border-2 border-primary overflow-hidden p-0 shadow-lg">
@@ -326,7 +325,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
             <div className="hidden md:block w-px bg-border self-stretch" />
 
             {/* ── Right column: Quantity picker (warm panel) ── */}
-            <div className="md:w-72 shrink-0 p-6 bg-muted space-y-4">
+            <div className="md:w-72 shrink-0 p-6 bg-muted space-y-4 ml-[200px]">
               <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                 How many tickets?
               </p>
@@ -417,7 +416,6 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
           </div>
         </Card>
       )}
-
       {/* Vendor: Business Pass with quantity + discounts */}
       {isVendor && (
         <Card className="relative border-2 border-primary overflow-hidden p-0 shadow-lg">
@@ -539,7 +537,6 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
           </div>
         </Card>
       )}
-
       {/* ── Order Summary ── */}
       <div className="bg-white border border-border flex flex-col md:flex-row md:items-start justify-between gap-0 md:gap-8 overflow-hidden">
 
@@ -619,7 +616,6 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
           )}
         </div>
       </div>
-
       <div className="flex justify-between pt-4">
         <Button
           variant="outline"
