@@ -172,6 +172,9 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
   }
 
   const isGroup = (data?.attendees?.length ?? 0) > 1;
+  const manageUrl = data?.managementToken
+    ? `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/manage/${data.managementToken}`
+    : null;
 
   return (
     <div className="space-y-6">
@@ -196,21 +199,23 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
       </div>
 
       {/* Self-service management link */}
-      {data?.managementToken && (
+      {manageUrl && (
         <div className="bg-white border border-border p-3 text-sm">
           <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-2 flex items-center gap-1.5">
             <Link className="w-3 h-3" />
             Self-Service Attendee Link
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex items-start gap-2">
             <code className="flex-1 text-xs font-mono text-foreground bg-slate-50 border border-border px-2 py-1.5 break-all">
-              {`${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/manage/${data.managementToken}`}
+              {manageUrl}
             </code>
             <button
               type="button"
               onClick={() => {
-                const url = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/manage/${data.managementToken}`;
-                navigator.clipboard.writeText(url).then(() => {
+                navigator.clipboard.writeText(manageUrl).then(() => {
+                  setCopyState("copied");
+                  setTimeout(() => setCopyState("idle"), 2000);
+                }).catch(() => {
                   setCopyState("copied");
                   setTimeout(() => setCopyState("idle"), 2000);
                 });
