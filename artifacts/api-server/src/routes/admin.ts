@@ -10,6 +10,8 @@ import {
   notificationEmailsTable,
   passInventoryTable,
   passConfigTable,
+  activityLogTable,
+  emailLogsTable,
 } from "@workspace/db";
 import { adminAuth, deriveAdminToken, getAdminPassword } from "../middleware/admin-auth";
 
@@ -636,6 +638,171 @@ router.put("/admin/passes/config/:passType", adminAuth, async (req, res): Promis
     .returning();
 
   res.json(row);
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Activity Feed
+// ──────────────────────────────────────────────────────────────────────────────
+router.get("/admin/activity", adminAuth, async (req, res): Promise<void> => {
+  // 1. Recent bookings (paid + invoiced), last 90 days
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+  const recentBookings = await db
+    .select()
+    .from(bookingsTable)
+    .where(
+      and(
+        or(
+          eq(bookingsTable.status, "paid"),
+          eq(bookingsTable.status, "invoiced")
+        ),
+        sql`${bookingsTable.createdAt} >= ${ninetyDaysAgo}`
+      )
+    )
+    .orderBy(desc(bookingsTable.createdAt))
+    .limit(100);
+
+  // 2. Attendee change log
+  const changeLog = await db
+    .select({
+      log: activityLogTable,
+      attendee: attendeesTable,
+      booking: bookingsTable,
+    })
+    .from(activityLogTable)
+    .leftJoin(attendeesTable, eq(activityLogTable.attendeeId, attendeesTable.id))
+    .leftJoin(bookingsTable, eq(activityLogTable.bookingId, bookingsTable.id))
+    .orderBy(desc(activityLogTable.createdAt))
+    .limit(200);
+
+  // 3. Email failures (last 30 days)
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const emailFailures = await db
+    .select()
+    .from(emailLogsTable)
+    .where(
+      and(
+        eq(emailLogsTable.status, "failed"),
+        sql`${emailLogsTable.sentAt} >= ${thirtyDaysAgo}`
+      )
+    )
+    .orderBy(desc(emailLogsTable.sentAt))
+    .limit(50);
+
+  // 4. Stats
+  const [unpaidResult] = await db
+    .select({ count: count() })
+    .from(bookingsTable)
+    .where(
+      and(
+        eq(bookingsTable.paymentMethod, "invoice"),
+        eq(bookingsTable.status, "invoiced")
+      )
+    );
+
+  const [tbcResult] = await db
+    .select({ count: count() })
+    .from(attendeesTable)
+    .where(eq(attendeesTable.isTbc, true));
+
+  // 5. Bookings this calendar month
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+  const [monthResult] = await db
+    .select({ count: count() })
+    .from(bookingsTable)
+    .where(
+      and(
+        or(eq(bookingsTable.status, "paid"), eq(bookingsTable.status, "invoiced")),
+        sql`${bookingsTable.createdAt} >= ${startOfMonth}`
+      )
+    );
+
+  // Build combined feed
+  const feed: Array<{
+    type: string;
+    timestamp: string;
+    booking?: ReturnType<typeof formatBooking> | null;
+    attendee?: ReturnType<typeof formatAttendee> | null;
+    data?: Record<string, unknown>;
+  }> = [];
+
+  for (const b of recentBookings) {
+    const isInvoice = b.paymentMethod === "invoice";
+    const isPaid = b.status === "paid";
+    const type = isInvoice
+      ? isPaid
+        ? "invoice_paid"
+        : "invoice_overdue" // all invoiced are "overdue" if past due, else "new"
+      : "new_booking_card";
+
+    // For invoice bookings: if created within last 7 days, show as new request; otherwise overdue
+    const isNew = Date.now() - b.createdAt.getTime() < 7 * 24 * 60 * 60 * 1000;
+    const resolvedType =
+      isInvoice && !isPaid
+        ? isNew
+          ? "new_booking_invoice"
+          : b.invoiceDueDate && b.invoiceDueDate < new Date()
+            ? "invoice_overdue"
+            : "new_booking_invoice"
+        : type;
+
+    feed.push({
+      type: resolvedType,
+      timestamp: b.createdAt.toISOString(),
+      booking: formatBooking(b),
+    });
+  }
+
+  for (const row of changeLog) {
+    if (!row.log) continue;
+    feed.push({
+      type: row.log.type,
+      timestamp: row.log.createdAt.toISOString(),
+      booking: row.booking ? formatBooking(row.booking) : null,
+      attendee: row.attendee ? formatAttendee(row.attendee) : null,
+      data: (row.log.data as Record<string, unknown>) ?? undefined,
+    });
+  }
+
+  for (const ef of emailFailures) {
+    feed.push({
+      type: "email_failure",
+      timestamp: ef.sentAt.toISOString(),
+      data: {
+        emailType: ef.type,
+        toEmail: ef.recipient,
+        error: ef.errorMessage,
+        bookingId: ef.bookingId,
+      },
+    });
+  }
+
+  // Sort combined feed by timestamp descending
+  feed.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  // Unpaid invoice list (for the alert panel)
+  const unpaidInvoiceList = await db
+    .select()
+    .from(bookingsTable)
+    .where(
+      and(
+        eq(bookingsTable.paymentMethod, "invoice"),
+        eq(bookingsTable.status, "invoiced")
+      )
+    )
+    .orderBy(bookingsTable.invoiceDueDate);
+
+  res.json({
+    feed: feed.slice(0, 100),
+    stats: {
+      unpaidInvoices: Number(unpaidResult?.count ?? 0),
+      tbcAttendees: Number(tbcResult?.count ?? 0),
+      emailFailures: emailFailures.length,
+      totalThisMonth: Number(monthResult?.count ?? 0),
+    },
+    unpaidInvoiceList: unpaidInvoiceList.map(formatBooking),
+  });
 });
 
 export default router;

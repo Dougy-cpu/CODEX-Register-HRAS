@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { attendeesTable, bookingsTable, eventSettingsTable } from "@workspace/db";
+import { attendeesTable, bookingsTable, eventSettingsTable, activityLogTable } from "@workspace/db";
 import { deriveAdminToken, getAdminPassword } from "../middleware/admin-auth";
 import { sendAttendeeChangeNotification } from "../lib/email";
 
@@ -225,6 +225,8 @@ router.patch("/attendees/:id/managed", async (req, res): Promise<void> => {
     return;
   }
 
+  const wasTbc = attendee.isTbc;
+
   const [updated] = await db
     .update(attendeesTable)
     .set({
@@ -241,6 +243,14 @@ router.patch("/attendees/:id/managed", async (req, res): Promise<void> => {
     .returning();
 
   res.json(formatAttendee(updated));
+
+  // Log to activity_log
+  db.insert(activityLogTable).values({
+    type: wasTbc ? "tbc_filled" : "attendee_change",
+    bookingId: booking.id,
+    attendeeId,
+    data: { firstName, lastName, jobTitle, company, workEmail, wasTbc },
+  }).catch(() => {});
 
   // Fire and forget — notify organisers that an attendee updated their details
   sendAttendeeChangeNotification(booking.id, attendeeId, { firstName, lastName, jobTitle, company, workEmail }).catch(() => {});
