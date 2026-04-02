@@ -56,7 +56,7 @@ router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> =
         ...(logoDataUrl !== undefined && { logoDataUrl }),
         ...(fromName !== undefined && { fromName }),
         ...(fromEmail !== undefined && { fromEmail }),
-        ...(attendeeChangesLocked !== undefined && { attendeeChangesLocked: Boolean(attendeeChangesLocked) }),
+        ...(attendeeChangesLocked !== undefined && { attendeeChangesLocked: attendeeChangesLocked === true }),
         ...(attendeeChangesLockedMessage !== undefined && { attendeeChangesLockedMessage: attendeeChangesLockedMessage || null }),
       })
       .where(eq(eventSettingsTable.id, existing[0].id))
@@ -75,7 +75,7 @@ router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> =
         logoDataUrl: logoDataUrl || null,
         fromName: fromName || "HR Analytics Summit",
         fromEmail: fromEmail || "noreply@hranalyticssummit.com",
-        attendeeChangesLocked: Boolean(attendeeChangesLocked) || false,
+        attendeeChangesLocked: attendeeChangesLocked === true,
         attendeeChangesLockedMessage: attendeeChangesLockedMessage || null,
       })
       .returning());
