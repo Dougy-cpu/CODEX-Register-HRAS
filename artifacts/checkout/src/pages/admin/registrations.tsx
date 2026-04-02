@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronDown, ChevronRight, Search, Download, Trash2, AlertTriangle, Send, Check, Clock, Pencil, X, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, Download, Trash2, AlertTriangle, Send, Check, Clock, Pencil, X, Loader2, Copy, Link } from "lucide-react";
 
 const STATUS_OPTIONS = [
   { value: "paid", label: "Paid" },
@@ -53,6 +53,7 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
   const [editForm, setEditForm] = useState<AttendeeEditForm>({ firstName: "", lastName: "", jobTitle: "", company: "", workEmail: "", phone: "", dietaryAccessibility: "" });
   const [saveState, setSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
 
   const startEditing = (a: NonNullable<typeof data>["attendees"][number]) => {
     setEditingAttendeeId(a.id);
@@ -193,6 +194,47 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
           <p className="font-medium">{data?.promoCode || "—"}</p>
         </div>
       </div>
+
+      {/* Self-service management link */}
+      {data?.managementToken && (
+        <div className="bg-white border border-border p-3 text-sm">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-2 flex items-center gap-1.5">
+            <Link className="w-3 h-3" />
+            Self-Service Attendee Link
+          </p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 text-xs font-mono text-foreground bg-slate-50 border border-border px-2 py-1.5 truncate">
+              {`${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/manage/${data.managementToken}`}
+            </code>
+            <button
+              type="button"
+              onClick={() => {
+                const url = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/manage/${data.managementToken}`;
+                navigator.clipboard.writeText(url).then(() => {
+                  setCopyState("copied");
+                  setTimeout(() => setCopyState("idle"), 2000);
+                });
+              }}
+              className="flex-none flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-border bg-slate-50 hover:bg-slate-100 transition-colors whitespace-nowrap"
+            >
+              {copyState === "copied" ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-green-600" />
+                  <span className="text-green-700">Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Copy link</span>
+                </>
+              )}
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1.5">
+            Send this link to the registrant — anyone with it can update attendee details for this booking.
+          </p>
+        </div>
+      )}
 
       {/* Manual status override */}
       <div className="flex items-center gap-4 py-3 px-4 bg-slate-50 border border-border">
