@@ -3,7 +3,7 @@ import AdminLayout from "@/components/layout/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, Lock, Unlock, Settings2, Loader2 } from "lucide-react";
+import { Check, Lock, Unlock, Settings2, Loader2, Globe, ShieldCheck } from "lucide-react";
 
 interface EventSettings {
   eventName: string;
@@ -425,6 +425,129 @@ export default function AdminSettings() {
                     <span className="flex items-center gap-1.5"><Loader2 className="w-4 h-4 animate-spin" /> Saving…</span>
                   ) : "Save Reference Format"}
                 </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Production Secrets Checklist ── */}
+          <div className="bg-white border border-border">
+            <div className="px-6 py-4 border-b border-border flex items-center gap-3">
+              <ShieldCheck className="w-5 h-5 text-primary" />
+              <h2 className="font-bold text-base">Production Environment Secrets</h2>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-muted-foreground">
+                All secrets below must be set in <strong>Replit → Secrets</strong> (the padlock icon in the sidebar) before publishing. These are never stored in code.
+              </p>
+
+              <div className="space-y-2">
+                {([
+                  {
+                    key: "STRIPE_SECRET_KEY",
+                    description: "Stripe live secret key (starts with sk_live_…). Found in the Stripe Dashboard → Developers → API keys.",
+                    required: true,
+                  },
+                  {
+                    key: "STRIPE_WEBHOOK_SECRET",
+                    description: "Webhook signing secret from the Stripe Dashboard → Webhooks endpoint. Must point to https://register.hranalyticssummit.com/api/stripe/webhook.",
+                    required: true,
+                  },
+                  {
+                    key: "DATABASE_URL",
+                    description: "PostgreSQL connection string. Auto-provisioned by Replit — do not change unless migrating to an external database.",
+                    required: true,
+                  },
+                  {
+                    key: "ADMIN_PASSWORD",
+                    description: "Password to log in to the admin panel at /admin. Choose a strong, unique password.",
+                    required: true,
+                  },
+                  {
+                    key: "SMTP_HOST",
+                    description: "Outbound email server hostname (e.g. smtp.resend.com or smtp.sendgrid.net).",
+                    required: false,
+                  },
+                  {
+                    key: "SMTP_PORT",
+                    description: "SMTP port (typically 587 for TLS or 465 for SSL).",
+                    required: false,
+                  },
+                  {
+                    key: "SMTP_USER",
+                    description: "SMTP username / API key for authentication.",
+                    required: false,
+                  },
+                  {
+                    key: "SMTP_PASS",
+                    description: "SMTP password or API secret.",
+                    required: false,
+                  },
+                ] as { key: string; description: string; required: boolean }[]).map(({ key, description, required }) => (
+                  <div key={key} className="flex gap-3 items-start p-3 border border-border rounded bg-muted/20">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <code className="font-mono text-xs font-semibold text-foreground">{key}</code>
+                        {required ? (
+                          <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-red-100 text-red-700">Required</span>
+                        ) : (
+                          <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Optional</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">{description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-800">
+                <strong>Stripe live mode:</strong> Ensure <code className="bg-blue-100 px-1 py-0.5 rounded">STRIPE_SECRET_KEY</code> begins with <code className="bg-blue-100 px-1 py-0.5 rounded">sk_live_</code> (not <code className="bg-blue-100 px-1 py-0.5 rounded">sk_test_</code>) before publishing. The app uses whichever key is present — no code changes are needed to switch from test to live mode.
+              </div>
+            </div>
+          </div>
+
+          {/* ── DNS / Domain Setup ── */}
+          <div className="bg-white border border-border">
+            <div className="px-6 py-4 border-b border-border flex items-center gap-3">
+              <Globe className="w-5 h-5 text-primary" />
+              <h2 className="font-bold text-base">Domain Setup — register.hranalyticssummit.com</h2>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-muted-foreground">
+                To make this app live at <strong>register.hranalyticssummit.com</strong>, add a single DNS record in your Squarespace domain settings. No changes are needed to your main Squarespace website.
+              </p>
+
+              <div className="bg-amber-50 border border-amber-200 rounded p-4">
+                <p className="text-sm font-semibold text-amber-800 mb-3">Step-by-step instructions (Squarespace)</p>
+                <ol className="text-sm text-amber-900 space-y-2 list-decimal list-inside">
+                  <li>Log in to <strong>Squarespace</strong> and go to <strong>Settings → Domains</strong>.</li>
+                  <li>Click on <strong>hranalyticssummit.com</strong>, then open <strong>DNS Settings</strong>.</li>
+                  <li>Click <strong>Add Record</strong> and choose <strong>CNAME</strong>.</li>
+                  <li>
+                    Set the fields as follows:
+                    <div className="mt-2 font-mono text-xs bg-white border border-amber-300 rounded p-3 space-y-1">
+                      <div><span className="text-muted-foreground w-16 inline-block">Type:</span> CNAME</div>
+                      <div><span className="text-muted-foreground w-16 inline-block">Host:</span> register</div>
+                      <div><span className="text-muted-foreground w-16 inline-block">Points to:</span> <em className="not-italic text-amber-800">[Your Replit deployment domain — e.g. my-app.replit.app]</em></div>
+                    </div>
+                  </li>
+                  <li>Save the record.</li>
+                </ol>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded p-4 text-sm text-blue-800 space-y-1">
+                <p><strong>Where to find your Replit deployment domain:</strong></p>
+                <p>After publishing this project in Replit, click <strong>Publish → View site</strong>. The domain shown (ending in <code className="text-xs bg-blue-100 px-1 py-0.5 rounded">.replit.app</code>) is what you enter in the <em>Points to</em> field above.</p>
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                DNS propagation typically takes a few minutes on Squarespace, but may take up to 24 hours in rare cases. Once propagated, the app will be live at <strong>https://register.hranalyticssummit.com</strong> with a valid SSL certificate provided automatically by Replit.
+              </p>
+
+              <div className="bg-muted/40 border border-border rounded p-4 text-sm space-y-1">
+                <p className="font-semibold text-xs uppercase tracking-wide text-muted-foreground mb-2">Stripe Webhook — update after DNS is live</p>
+                <p className="text-muted-foreground text-xs">In the <a href="https://dashboard.stripe.com/webhooks" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">Stripe Dashboard → Webhooks</a>, update the endpoint URL to:</p>
+                <p className="font-mono text-xs bg-white border border-border rounded px-3 py-2 select-all">https://register.hranalyticssummit.com/api/stripe/webhook</p>
+                <p className="text-muted-foreground text-xs">Copy the new webhook signing secret and add it as the <code className="text-xs bg-muted px-1 py-0.5 rounded">STRIPE_WEBHOOK_SECRET</code> environment variable in Replit Secrets.</p>
               </div>
             </div>
           </div>
