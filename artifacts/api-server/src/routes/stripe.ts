@@ -307,12 +307,13 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
     }
   }
 
-  // A charge was refunded — mark the booking as cancelled and email the customer.
+  // A charge was refunded — mark the booking as refunded and email the customer, but only for full refunds.
   if (event.type === "charge.refunded") {
     const charge = event.data.object as Stripe.Charge;
     const paymentIntentId = typeof charge.payment_intent === "string" ? charge.payment_intent : null;
+    const isFullRefund = charge.refunded === true || charge.amount_refunded >= charge.amount;
 
-    if (paymentIntentId) {
+    if (paymentIntentId && isFullRefund) {
       const [booking] = await db
         .select()
         .from(bookingsTable)
@@ -324,7 +325,7 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
           .set({ status: "refunded", updatedAt: new Date() })
           .where(eq(bookingsTable.id, booking.id));
 
-        logger.info({ bookingId: booking.id, paymentIntentId, refunded: charge.amount_refunded }, "charge.refunded: booking refunded");
+        logger.info({ bookingId: booking.id, paymentIntentId, amountRefunded: charge.amount_refunded }, "charge.refunded: full refund — booking marked refunded");
 
         try {
           await sendRefundConfirmationEmail(booking.id, charge.amount_refunded);
@@ -337,6 +338,8 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
         } catch (err) {
           logger.error({ err, bookingId: booking.id }, "charge.refunded: failed to re-sync to Google Sheets");
         }
+      } else if (booking && !isFullRefund) {
+        logger.info({ bookingId: booking.id, paymentIntentId, amountRefunded: charge.amount_refunded, total: charge.amount }, "charge.refunded: partial refund — booking status unchanged");
       }
     }
   }
