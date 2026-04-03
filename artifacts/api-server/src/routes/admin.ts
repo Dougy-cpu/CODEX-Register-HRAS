@@ -93,8 +93,8 @@ router.get("/admin/stats", adminAuth, async (_req, res): Promise<void> => {
   );
 
   const passCounts = {
-    single: allBookings.filter((b) => b.passType === "single").length,
-    business: allBookings.filter((b) => b.passType === "business").length,
+    single: completed.filter((b) => b.passType === "single").length,
+    business: completed.filter((b) => b.passType === "business").length,
   };
 
   const paymentMethodCounts = {
