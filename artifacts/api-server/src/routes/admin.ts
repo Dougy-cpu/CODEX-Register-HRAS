@@ -104,21 +104,29 @@ router.get("/admin/stats", adminAuth, async (_req, res): Promise<void> => {
 
   const allAttendees = await db.select().from(attendeesTable);
 
-  const recentBookings = allBookings
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-    .slice(0, 10);
+  function withLead(booking: typeof bookingsTable.$inferSelect) {
+    const lead = allAttendees.find((a) => a.bookingId === booking.id && a.isLead);
+    return {
+      ...formatBooking(booking),
+      leadName: lead ? `${lead.firstName} ${lead.lastName}` : null,
+      leadEmail: lead?.workEmail || null,
+      leadPhone: lead?.phone || booking.billingPhone || null,
+      leadJobTitle: lead?.jobTitle || null,
+      leadCompany: lead?.company || booking.billingCompany || null,
+    };
+  }
 
-  const recentWithLeads = await Promise.all(
-    recentBookings.map(async (booking) => {
-      const lead = allAttendees.find((a) => a.bookingId === booking.id && a.isLead);
-      return {
-        ...formatBooking(booking),
-        leadName: lead ? `${lead.firstName} ${lead.lastName}` : null,
-        leadEmail: lead?.workEmail || null,
-        leadCompany: lead?.company || null,
-      };
-    })
-  );
+  const sortedAll = [...allBookings].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+  const recentCompleted = sortedAll
+    .filter((b) => b.status === "paid" || b.status === "invoiced")
+    .slice(0, 10)
+    .map(withLead);
+
+  const recentPartials = sortedAll
+    .filter((b) => b.status === "partial")
+    .slice(0, 15)
+    .map(withLead);
 
   res.json({
     totalRegistrations: allBookings.length,
@@ -128,7 +136,8 @@ router.get("/admin/stats", adminAuth, async (_req, res): Promise<void> => {
     totalVat: parseFloat(totalVat.toFixed(2)),
     passCounts,
     paymentMethodCounts,
-    recentRegistrations: recentWithLeads,
+    recentRegistrations: recentCompleted,
+    recentPartials,
   });
 });
 
@@ -649,7 +658,7 @@ router.put("/admin/passes/config/:passType", adminAuth, async (req, res): Promis
 // Activity Feed
 // ──────────────────────────────────────────────────────────────────────────────
 router.get("/admin/activity", adminAuth, async (req, res): Promise<void> => {
-  // 1. Recent bookings (paid + invoiced), last 90 days
+  // 1a. Recent bookings (paid + invoiced), last 90 days
   const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
   const recentBookings = await db
     .select()
@@ -665,6 +674,30 @@ router.get("/admin/activity", adminAuth, async (req, res): Promise<void> => {
     )
     .orderBy(desc(bookingsTable.createdAt))
     .limit(100);
+
+  // 1b. Partial checkouts (last 90 days)
+  const partialBookings = await db
+    .select()
+    .from(bookingsTable)
+    .where(
+      and(
+        eq(bookingsTable.status, "partial"),
+        sql`${bookingsTable.createdAt} >= ${ninetyDaysAgo}`
+      )
+    )
+    .orderBy(desc(bookingsTable.createdAt))
+    .limit(100);
+
+  // Lead attendees for partial bookings
+  const partialBookingIds = partialBookings.map((b) => b.id);
+  const partialLeads =
+    partialBookingIds.length > 0
+      ? await db
+          .select()
+          .from(attendeesTable)
+          .where(eq(attendeesTable.isLead, true))
+          .then((rows) => rows.filter((a) => partialBookingIds.includes(a.bookingId!)))
+      : [];
 
   // 2. Attendee change log
   const changeLog = await db
@@ -738,10 +771,9 @@ router.get("/admin/activity", adminAuth, async (req, res): Promise<void> => {
     const type = isInvoice
       ? isPaid
         ? "invoice_paid"
-        : "invoice_overdue" // all invoiced are "overdue" if past due, else "new"
+        : "invoice_overdue"
       : "new_booking_card";
 
-    // For invoice bookings: if created within last 7 days, show as new request; otherwise overdue
     const isNew = Date.now() - b.createdAt.getTime() < 7 * 24 * 60 * 60 * 1000;
     const resolvedType =
       isInvoice && !isPaid
@@ -756,6 +788,16 @@ router.get("/admin/activity", adminAuth, async (req, res): Promise<void> => {
       type: resolvedType,
       timestamp: b.createdAt.toISOString(),
       booking: formatBooking(b),
+    });
+  }
+
+  for (const b of partialBookings) {
+    const lead = partialLeads.find((a) => a.bookingId === b.id);
+    feed.push({
+      type: "partial_checkout",
+      timestamp: b.createdAt.toISOString(),
+      booking: formatBooking(b),
+      attendee: lead ? formatAttendee(lead) : null,
     });
   }
 
@@ -799,12 +841,13 @@ router.get("/admin/activity", adminAuth, async (req, res): Promise<void> => {
     .orderBy(bookingsTable.invoiceDueDate);
 
   res.json({
-    feed: feed.slice(0, 100),
+    feed: feed.slice(0, 200),
     stats: {
       unpaidInvoices: Number(unpaidResult?.count ?? 0),
       tbcAttendees: Number(tbcResult?.count ?? 0),
       emailFailures: emailFailures.length,
       totalThisMonth: Number(monthResult?.count ?? 0),
+      partialCheckouts: partialBookings.length,
     },
     unpaidInvoiceList: unpaidInvoiceList.map(formatBooking),
   });

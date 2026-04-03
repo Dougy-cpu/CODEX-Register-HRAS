@@ -14,6 +14,7 @@ import {
   Mail,
   Clock,
   TrendingUp,
+  Hourglass,
 } from "lucide-react";
 
 function adminFetch(path: string, init?: RequestInit) {
@@ -37,6 +38,7 @@ type FeedItem = {
     billingName: string;
     billingCompany: string;
     billingEmail: string;
+    billingPhone: string | null;
     totalAmount: number;
     quantity: number;
     passType: string;
@@ -51,6 +53,7 @@ type FeedItem = {
     jobTitle: string;
     company: string;
     workEmail: string;
+    phone: string | null;
   };
   data?: Record<string, unknown>;
 };
@@ -60,6 +63,7 @@ type Stats = {
   tbcAttendees: number;
   emailFailures: number;
   totalThisMonth: number;
+  partialCheckouts: number;
 };
 
 type ActivityResponse = {
@@ -113,6 +117,12 @@ const EVENT_TYPE_CONFIG: Record<
     icon: Mail,
     color: "text-red-700",
     bg: "bg-red-50 border-red-200",
+  },
+  partial_checkout: {
+    label: "Partial Checkout",
+    icon: Hourglass,
+    color: "text-yellow-700",
+    bg: "bg-yellow-50 border-yellow-200",
   },
 };
 
@@ -188,32 +198,67 @@ function FeedCard({ item }: { item: FeedItem }) {
           </span>
         </div>
 
-        {item.booking && (
-          <div className="mt-1 text-sm text-slate-700">
-            <span className="font-medium">{item.booking.billingName}</span>
-            {item.booking.billingCompany && (
-              <span className="text-slate-500">
-                {" "}
-                · {item.booking.billingCompany}
-              </span>
+        {item.type === "partial_checkout" ? (
+          <div className="mt-1.5 text-sm text-slate-700 space-y-0.5">
+            {(item.attendee || item.booking) && (
+              <div>
+                <span className="font-semibold">
+                  {item.attendee
+                    ? `${item.attendee.firstName} ${item.attendee.lastName}`
+                    : item.booking?.billingName || "—"}
+                </span>
+                {(item.attendee?.jobTitle || item.attendee?.company || item.booking?.billingCompany) && (
+                  <span className="text-slate-500">
+                    {item.attendee?.jobTitle ? ` · ${item.attendee.jobTitle}` : ""}
+                    {(item.attendee?.company || item.booking?.billingCompany)
+                      ? `, ${item.attendee?.company || item.booking?.billingCompany}`
+                      : ""}
+                  </span>
+                )}
+              </div>
             )}
-            <span className="text-slate-500"> · {passLabel}</span>
-            <span className="ml-2 font-semibold text-slate-900">
-              £{item.booking.totalAmount.toLocaleString("en-GB", { minimumFractionDigits: 2 })}
-            </span>
+            <div className="text-xs text-slate-500 space-x-3">
+              {(item.attendee?.workEmail || item.booking?.billingEmail) && (
+                <span>{item.attendee?.workEmail || item.booking?.billingEmail}</span>
+              )}
+              {(item.attendee?.phone || item.booking?.billingPhone) && (
+                <span>{item.attendee?.phone || item.booking?.billingPhone}</span>
+              )}
+            </div>
+            {passLabel && (
+              <div className="text-xs text-slate-500">{passLabel}</div>
+            )}
           </div>
-        )}
+        ) : (
+          <>
+            {item.booking && (
+              <div className="mt-1 text-sm text-slate-700">
+                <span className="font-medium">{item.booking.billingName}</span>
+                {item.booking.billingCompany && (
+                  <span className="text-slate-500">
+                    {" "}
+                    · {item.booking.billingCompany}
+                  </span>
+                )}
+                <span className="text-slate-500"> · {passLabel}</span>
+                <span className="ml-2 font-semibold text-slate-900">
+                  £{item.booking.totalAmount.toLocaleString("en-GB", { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            )}
 
-        {item.attendee && (
-          <div className="mt-1 text-sm text-slate-700">
-            <span className="font-medium">
-              {item.attendee.firstName} {item.attendee.lastName}
-            </span>
-            <span className="text-slate-500">
-              {" "}
-              · {item.attendee.jobTitle}, {item.attendee.company}
-            </span>
-          </div>
+            {item.attendee && (
+              <div className="mt-1 text-sm text-slate-700">
+                <span className="font-medium">
+                  {item.attendee.firstName} {item.attendee.lastName}
+                </span>
+                <span className="text-slate-500">
+                  {" "}
+                  · {item.attendee.jobTitle}, {item.attendee.company}
+                </span>
+              </div>
+            )}
+          </>
         )}
 
         {item.type === "email_failure" && item.data && (
@@ -271,6 +316,7 @@ export default function AdminActivity() {
     { key: "bookings", label: "Bookings" },
     { key: "invoices", label: "Invoices" },
     { key: "attendees", label: "Attendees" },
+    { key: "partial", label: "Partial Checkouts" },
     { key: "alerts", label: "Alerts" },
   ];
 
@@ -279,6 +325,7 @@ export default function AdminActivity() {
     bookings: ["new_booking_card", "new_booking_invoice"],
     invoices: ["new_booking_invoice", "invoice_paid", "invoice_overdue"],
     attendees: ["attendee_change", "tbc_filled"],
+    partial: ["partial_checkout"],
     alerts: ["invoice_overdue", "email_failure"],
   };
 
@@ -291,7 +338,7 @@ export default function AdminActivity() {
     <AdminLayout title="Activity">
       <div className="space-y-6">
         {/* Stat Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <Card
             className={`border-2 ${stats?.unpaidInvoices ? "border-amber-400 bg-amber-50" : "border-slate-200"}`}
           >
@@ -364,6 +411,27 @@ export default function AdminActivity() {
                   </p>
                   <p className="text-xs text-slate-500 font-medium">
                     This Month
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card
+            className={`border-2 ${stats?.partialCheckouts ? "border-yellow-400 bg-yellow-50" : "border-slate-200"} cursor-pointer`}
+            onClick={() => setFilter("partial")}
+          >
+            <CardContent className="pt-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
+                  <Hourglass className="w-5 h-5 text-yellow-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900">
+                    {stats?.partialCheckouts ?? "—"}
+                  </p>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Partial Checkouts
                   </p>
                 </div>
               </div>
