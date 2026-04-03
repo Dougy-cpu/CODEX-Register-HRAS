@@ -381,27 +381,23 @@ router.patch("/admin/registrations/:id/status", adminAuth, async (req, res): Pro
 
   if (status === "cancelled") {
     const stripe = getStripe();
+    const needsInvoiceVoid = existing.status === "invoiced" && !!existing.stripeInvoiceId;
+    const needsCardRefund = existing.status === "paid" && existing.paymentMethod === "card" && !!existing.stripePaymentIntentId;
 
-    if (
-      stripe &&
-      existing.status === "invoiced" &&
-      existing.stripeInvoiceId
-    ) {
+    if (!stripe && (needsInvoiceVoid || needsCardRefund)) {
+      stripeAction = "failed";
+      console.error({ bookingId: id }, "Stripe not configured — cannot void invoice or issue refund on cancellation");
+    } else if (stripe && needsInvoiceVoid) {
       try {
-        await stripe.invoices.voidInvoice(existing.stripeInvoiceId);
+        await stripe.invoices.voidInvoice(existing.stripeInvoiceId!);
         stripeAction = "invoice_voided";
       } catch (err) {
         console.error({ err, bookingId: id }, "Failed to void Stripe invoice on cancellation");
         stripeAction = "failed";
       }
-    } else if (
-      stripe &&
-      existing.status === "paid" &&
-      existing.paymentMethod === "card" &&
-      existing.stripePaymentIntentId
-    ) {
+    } else if (stripe && needsCardRefund) {
       try {
-        await stripe.refunds.create({ payment_intent: existing.stripePaymentIntentId });
+        await stripe.refunds.create({ payment_intent: existing.stripePaymentIntentId! });
         finalStatus = "refunded";
         stripeAction = "refund_issued";
       } catch (err) {
