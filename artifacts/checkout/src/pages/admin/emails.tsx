@@ -70,10 +70,38 @@ const TEMPLATE_LABELS: Record<TemplateType, string> = {
   invoice_reminder: "Invoice Reminder",
 };
 
-const TEMPLATE_VARIABLES: Record<TemplateType, string[]> = {
-  welcome: ["{{firstName}}", "{{name}}"],
-  confirmation: ["{{firstName}}", "{{orderReference}}", "{{passType}}", "{{quantity}}", "{{total}}"],
-  invoice_reminder: ["{{firstName}}", "{{recipientName}}", "{{orderReference}}", "{{dueDate}}", "{{payOnlineButton}}"],
+type TemplateVariable = {
+  tag: string;
+  label: string;
+  description: string;
+};
+
+const TEMPLATE_VARIABLES: Record<TemplateType, TemplateVariable[]> = {
+  welcome: [
+    { tag: "{{firstName}}", label: "First Name", description: "Recipient's first name" },
+    { tag: "{{managementLink}}", label: "Manage Attendees Button", description: "Secure self-service button to manage attendee details — auto-generates a unique link per booking" },
+  ],
+  confirmation: [
+    { tag: "{{firstName}}", label: "First Name", description: "Lead attendee's first name" },
+    { tag: "{{orderReference}}", label: "Order Reference", description: "Unique booking reference (e.g. HRAS26-6542)" },
+    { tag: "{{passLabel}}", label: "Pass Label", description: "Pass type name (e.g. HR Professional Pass)" },
+    { tag: "{{quantity}}", label: "Quantity", description: "Number of passes booked" },
+    { tag: "{{quantityLabel}}", label: "Quantity Label", description: "\"pass\" or \"passes\" (singular/plural)" },
+    { tag: "{{attendeesTable}}", label: "Attendees Table", description: "HTML table listing all registered attendees on this booking" },
+    { tag: "{{priceSummary}}", label: "Price Summary", description: "Itemised price breakdown including subtotal, VAT, and any discounts" },
+    { tag: "{{eventDate}}", label: "Event Date", description: "Date of the event (from Settings)" },
+    { tag: "{{eventVenue}}", label: "Venue", description: "Venue name (from Settings)" },
+    { tag: "{{eventVenuePostcode}}", label: "Venue Postcode", description: "Venue postcode (from Settings)" },
+    { tag: "{{managementLink}}", label: "Manage Attendees Button", description: "Secure self-service button — lets the booking contact manage all attendee details" },
+    { tag: "{{invoicePaymentButton}}", label: "Invoice Pay Button", description: "Online payment button — only rendered for invoice bookings, empty for card payments" },
+  ],
+  invoice_reminder: [
+    { tag: "{{firstName}}", label: "First Name", description: "Recipient's first name" },
+    { tag: "{{recipientName}}", label: "Full Name", description: "Recipient's full name" },
+    { tag: "{{orderReference}}", label: "Order Reference", description: "Unique booking reference" },
+    { tag: "{{dueDate}}", label: "Due Date", description: "Invoice payment due date" },
+    { tag: "{{payOnlineButton}}", label: "Pay Online Button", description: "Button linking to the online payment page for this booking" },
+  ],
 };
 
 const TEMPLATE_DESCRIPTIONS: Record<TemplateType, string> = {
@@ -262,11 +290,34 @@ function TemplateEditor({ type, settings }: { type: TemplateType; settings: Even
                 {showPreview ? "Edit" : "Preview"}
               </Button>
             </div>
-            <div className="p-3 bg-muted/30 border border-border text-sm mb-2 font-mono text-muted-foreground flex flex-wrap gap-2">
-              <span className="font-sans font-semibold text-foreground">Variables:</span>
-              {TEMPLATE_VARIABLES[type].map(v => (
-                <code key={v} className="bg-muted px-1.5 py-0.5 rounded text-xs">{v}</code>
-              ))}
+            <div className="border border-border rounded bg-slate-50 p-3 space-y-2">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Available Variables — click to insert at cursor
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {TEMPLATE_VARIABLES[type].map(v => (
+                  <button
+                    key={v.tag}
+                    type="button"
+                    title={v.description}
+                    onClick={() => {
+                      if (!showPreview && editor) {
+                        editor.chain().focus().insertContent(v.tag).run();
+                      }
+                    }}
+                    className="group relative inline-flex flex-col items-start gap-0.5 px-2.5 py-1.5 rounded border border-slate-300 bg-white hover:border-primary hover:bg-primary/5 transition-colors text-left cursor-pointer"
+                  >
+                    <span className="font-mono text-xs font-semibold text-primary leading-tight">{v.tag}</span>
+                    <span className="text-[10px] text-slate-500 leading-tight">{v.label}</span>
+                    <span className="pointer-events-none absolute bottom-full left-0 mb-1.5 w-56 rounded bg-slate-900 text-white text-xs px-2.5 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-lg leading-snug">
+                      {v.description}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {showPreview && (
+                <p className="text-xs text-slate-400 italic">Switch to Edit mode to insert variables.</p>
+              )}
             </div>
             <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageFileChange} />
             {showPreview ? (

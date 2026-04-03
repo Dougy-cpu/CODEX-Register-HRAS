@@ -836,19 +836,20 @@ export async function sendWelcomeEmail(
     const settings = await getEventSettings();
     const appBaseUrl = process.env.APP_BASE_URL || "https://hranalyticssummit.com/register";
 
-    let manageLinkSection = "";
+    let manageLinkHtml = "";
     if (bookingId) {
       const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
       if (booking?.managementToken) {
-        manageLinkSection = buildManageLinkSection(`${appBaseUrl}/manage/${booking.managementToken}`);
+        manageLinkHtml = buildManageLinkSection(`${appBaseUrl}/manage/${booking.managementToken}`);
       }
     }
 
     const personalised = template.htmlBody
       .replace(/\{\{firstName\}\}/g, firstName)
-      .replace(/\{\{name\}\}/g, firstName);
+      .replace(/\{\{name\}\}/g, firstName)
+      .replace(/\{\{managementLink\}\}/g, manageLinkHtml);
 
-    const html = wrapInBrandedLayout(personalised + manageLinkSection, settings);
+    const html = wrapInBrandedLayout(personalised, settings);
 
     const sent = await sendMail({
       to: toEmail,
