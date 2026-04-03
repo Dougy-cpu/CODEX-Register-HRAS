@@ -43,7 +43,7 @@ router.post("/promo-codes/validate", async (req, res): Promise<void> => {
   }
 
   if (promo.maxUses !== null && promo.usedCount >= promo.maxUses) {
-    res.status(400).json({ error: "This promo code has reached its maximum usage limit" });
+    res.status(400).json({ error: "This promo code has already been used up" });
     return;
   }
 

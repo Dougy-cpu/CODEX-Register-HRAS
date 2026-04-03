@@ -286,15 +286,22 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
         method: "POST",
         body: JSON.stringify({ code, passType: selectedPass, quantity }),
       });
-      const data = res as { valid?: boolean; error?: string; code?: string };
-      if (data.valid && data.code) {
+      const data = res as { valid?: boolean; error?: string; code?: string } | null;
+      if (data?.valid && data?.code) {
         setAppliedPromoCode(data.code);
         setPromoInput("");
       } else {
-        setPromoError(data.error || "Invalid promo code");
+        setPromoError(
+          typeof data?.error === "string" ? data.error : "Invalid promo code"
+        );
       }
-    } catch (e: any) {
-      setPromoError(e?.data?.error || e?.message || "Invalid or expired promo code");
+    } catch (e: unknown) {
+      const err = e as Record<string, unknown> | null;
+      const apiMsg = err?.data && typeof (err.data as Record<string, unknown>)?.error === "string"
+        ? (err.data as Record<string, unknown>).error as string
+        : null;
+      const fallbackMsg = typeof err?.message === "string" ? err.message : null;
+      setPromoError(apiMsg || fallbackMsg || "Invalid or expired promo code");
     } finally {
       setPromoValidating(false);
     }
