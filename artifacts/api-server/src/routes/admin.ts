@@ -384,6 +384,11 @@ router.delete("/admin/registrations", adminAuth, async (req, res): Promise<void>
   }
 
   for (const bookingId of numericIds) {
+    await db.delete(activityLogTable).where(eq(activityLogTable.bookingId, bookingId));
+    const attendees = await db.select({ id: attendeesTable.id }).from(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
+    for (const a of attendees) {
+      await db.delete(activityLogTable).where(eq(activityLogTable.attendeeId, a.id));
+    }
     await db.delete(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
     await db.delete(bookingsTable).where(eq(bookingsTable.id, bookingId));
   }

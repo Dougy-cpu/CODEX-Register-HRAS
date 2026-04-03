@@ -56,6 +56,9 @@ function BenefitsList({
 }) {
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const dragIdx = useRef<number | null>(null);
+  const [dragging, setDragging] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
 
   const add = () => {
     const trimmed = draft.trim();
@@ -69,11 +72,52 @@ function BenefitsList({
     onChange(benefits.filter((_, i) => i !== idx));
   };
 
+  const handleDragStart = (idx: number) => {
+    dragIdx.current = idx;
+    setDragging(idx);
+  };
+
+  const handleDragOver = (e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    setDragOver(idx);
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIdx: number) => {
+    e.preventDefault();
+    const from = dragIdx.current;
+    if (from === null || from === dropIdx) {
+      setDragOver(null);
+      setDragging(null);
+      return;
+    }
+    const reordered = [...benefits];
+    const [moved] = reordered.splice(from, 1);
+    reordered.splice(dropIdx, 0, moved);
+    onChange(reordered);
+    dragIdx.current = null;
+    setDragging(null);
+    setDragOver(null);
+  };
+
+  const handleDragEnd = () => {
+    dragIdx.current = null;
+    setDragging(null);
+    setDragOver(null);
+  };
+
   return (
     <div className="space-y-2">
       {benefits.map((b, idx) => (
-        <div key={idx} className="flex items-center gap-2 group">
-          <GripVertical className="w-4 h-4 text-muted-foreground shrink-0" />
+        <div
+          key={idx}
+          draggable
+          onDragStart={() => handleDragStart(idx)}
+          onDragOver={e => handleDragOver(e, idx)}
+          onDrop={e => handleDrop(e, idx)}
+          onDragEnd={handleDragEnd}
+          className={`flex items-center gap-2 group transition-opacity ${dragOver === idx && dragging !== idx ? "border-t-2 border-primary" : ""} ${dragging === idx ? "opacity-40" : ""}`}
+        >
+          <GripVertical className="w-4 h-4 text-muted-foreground shrink-0 cursor-grab active:cursor-grabbing" />
           <span className="flex-1 text-sm bg-white border border-border px-3 py-2">{b}</span>
           <button
             type="button"
