@@ -1,6 +1,6 @@
 import { ReactNode, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import logoUrl from "@assets/logo.webp";
+import logoUrl from "@assets/HRAS_Logo_v02_White_BG.png";
 import { LayoutDashboard, Users, Tag, Percent, Mail, Bell, Ticket, Settings, LogOut, Activity } from "lucide-react";
 
 interface AdminLayoutProps {
