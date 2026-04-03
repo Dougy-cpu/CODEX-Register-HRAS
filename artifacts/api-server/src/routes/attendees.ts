@@ -177,7 +177,7 @@ router.patch("/attendees/:id/managed", async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const attendeeId = parseInt(raw, 10);
 
-  const { managementToken, firstName, lastName, jobTitle, company, workEmail, phone, dietaryAccessibility } = req.body;
+  const { managementToken, firstName, lastName, jobTitle, company, workEmail, phone, dietaryAccessibility, gdprConsent } = req.body;
 
   if (!managementToken) {
     res.status(400).json({ error: "managementToken is required" });
@@ -238,6 +238,8 @@ router.patch("/attendees/:id/managed", async (req, res): Promise<void> => {
       phone: phone || null,
       dietaryAccessibility: dietaryAccessibility || null,
       isTbc: false,
+      gdprConsent: !!gdprConsent,
+      gdprConsentAt: gdprConsent ? new Date() : null,
     })
     .where(eq(attendeesTable.id, attendeeId))
     .returning();

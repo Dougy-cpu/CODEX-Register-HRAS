@@ -5,6 +5,7 @@ import { z } from "zod";
 import { CheckCircle2, User, Clock, ChevronDown, ChevronUp, Loader2, AlertCircle, Calendar, MapPin, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { customFetch } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Attendee, BookingWithAttendees } from "@/types/booking";
@@ -17,6 +18,9 @@ const attendeeSchema = z.object({
   workEmail: z.string().email("Valid email is required"),
   phone: z.string().optional(),
   dietaryAccessibility: z.string().optional(),
+  gdprConsent: z.boolean().refine(val => val === true, {
+    message: "You must agree to the terms before saving",
+  }),
 });
 
 type AttendeeFormData = z.infer<typeof attendeeSchema>;
@@ -27,6 +31,7 @@ interface AttendeeFormErrors {
   jobTitle?: string;
   company?: string;
   workEmail?: string;
+  gdprConsent?: string;
 }
 
 function AttendeeCard({
@@ -51,6 +56,7 @@ function AttendeeCard({
     workEmail: attendee.isTbc ? "" : attendee.workEmail,
     phone: attendee.phone ?? "",
     dietaryAccessibility: attendee.dietaryAccessibility ?? "",
+    gdprConsent: attendee.gdprConsent ?? false,
   });
   const [errors, setErrors] = useState<AttendeeFormErrors>({});
 
@@ -230,6 +236,28 @@ function AttendeeCard({
                 onChange={(e) => setForm((f) => ({ ...f, dietaryAccessibility: e.target.value }))}
                 placeholder="e.g. vegetarian, wheelchair access"
               />
+            </div>
+
+            <div className="pt-4 mt-2 border-t border-border">
+              <div className="flex items-start space-x-3">
+                <Checkbox
+                  checked={form.gdprConsent}
+                  onCheckedChange={(val) => {
+                    setForm((f) => ({ ...f, gdprConsent: !!val }));
+                    if (errors.gdprConsent) setErrors((e) => ({ ...e, gdprConsent: undefined }));
+                  }}
+                  className="mt-1"
+                />
+                <div className="space-y-1 leading-none">
+                  <label className="font-normal text-base cursor-pointer">
+                    I understand how my data will be processed in accordance with{" "}
+                    <a href="https://peoplestrategyhub.com/your-data-gdpr" target="_blank" rel="noreferrer" className="underline text-primary hover:text-primary/80">GDPR</a>
+                    {" "}and{" "}
+                    <a href="https://www.hranalyticssummit.com/terms-and-conditions" target="_blank" rel="noreferrer" className="underline text-primary hover:text-primary/80">Conference T&Cs</a>
+                  </label>
+                  {errors.gdprConsent && <p className="text-xs text-destructive">{errors.gdprConsent}</p>}
+                </div>
+              </div>
             </div>
 
             {mutation.isError && (
