@@ -8,6 +8,7 @@ export const bookingStatusEnum = pgEnum("booking_status", [
   "paid",
   "invoiced",
   "cancelled",
+  "refunded",
   "disputed",
 ]);
 

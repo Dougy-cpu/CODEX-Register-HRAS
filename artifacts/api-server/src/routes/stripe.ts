@@ -318,13 +318,13 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
         .from(bookingsTable)
         .where(eq(bookingsTable.stripePaymentIntentId, paymentIntentId));
 
-      if (booking && booking.status !== "cancelled") {
+      if (booking && booking.status !== "refunded" && booking.status !== "cancelled") {
         await db
           .update(bookingsTable)
-          .set({ status: "cancelled", updatedAt: new Date() })
+          .set({ status: "refunded", updatedAt: new Date() })
           .where(eq(bookingsTable.id, booking.id));
 
-        logger.info({ bookingId: booking.id, paymentIntentId, refunded: charge.amount_refunded }, "charge.refunded: booking cancelled");
+        logger.info({ bookingId: booking.id, paymentIntentId, refunded: charge.amount_refunded }, "charge.refunded: booking refunded");
 
         try {
           await sendRefundConfirmationEmail(booking.id, charge.amount_refunded);

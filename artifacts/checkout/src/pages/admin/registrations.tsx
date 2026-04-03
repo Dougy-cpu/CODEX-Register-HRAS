@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ChevronDown, ChevronRight, Search, Download, Trash2, AlertTriangle, Send, Check, Clock, Pencil, X, Loader2, Copy, Link } from "lucide-react";
 
 const STATUS_OPTIONS = [
@@ -15,6 +16,7 @@ const STATUS_OPTIONS = [
   { value: "pending_payment", label: "Pending Payment" },
   { value: "partial", label: "Partial (in progress)" },
   { value: "cancelled", label: "Cancelled" },
+  { value: "refunded", label: "Refunded" },
   { value: "disputed", label: "Disputed" },
 ];
 
@@ -23,6 +25,7 @@ const statusBadge = (status: string) => {
     status === "paid" ? "bg-green-100 text-green-800" :
     status === "invoiced" ? "bg-blue-100 text-blue-800" :
     status === "cancelled" ? "bg-red-100 text-red-800" :
+    status === "refunded" ? "bg-purple-100 text-purple-800" :
     status === "disputed" ? "bg-amber-100 text-amber-800" :
     "bg-yellow-100 text-yellow-800";
   return (
@@ -47,6 +50,8 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
     query: { queryKey: ["registration", id] }
   });
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<string | null>(null);
+  const [stripeActionResult, setStripeActionResult] = useState<{ action: string; status: string } | null>(null);
   const [reminderState, setReminderState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [reminderError, setReminderError] = useState<string | null>(null);
   const [editingAttendeeId, setEditingAttendeeId] = useState<number | null>(null);
@@ -143,8 +148,17 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
     }
   };
 
-  const handleStatusChange = async (newStatus: string) => {
+  const handleStatusChange = (newStatus: string) => {
     if (newStatus === data?.status) return;
+    if (newStatus === "cancelled" || newStatus === "refunded") {
+      setPendingStatus(newStatus);
+    } else {
+      void confirmStatusChange(newStatus);
+    }
+  };
+
+  const confirmStatusChange = async (newStatus: string) => {
+    setStripeActionResult(null);
     setUpdatingStatus(true);
     try {
       const token = localStorage.getItem("admin_token") || "";
@@ -154,6 +168,10 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
         body: JSON.stringify({ status: newStatus }),
       });
       if (!res.ok) throw new Error("Status update failed");
+      const body = await res.json().catch(() => ({}));
+      if (body.stripeAction && body.stripeAction !== "skipped") {
+        setStripeActionResult({ action: body.stripeAction, status: newStatus });
+      }
       await refetch();
       onStatusChanged();
     } catch {
@@ -238,6 +256,62 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
           <p className="text-xs text-muted-foreground mt-1.5">
             Send this link to the registrant — anyone with it can update attendee details for this booking.
           </p>
+        </div>
+      )}
+
+      {/* Confirmation dialog for irreversible status changes */}
+      <AlertDialog open={!!pendingStatus} onOpenChange={(open) => { if (!open) setPendingStatus(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Are you sure?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-foreground">
+                {pendingStatus === "cancelled" && data?.paymentMethod === "card" && data?.status === "paid" ? (
+                  <p>A <strong>full refund</strong> will be issued to the customer's card. This cannot be reversed.</p>
+                ) : pendingStatus === "cancelled" && data?.paymentMethod === "invoice" && data?.status === "invoiced" ? (
+                  <p>The outstanding <strong>Stripe invoice will be voided</strong>. This cannot be reversed.</p>
+                ) : pendingStatus === "refunded" ? (
+                  <p>The booking will be marked as <strong>refunded</strong>. Ensure any payment has already been returned to the customer.</p>
+                ) : (
+                  <p>This will mark the booking as <strong>{pendingStatus}</strong>. This action cannot be reversed.</p>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingStatus(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => {
+                const s = pendingStatus!;
+                setPendingStatus(null);
+                void confirmStatusChange(s);
+              }}
+            >
+              {pendingStatus === "cancelled" && data?.paymentMethod === "card" && data?.status === "paid"
+                ? "Yes, issue refund"
+                : pendingStatus === "cancelled" && data?.paymentMethod === "invoice" && data?.status === "invoiced"
+                ? "Yes, void invoice"
+                : "Yes, confirm"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Stripe action result banner */}
+      {stripeActionResult && (
+        <div className={`flex items-start gap-2 px-4 py-2 text-sm border-b ${stripeActionResult.action === "failed" ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-green-50 border-green-200 text-green-800"}`}>
+          {stripeActionResult.action === "failed" ? (
+            <><AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" /><span>Status updated but the Stripe action failed — please check the Stripe dashboard.</span></>
+          ) : stripeActionResult.action === "refund_issued" ? (
+            <><Check className="h-4 w-4 mt-0.5 shrink-0" /><span>Refund issued · Status set to Refunded</span></>
+          ) : stripeActionResult.action === "invoice_voided" ? (
+            <><Check className="h-4 w-4 mt-0.5 shrink-0" /><span>Booking cancelled · Stripe invoice voided</span></>
+          ) : null}
+          <button className="ml-auto text-xs opacity-60 hover:opacity-100" onClick={() => setStripeActionResult(null)}><X className="h-3 w-3" /></button>
         </div>
       )}
 
@@ -754,6 +828,7 @@ export default function AdminRegistrations() {
               <SelectItem value="partial">Partial (in progress)</SelectItem>
               <SelectItem value="pending_payment">Pending Payment</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
+              <SelectItem value="refunded">Refunded</SelectItem>
             </SelectContent>
           </Select>
         </div>

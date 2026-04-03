@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import Stripe from "stripe";
 import { eq, desc, ilike, or, and, sql, count } from "drizzle-orm";
 import ExcelJS from "exceljs";
 import { db } from "@workspace/db";
@@ -16,6 +17,12 @@ import {
 import { adminAuth, deriveAdminToken, getAdminPassword } from "../middleware/admin-auth";
 
 const router: IRouter = Router();
+
+function getStripe(): Stripe | null {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) return null;
+  return new Stripe(key);
+}
 
 function formatBooking(b: typeof bookingsTable.$inferSelect) {
   return {
@@ -357,7 +364,7 @@ router.patch("/admin/registrations/:id/status", adminAuth, async (req, res): Pro
   const id = parseInt(raw, 10);
   const { status } = req.body as { status: string };
 
-  const allowed = ["paid", "invoiced", "partial", "pending_payment", "cancelled", "disputed"];
+  const allowed = ["paid", "invoiced", "partial", "pending_payment", "cancelled", "refunded", "disputed"];
   if (!status || !allowed.includes(status)) {
     res.status(400).json({ error: `status must be one of: ${allowed.join(", ")}` });
     return;
@@ -369,13 +376,48 @@ router.patch("/admin/registrations/:id/status", adminAuth, async (req, res): Pro
     return;
   }
 
+  let finalStatus = status;
+  let stripeAction: "refund_issued" | "invoice_voided" | "skipped" | "failed" = "skipped";
+
+  if (status === "cancelled") {
+    const stripe = getStripe();
+
+    if (
+      stripe &&
+      existing.status === "invoiced" &&
+      existing.stripeInvoiceId
+    ) {
+      try {
+        await stripe.invoices.voidInvoice(existing.stripeInvoiceId);
+        stripeAction = "invoice_voided";
+      } catch (err) {
+        console.error({ err, bookingId: id }, "Failed to void Stripe invoice on cancellation");
+        stripeAction = "failed";
+      }
+    } else if (
+      stripe &&
+      existing.status === "paid" &&
+      existing.paymentMethod === "card" &&
+      existing.stripePaymentIntentId
+    ) {
+      try {
+        await stripe.refunds.create({ payment_intent: existing.stripePaymentIntentId });
+        finalStatus = "refunded";
+        stripeAction = "refund_issued";
+      } catch (err) {
+        console.error({ err, bookingId: id }, "Failed to issue Stripe refund on cancellation");
+        stripeAction = "failed";
+      }
+    }
+  }
+
   const [updated] = await db
     .update(bookingsTable)
-    .set({ status, updatedAt: new Date() })
+    .set({ status: finalStatus as typeof existing.status, updatedAt: new Date() })
     .where(eq(bookingsTable.id, id))
     .returning();
 
-  res.json(formatBooking(updated));
+  res.json({ ...formatBooking(updated), stripeAction });
 });
 
 router.delete("/admin/registrations", adminAuth, async (req, res): Promise<void> => {
