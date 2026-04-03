@@ -18,11 +18,17 @@ function isAdminRequest(req: import("express").Request): boolean {
 
 const router: IRouter = Router();
 
-function generateOrderRef(bookingId?: number): string {
+async function generateOrderRef(bookingId?: number): Promise<string> {
+  const [settings] = await db.select({
+    refPrefix: eventSettingsTable.refPrefix,
+    refOffset: eventSettingsTable.refOffset,
+  }).from(eventSettingsTable).limit(1);
+  const prefix = settings?.refPrefix ?? "HRAS26";
+  const offset = settings?.refOffset ?? 6541;
   if (bookingId) {
-    return `HRAS26-${6541 + bookingId}`;
+    return `${prefix}-${offset + bookingId}`;
   }
-  return `HRAS26-${6541 + Math.floor(10000 + Math.random() * 90000)}`;
+  return `${prefix}-${offset + Math.floor(10000 + Math.random() * 90000)}`;
 }
 
 function formatBooking(b: typeof bookingsTable.$inferSelect) {
@@ -265,7 +271,7 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
   if (admin && status !== undefined) {
     updateData.status = status;
     if ((status === "paid" || status === "invoiced") && !existing.orderReference) {
-      updateData.orderReference = generateOrderRef(id);
+      updateData.orderReference = await generateOrderRef(id);
     }
   }
 

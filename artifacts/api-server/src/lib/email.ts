@@ -66,6 +66,11 @@ const defaultSettings: Omit<EventSettings, "id" | "updatedAt"> = {
   freeagentTokenExpiresAt: null,
   attendeeChangesLocked: false,
   attendeeChangesLockedMessage: null,
+  refPrefix: "HRAS26",
+  refOffset: 6541,
+  notifyCompleteSubject: null,
+  notifyIncompleteSubject: null,
+  notifyAttendeeSubject: null,
 };
 
 export async function getEventSettings(): Promise<EventSettings> {
@@ -74,6 +79,10 @@ export async function getEventSettings(): Promise<EventSettings> {
   // Seed defaults if not present
   const [inserted] = await db.insert(eventSettingsTable).values(defaultSettings).returning();
   return inserted;
+}
+
+function applySubjectVars(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? `{{${key}}}`);
 }
 
 function createTransporter() {
@@ -553,6 +562,7 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
     return;
   }
 
+  const settings = await getEventSettings();
   const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
   const lead = attendees.find((a) => a.isLead) || attendees[0];
 
@@ -578,7 +588,17 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
     </tr>
   `).join("");
 
-  const subject = `New Registration: ${booking.orderReference || `#${bookingId}`} — ${lead ? `${lead.firstName} ${lead.lastName}` : "Unknown"}`;
+  const defaultCompleteSubject = `New Registration: {{orderReference}} — {{firstName}} {{lastName}}`;
+  const subjectTemplate = settings.notifyCompleteSubject || defaultCompleteSubject;
+  const subject = applySubjectVars(subjectTemplate, {
+    orderReference: booking.orderReference || `#${bookingId}`,
+    firstName: lead?.firstName || "Unknown",
+    lastName: lead?.lastName || "",
+    eventName: settings.eventName,
+    passType: booking.passType,
+    quantity: String(booking.quantity),
+    paymentMethod: booking.paymentMethod || "",
+  });
 
   const html = wrapInBrandedLayout(`
     <h2 style="margin:0 0 8px;font-size:22px">New Registration Received</h2>
@@ -702,7 +722,15 @@ export async function sendIncompleteFormNotification(bookingId: number): Promise
     </tr>
   `).join("");
 
-  const subject = `Incomplete Registration: ${lead.firstName} ${lead.lastName} — HR Analytics Summit`;
+  const settings = await getEventSettings();
+  const defaultIncompleteSubject = `Incomplete Registration: {{firstName}} {{lastName}} — {{eventName}}`;
+  const subject = applySubjectVars(settings.notifyIncompleteSubject || defaultIncompleteSubject, {
+    firstName: lead.firstName,
+    lastName: lead.lastName,
+    eventName: settings.eventName,
+    passType: passLabels[booking.passType] || booking.passType,
+    quantity: String(booking.quantity),
+  });
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -887,7 +915,7 @@ export async function sendAttendeeChangeNotification(
     if (!booking) return;
 
     const settings = await getEventSettings();
-    const orderRef = booking.orderReference || `HRAS26-${6541 + bookingId}`;
+    const orderRef = booking.orderReference || `${settings.refPrefix}-${settings.refOffset + bookingId}`;
     const changedAt = new Date().toLocaleString("en-GB", {
       timeZone: "Europe/London",
       weekday: "short",
@@ -899,7 +927,13 @@ export async function sendAttendeeChangeNotification(
       timeZoneName: "short",
     });
 
-    const subject = `Attendee Details Updated — ${orderRef} — ${updatedData.firstName} ${updatedData.lastName}`;
+    const defaultAttendeeSubject = `Attendee Details Updated — {{orderReference}} — {{firstName}} {{lastName}}`;
+    const subject = applySubjectVars(settings.notifyAttendeeSubject || defaultAttendeeSubject, {
+      orderReference: orderRef,
+      firstName: updatedData.firstName,
+      lastName: updatedData.lastName,
+      eventName: settings.eventName,
+    });
 
     const html = `<!DOCTYPE html>
 <html lang="en">

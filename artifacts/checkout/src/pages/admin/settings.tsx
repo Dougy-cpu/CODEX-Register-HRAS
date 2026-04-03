@@ -17,6 +17,8 @@ interface EventSettings {
   fromEmail: string;
   attendeeChangesLocked: boolean;
   attendeeChangesLockedMessage: string | null;
+  refPrefix: string;
+  refOffset: number;
 }
 
 const DEFAULT_LOCKED_MESSAGE =
@@ -73,7 +75,13 @@ export default function AdminSettings() {
     fromEmail: "noreply@hranalyticssummit.com",
     attendeeChangesLocked: false,
     attendeeChangesLockedMessage: null,
+    refPrefix: "HRAS26",
+    refOffset: 6541,
   });
+
+  const [refSaving, setRefSaving] = useState(false);
+  const [refSaved, setRefSaved] = useState(false);
+  const [refError, setRefError] = useState("");
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestLockRef = useRef<{ locked: boolean; message: string | null }>({
@@ -104,6 +112,8 @@ export default function AdminSettings() {
             fromEmail: data.fromEmail,
             attendeeChangesLocked: lockState.locked,
             attendeeChangesLockedMessage: lockState.message,
+            refPrefix: data.refPrefix ?? "HRAS26",
+            refOffset: data.refOffset ?? 6541,
           });
         }
       })
@@ -169,6 +179,31 @@ export default function AdminSettings() {
       }
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveRef = async () => {
+    const prefix = form.refPrefix.trim();
+    const offset = parseInt(String(form.refOffset), 10);
+    if (!prefix) { setRefError("Prefix is required"); return; }
+    if (isNaN(offset) || offset < 0) { setRefError("Offset must be a non-negative number"); return; }
+    setRefSaving(true);
+    setRefError("");
+    setRefSaved(false);
+    try {
+      const res = await adminFetch("/api/admin/event-settings", {
+        method: "PUT",
+        body: JSON.stringify({ refPrefix: prefix, refOffset: offset }),
+      });
+      if (res.ok) {
+        setRefSaved(true);
+        setTimeout(() => setRefSaved(false), 2500);
+      } else {
+        const body = await res.json().catch(() => ({}));
+        setRefError(body.error || "Failed to save");
+      }
+    } finally {
+      setRefSaving(false);
     }
   };
 
@@ -327,6 +362,70 @@ export default function AdminSettings() {
               </div>
 
               {lockError && <p className="text-sm text-destructive">{lockError}</p>}
+            </div>
+          </div>
+
+          {/* ── Booking Reference Format ── */}
+          <div className="bg-white border border-border">
+            <div className="px-6 py-4 border-b border-border flex items-center gap-3">
+              <Settings2 className="w-5 h-5 text-primary" />
+              <h2 className="font-bold text-base">Booking Reference Format</h2>
+            </div>
+            <div className="p-6 space-y-5">
+              <p className="text-sm text-muted-foreground">
+                References are generated as <strong>PREFIX-[OFFSET + booking ID]</strong>.
+                Adjust these when re-running the system for a new event to keep reference sequences clean and avoid conflicts with previous years.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Prefix</label>
+                  <Input
+                    value={form.refPrefix}
+                    onChange={e => setForm(f => ({ ...f, refPrefix: e.target.value }))}
+                    placeholder="HRAS26"
+                    className="font-mono"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">e.g. HRAS27 for next year's event</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Offset</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={form.refOffset}
+                    onChange={e => setForm(f => ({ ...f, refOffset: parseInt(e.target.value, 10) || 0 }))}
+                    placeholder="6541"
+                    className="font-mono"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Added to the booking ID to form the number</p>
+                </div>
+              </div>
+
+              {/* Preview */}
+              <div className="bg-muted/40 border border-border rounded p-3 flex items-center gap-3">
+                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Preview:</span>
+                <span className="font-mono text-sm font-semibold text-foreground">
+                  {form.refPrefix.trim() || "PREFIX"}-{(form.refOffset || 0) + 1} &nbsp;/&nbsp; {form.refPrefix.trim() || "PREFIX"}-{(form.refOffset || 0) + 2} &nbsp;/&nbsp; …
+                </span>
+              </div>
+
+              {refError && <p className="text-sm text-destructive">{refError}</p>}
+
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  onClick={handleSaveRef}
+                  disabled={refSaving}
+                  className={`h-10 px-6 ${refSaved ? "bg-green-600 hover:bg-green-700" : "bg-primary hover:bg-primary/90"} text-white`}
+                >
+                  {refSaved ? (
+                    <span className="flex items-center gap-1.5"><Check className="w-4 h-4" /> Saved</span>
+                  ) : refSaving ? (
+                    <span className="flex items-center gap-1.5"><Loader2 className="w-4 h-4 animate-spin" /> Saving…</span>
+                  ) : "Save Reference Format"}
+                </Button>
+              </div>
             </div>
           </div>
 

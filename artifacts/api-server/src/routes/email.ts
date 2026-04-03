@@ -37,6 +37,8 @@ router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> =
     orgName, orgAddress, orgWebsite, logoDataUrl,
     fromName, fromEmail,
     attendeeChangesLocked, attendeeChangesLockedMessage,
+    refPrefix, refOffset,
+    notifyCompleteSubject, notifyIncompleteSubject, notifyAttendeeSubject,
   } = req.body;
 
   const existing = await db.select().from(eventSettingsTable);
@@ -58,6 +60,11 @@ router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> =
         ...(fromEmail !== undefined && { fromEmail }),
         ...(attendeeChangesLocked !== undefined && { attendeeChangesLocked: attendeeChangesLocked === true }),
         ...(attendeeChangesLockedMessage !== undefined && { attendeeChangesLockedMessage: attendeeChangesLockedMessage || null }),
+        ...(refPrefix !== undefined && { refPrefix: String(refPrefix).trim() || "HRAS26" }),
+        ...(refOffset !== undefined && { refOffset: parseInt(String(refOffset), 10) || 6541 }),
+        ...(notifyCompleteSubject !== undefined && { notifyCompleteSubject: notifyCompleteSubject || null }),
+        ...(notifyIncompleteSubject !== undefined && { notifyIncompleteSubject: notifyIncompleteSubject || null }),
+        ...(notifyAttendeeSubject !== undefined && { notifyAttendeeSubject: notifyAttendeeSubject || null }),
       })
       .where(eq(eventSettingsTable.id, existing[0].id))
       .returning());
