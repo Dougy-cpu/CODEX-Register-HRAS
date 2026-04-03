@@ -22,7 +22,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 const promoSchema = z.object({
   code: z.string().min(1, "Code is required").toUpperCase(),
-  discountType: z.enum(["percentage", "fixed"]),
+  discountType: z.enum(["percentage", "fixed", "per_ticket"]),
   discountValue: z.coerce.number().min(1, "Value must be greater than 0"),
   maxUses: z.coerce.number().optional().nullable(),
   isActive: z.boolean().default(true),
@@ -166,6 +166,7 @@ export default function AdminPromoCodes() {
                           <SelectContent>
                             <SelectItem value="percentage">Percentage (%)</SelectItem>
                             <SelectItem value="fixed">Fixed Amount (£)</SelectItem>
+                            <SelectItem value="per_ticket">Per Ticket (£ per ticket)</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -296,7 +297,11 @@ export default function AdminPromoCodes() {
                 <TableRow key={promo.id}>
                   <TableCell className="font-mono font-bold text-lg">{promo.code}</TableCell>
                   <TableCell>
-                    {promo.discountType === "percentage" ? `${promo.discountValue}%` : `£${promo.discountValue}`}
+                    {promo.discountType === "percentage"
+                      ? `${promo.discountValue}%`
+                      : promo.discountType === "per_ticket"
+                        ? `£${promo.discountValue}/ticket`
+                        : `£${promo.discountValue}`}
                   </TableCell>
                   <TableCell>
                     {passTypeBadges(promo.applicablePassTypes)}

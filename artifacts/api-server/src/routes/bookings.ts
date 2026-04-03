@@ -5,7 +5,7 @@ import { bookingsTable, attendeesTable, eventSettingsTable } from "@workspace/db
 import { calculatePricing } from "../lib/pricing";
 import { v4 as uuidv4 } from "uuid";
 import { deriveAdminToken, getAdminPassword } from "../middleware/admin-auth";
-import { sendIncompleteFormNotification } from "../lib/email";
+import { sendIncompleteFormNotification, sendBookingEmails, sendOrganiserNotification } from "../lib/email";
 import { logger } from "../lib/logger";
 
 function isAdminRequest(req: import("express").Request): boolean {
@@ -309,6 +309,49 @@ router.post("/bookings/:id/incomplete-ping", async (req, res): Promise<void> => 
   } catch (err) {
     logger.error({ err, bookingId: id }, "Failed to process incomplete-ping");
   }
+});
+
+// Confirm a booking that has a total of £0 (fully covered by promo code).
+// Marks the booking as paid and sends confirmation emails.
+router.post("/bookings/:id/confirm-free", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+
+  const [existing] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, id));
+  if (!existing) {
+    res.status(404).json({ error: "Booking not found" });
+    return;
+  }
+
+  const sessionToken = req.headers["x-booking-session"] as string | undefined;
+  if (!sessionToken || sessionToken !== existing.sessionToken) {
+    res.status(403).json({ error: "Forbidden — session token mismatch" });
+    return;
+  }
+
+  if (existing.status === "paid" || existing.status === "invoiced") {
+    res.json({ alreadyConfirmed: true, orderReference: existing.orderReference });
+    return;
+  }
+
+  const pricing = await calculatePricing(existing.passType, existing.quantity, existing.promoCode);
+
+  if (pricing.total > 0) {
+    res.status(400).json({ error: "Booking total is not zero — payment required" });
+    return;
+  }
+
+  const orderRef = await generateOrderRef(id);
+
+  await db
+    .update(bookingsTable)
+    .set({ status: "paid", currentStep: 5, orderReference: orderRef, updatedAt: new Date() })
+    .where(eq(bookingsTable.id, id));
+
+  try { await sendBookingEmails(id); } catch (err) { logger.error({ err, bookingId: id }, "confirm-free: failed to send confirmation emails"); }
+  try { await sendOrganiserNotification(id); } catch (err) { logger.error({ err, bookingId: id }, "confirm-free: failed to send organiser notification"); }
+
+  res.json({ confirmed: true, orderReference: orderRef });
 });
 
 router.get("/bookings/:id/pricing", async (req, res): Promise<void> => {

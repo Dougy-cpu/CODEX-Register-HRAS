@@ -3,7 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { sql } from "drizzle-orm";
 
-export const discountTypeEnum = pgEnum("discount_type", ["percentage", "fixed"]);
+export const discountTypeEnum = pgEnum("discount_type", ["percentage", "fixed", "per_ticket"]);
 
 export const promoCodesTable = pgTable("promo_codes", {
   id: serial("id").primaryKey(),

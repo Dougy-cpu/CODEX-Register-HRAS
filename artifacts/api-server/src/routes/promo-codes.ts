@@ -64,6 +64,11 @@ router.post("/promo-codes/validate", async (req, res): Promise<void> => {
 
   if (promo.discountType === "percentage") {
     discountAmount = parseFloat(((baseSubtotal * parseFloat(promo.discountValue.toString())) / 100).toFixed(2));
+  } else if (promo.discountType === "per_ticket") {
+    discountAmount = Math.min(
+      parseFloat((parseFloat(promo.discountValue.toString()) * parseInt(quantity, 10)).toFixed(2)),
+      baseSubtotal
+    );
   } else {
     discountAmount = Math.min(parseFloat(promo.discountValue.toString()), baseSubtotal);
   }

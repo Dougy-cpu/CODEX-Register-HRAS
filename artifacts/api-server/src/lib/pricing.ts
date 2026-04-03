@@ -99,6 +99,11 @@ export async function calculatePricing(
         promoDiscountAmount = parseFloat(
           ((afterGroupDiscount * parseFloat(promo.discountValue.toString())) / 100).toFixed(2)
         );
+      } else if (promo.discountType === "per_ticket") {
+        promoDiscountAmount = Math.min(
+          parseFloat((parseFloat(promo.discountValue.toString()) * quantity).toFixed(2)),
+          afterGroupDiscount
+        );
       } else {
         promoDiscountAmount = Math.min(
           parseFloat(promo.discountValue.toString()),

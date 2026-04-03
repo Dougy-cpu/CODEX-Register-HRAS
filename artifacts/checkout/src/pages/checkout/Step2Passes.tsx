@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useUpdateBooking, useCalculatePricing, useListDiscountTiers, type PricingRequestPassType, type DiscountTier } from "@workspace/api-client-react";
+import { useUpdateBooking, useCalculatePricing, useListDiscountTiers, customFetch, type PricingRequestPassType, type DiscountTier } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Check, Minus, Plus, Users, Flame, AlertCircle, TrendingUp, Star } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Check, Minus, Plus, Users, Flame, AlertCircle, TrendingUp, Star, Tag, X } from "lucide-react";
 import type { BookingWithAttendees } from "@/types/booking";
 
 interface Step2PassesProps {
@@ -246,6 +247,11 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
   const [inventory, setInventory] = useState<Record<string, number | null>>({ single: null, business: null });
   const [passConfig, setPassConfig] = useState<Record<string, PassConfig | null>>({ single: null, business: null });
 
+  const [promoInput, setPromoInput] = useState<string>("");
+  const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(booking.promoCode ?? null);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [promoValidating, setPromoValidating] = useState(false);
+
   const calculatePricingMutation = useCalculatePricing();
   const queryClient = useQueryClient();
 
@@ -264,16 +270,51 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
 
   useEffect(() => {
     calculatePricingMutation.mutate({
-      data: { passType: selectedPass, quantity },
+      data: { passType: selectedPass, quantity, promoCode: appliedPromoCode ?? undefined },
     });
-  }, [selectedPass, quantity]);
+  }, [selectedPass, quantity, appliedPromoCode]);
 
   const currentPricing = calculatePricingMutation.data;
+
+  const handleApplyPromo = async () => {
+    const code = promoInput.trim().toUpperCase();
+    if (!code) return;
+    setPromoValidating(true);
+    setPromoError(null);
+    try {
+      const res = await customFetch(`/api/promo-codes/validate`, {
+        method: "POST",
+        body: JSON.stringify({ code, passType: selectedPass, quantity }),
+      });
+      const data = res as { valid?: boolean; error?: string; code?: string };
+      if (data.valid && data.code) {
+        setAppliedPromoCode(data.code);
+        setPromoInput("");
+      } else {
+        setPromoError(data.error || "Invalid promo code");
+      }
+    } catch (e: any) {
+      setPromoError(e?.data?.error || e?.message || "Invalid or expired promo code");
+    } finally {
+      setPromoValidating(false);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setAppliedPromoCode(null);
+    setPromoInput("");
+    setPromoError(null);
+  };
 
   const handleContinue = async () => {
     await updateBooking.mutateAsync({
       id: booking.id,
-      data: { passType: selectedPass as "single" | "business", quantity, currentStep: 3 },
+      data: {
+        passType: selectedPass as "single" | "business",
+        quantity,
+        promoCode: appliedPromoCode ?? undefined,
+        currentStep: 3,
+      },
     });
     queryClient.invalidateQueries({ queryKey: ["booking"] });
   };
@@ -598,6 +639,50 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
           <p className="text-sm text-muted-foreground pt-1">
             You'll add attendee details in the next step.
           </p>
+
+          {/* Promo code input */}
+          <div className="pt-4 space-y-2">
+            {appliedPromoCode ? (
+              <div className="flex items-center gap-2 bg-green-50 border border-green-200 px-3 py-2 text-sm font-semibold text-green-800">
+                <Tag className="w-4 h-4 shrink-0" />
+                <span className="flex-1">Code <span className="font-mono">{appliedPromoCode}</span> applied</span>
+                <button
+                  type="button"
+                  onClick={handleRemovePromo}
+                  className="ml-auto text-green-600 hover:text-green-800 transition-colors"
+                  aria-label="Remove promo code"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Promo Code</p>
+                <div className="flex gap-2">
+                  <Input
+                    className="h-10 uppercase bg-white text-sm font-mono"
+                    placeholder="Enter code"
+                    value={promoInput}
+                    onChange={e => { setPromoInput(e.target.value.toUpperCase()); setPromoError(null); }}
+                    onKeyDown={e => e.key === "Enter" && handleApplyPromo()}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-10 px-4 border-border shrink-0"
+                    onClick={handleApplyPromo}
+                    disabled={promoValidating || !promoInput.trim()}
+                  >
+                    {promoValidating ? "Checking…" : "Apply"}
+                  </Button>
+                </div>
+                {promoError && (
+                  <p className="text-xs text-red-600 font-medium">{promoError}</p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right: price breakdown */}
@@ -618,6 +703,16 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                 <div className="flex justify-between text-sm font-bold text-secondary">
                   <span>Group Discount ({currentPricing.groupDiscountPercent}%)</span>
                   <span>-£{currentPricing.groupDiscountAmount.toFixed(2)}</span>
+                </div>
+              )}
+
+              {currentPricing.promoDiscountAmount > 0 && (
+                <div className="flex justify-between text-sm font-bold text-primary">
+                  <span className="flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5 shrink-0" />
+                    Promo Code
+                  </span>
+                  <span>-£{currentPricing.promoDiscountAmount.toFixed(2)}</span>
                 </div>
               )}
 

@@ -7,7 +7,8 @@ import {
   useUpdateBooking, 
   useCalculatePricing, 
   useCreateStripeCheckoutSession,
-  useCreateStripeInvoice
+  useCreateStripeInvoice,
+  customFetch
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -43,6 +44,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
   const [paymentMethod, setPaymentMethod] = useState<"card" | "invoice">("card");
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [isFreeConfirming, setIsFreeConfirming] = useState(false);
   // Set to true just before intentional navigation (Stripe redirect / invoice success)
   // so the beforeunload handler does NOT fire a false incomplete-ping.
   const isSubmittingPaymentRef = useRef(false);
@@ -162,6 +164,102 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
       setIsProcessing(false);
     }
   };
+
+  const handleConfirmFree = async () => {
+    setIsFreeConfirming(true);
+    setPaymentError(null);
+    try {
+      await customFetch(`/api/bookings/${booking.id}/confirm-free`, { method: "POST" });
+      queryClient.invalidateQueries({ queryKey: ["booking"] });
+    } catch (e: any) {
+      const message = e?.data?.error || e?.message || "Something went wrong. Please try again or contact us.";
+      setPaymentError(message);
+      setIsFreeConfirming(false);
+    }
+  };
+
+  const isFreeBooking = currentPricing !== undefined && currentPricing.total === 0;
+
+  if (isFreeBooking) {
+    return (
+      <div className="max-w-5xl mx-auto space-y-8 flex flex-col md:flex-row gap-12">
+        <div className="flex-1 space-y-8">
+          <div>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">Confirm Registration</h1>
+            <p className="text-lg text-muted-foreground">Your promo code covers the full cost — no payment needed.</p>
+          </div>
+
+          <div className="bg-white border border-border p-6 md:p-8 space-y-4">
+            <div className="flex items-start gap-3 text-green-800 bg-green-50 border border-green-200 p-4">
+              <Check className="w-5 h-5 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold">Your promo code has been applied</p>
+                <p className="text-sm text-green-700 mt-0.5">This booking is completely free. Click the button below to confirm your place at the summit.</p>
+              </div>
+            </div>
+          </div>
+
+          {paymentError && (
+            <div className="bg-red-50 border border-red-200 rounded p-4 text-sm text-red-800">
+              <p className="font-semibold mb-1">Error</p>
+              <p>{paymentError}</p>
+            </div>
+          )}
+
+          <div className="flex justify-between pt-4">
+            <Button variant="outline" size="lg" className="px-8 h-14 text-lg border-border" onClick={async () => {
+              await updateBooking.mutateAsync({ id: booking.id, data: { currentStep: 3 } });
+              queryClient.invalidateQueries({ queryKey: ["booking"] });
+            }}>Back</Button>
+            <Button
+              size="lg"
+              className="px-10 h-14 text-lg bg-primary hover:bg-primary/90 text-white border-none"
+              onClick={handleConfirmFree}
+              disabled={isFreeConfirming}
+            >
+              {isFreeConfirming ? "Confirming…" : "Confirm Registration"}
+            </Button>
+          </div>
+        </div>
+
+        <div className="w-full md:w-[380px] shrink-0 space-y-6">
+          <div className="bg-muted p-6">
+            <h3 className="text-xl font-bold mb-6">Order Summary</h3>
+            <div className="space-y-4">
+              <div className="flex justify-between text-base">
+                <span>{booking.quantity} × {booking.passType === "single" ? "Single Pass" : booking.passType === "team" ? "Team Pass" : "Business Pass"}</span>
+                <span>£{currentPricing.baseSubtotal.toFixed(2)}</span>
+              </div>
+              {currentPricing.groupDiscountAmount > 0 && (
+                <div className="flex justify-between text-base text-primary font-bold">
+                  <span>Group Discount</span>
+                  <span>-£{currentPricing.groupDiscountAmount.toFixed(2)}</span>
+                </div>
+              )}
+              {currentPricing.promoDiscountAmount > 0 && (
+                <div className="flex justify-between text-base text-primary font-bold">
+                  <span>Promo Code</span>
+                  <span>-£{currentPricing.promoDiscountAmount.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-base">
+                <span>Subtotal</span>
+                <span>£{currentPricing.subtotalAfterDiscounts.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-base text-muted-foreground border-b border-border pb-4">
+                <span>VAT (20%)</span>
+                <span>£{currentPricing.vatAmount.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between font-bold text-2xl pt-2">
+                <span>Total</span>
+                <span>£0.00</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 flex flex-col md:flex-row gap-12">
