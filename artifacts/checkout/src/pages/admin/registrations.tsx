@@ -51,7 +51,7 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
   });
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<string | null>(null);
-  const [stripeActionResult, setStripeActionResult] = useState<{ action: string; status: string } | null>(null);
+  const [stripeActionResult, setStripeActionResult] = useState<string | null>(null);
   const [reminderState, setReminderState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [reminderError, setReminderError] = useState<string | null>(null);
   const [editingAttendeeId, setEditingAttendeeId] = useState<number | null>(null);
@@ -170,7 +170,7 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
       if (!res.ok) throw new Error("Status update failed");
       const body = await res.json().catch(() => ({}));
       if (body.stripeAction && body.stripeAction !== "skipped") {
-        setStripeActionResult({ action: body.stripeAction, status: newStatus });
+        setStripeActionResult(body.stripeAction);
       }
       await refetch();
       onStatusChanged();
@@ -303,12 +303,12 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
 
       {/* Stripe action result banner */}
       {stripeActionResult && (
-        <div className={`flex items-start gap-2 px-4 py-2 text-sm border-b ${stripeActionResult.action === "failed" ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-green-50 border-green-200 text-green-800"}`}>
-          {stripeActionResult.action === "failed" ? (
+        <div className={`flex items-start gap-2 px-4 py-2 text-sm border-b ${stripeActionResult === "failed" ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-green-50 border-green-200 text-green-800"}`}>
+          {stripeActionResult === "failed" ? (
             <><AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" /><span>Status updated but the Stripe action failed — please check the Stripe dashboard.</span></>
-          ) : stripeActionResult.action === "refund_issued" ? (
+          ) : stripeActionResult === "refund_issued" ? (
             <><Check className="h-4 w-4 mt-0.5 shrink-0" /><span>Refund issued · Status set to Refunded</span></>
-          ) : stripeActionResult.action === "invoice_voided" ? (
+          ) : stripeActionResult === "invoice_voided" ? (
             <><Check className="h-4 w-4 mt-0.5 shrink-0" /><span>Booking cancelled · Stripe invoice voided</span></>
           ) : null}
           <button className="ml-auto text-xs opacity-60 hover:opacity-100" onClick={() => setStripeActionResult(null)}><X className="h-3 w-3" /></button>
