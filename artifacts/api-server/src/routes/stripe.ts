@@ -313,13 +313,15 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
     const paymentIntentId = typeof charge.payment_intent === "string" ? charge.payment_intent : null;
     const isFullRefund = charge.refunded === true || charge.amount_refunded >= charge.amount;
 
-    if (paymentIntentId && isFullRefund) {
+    if (paymentIntentId) {
       const [booking] = await db
         .select()
         .from(bookingsTable)
         .where(eq(bookingsTable.stripePaymentIntentId, paymentIntentId));
 
-      if (booking && booking.status !== "refunded" && booking.status !== "cancelled") {
+      if (booking && !isFullRefund) {
+        logger.info({ bookingId: booking.id, paymentIntentId, amountRefunded: charge.amount_refunded, total: charge.amount }, "charge.refunded: partial refund — booking status unchanged");
+      } else if (booking && isFullRefund && booking.status !== "refunded") {
         await db
           .update(bookingsTable)
           .set({ status: "refunded", updatedAt: new Date() })
@@ -338,8 +340,6 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
         } catch (err) {
           logger.error({ err, bookingId: booking.id }, "charge.refunded: failed to re-sync to Google Sheets");
         }
-      } else if (booking && !isFullRefund) {
-        logger.info({ bookingId: booking.id, paymentIntentId, amountRefunded: charge.amount_refunded, total: charge.amount }, "charge.refunded: partial refund — booking status unchanged");
       }
     }
   }
