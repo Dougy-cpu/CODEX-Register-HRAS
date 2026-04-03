@@ -1,5 +1,5 @@
 import { db } from "@workspace/db";
-import { emailTemplatesTable, discountTiersTable } from "@workspace/db";
+import { emailTemplatesTable, discountTiersTable, passConfigTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 
@@ -137,6 +137,29 @@ export async function seed() {
     if (existingTiers.length === 0) {
       await db.insert(discountTiersTable).values(DEFAULT_DISCOUNT_TIERS);
       logger.info("Seeded default discount tiers");
+    }
+
+    const existingPasses = await db.select().from(passConfigTable);
+    if (existingPasses.length === 0) {
+      await db.insert(passConfigTable).values([
+        {
+          passType: "single",
+          currentPrice: "199.00",
+          originalPrice: "429.00",
+          pricingPeriodName: "Super Early Bird",
+          benefits: ["Conference Sessions", "Networking Sessions", "Happy Hour Networking", "Personalised Agenda", "Access to Pre-Event Social", "Exhibition Hall", "Award-winning Food & Drink", "On-Demand Recordings", "Additional Content Access", "Presentation Slides", "Post-Event Content"],
+          extraBenefits: [],
+        },
+        {
+          passType: "business",
+          currentPrice: "499.00",
+          originalPrice: "999.00",
+          pricingPeriodName: "Super Early Bird",
+          benefits: ["Conference Sessions", "Networking Sessions", "Happy Hour with Entertainment", "Exhibition Hall", "Award-winning Food & Drink", "On-Demand Recordings", "Additional Content Access", "Presentation Slides", "Post-Event Content"],
+          extraBenefits: ["Exclusive Attendee Report", "Company Branding at the Summit"],
+        },
+      ]);
+      logger.info("Seeded default pass config");
     }
   } catch (err) {
     logger.error({ err }, "Seed failed");
