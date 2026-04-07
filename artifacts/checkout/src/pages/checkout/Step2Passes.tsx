@@ -658,7 +658,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
               onChange={e => setHearAboutUs(e.target.value)}
               className="w-full h-10 border border-input bg-white rounded-none px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             >
-              <option value="">Select an option (optional)</option>
+              <option value="">Select an option</option>
               <option value="LinkedIn">LinkedIn</option>
               <option value="Google / Search engine">Google / Search engine</option>
               <option value="Email newsletter">Email newsletter</option>
