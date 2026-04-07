@@ -214,6 +214,7 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
     attendeeType,
     quantity,
     promoCode,
+    hearAboutUs,
     paymentMethod,
     currentStep,
     billingName,
@@ -266,6 +267,7 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
   if (billingCountry !== undefined) updateData.billingCountry = billingCountry;
   if (billingPhone !== undefined) updateData.billingPhone = billingPhone || null;
   if (billingVatNumber !== undefined) updateData.billingVatNumber = billingVatNumber || null;
+  if (hearAboutUs !== undefined) updateData.hearAboutUs = hearAboutUs || null;
 
   // Only admin requests may mutate status
   if (admin && status !== undefined) {

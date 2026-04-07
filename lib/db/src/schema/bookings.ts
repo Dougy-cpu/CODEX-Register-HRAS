@@ -55,6 +55,7 @@ export const bookingsTable = pgTable("bookings", {
   billingPhone: text("billing_phone"),
   billingVatNumber: text("billing_vat_number"),
   invoiceDueDate: timestamp("invoice_due_date", { withTimezone: true }),
+  hearAboutUs: text("hear_about_us"),
   managementToken: text("management_token").unique(),
   partialNotificationSent: boolean("partial_notification_sent").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

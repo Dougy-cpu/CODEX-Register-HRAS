@@ -1,7 +1,16 @@
 import { db } from "@workspace/db";
 import { emailTemplatesTable, discountTiersTable, passConfigTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { logger } from "./logger";
+
+export async function runMigrations() {
+  try {
+    await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS hear_about_us TEXT`);
+    logger.info("Migration: hear_about_us column ensured");
+  } catch (err) {
+    logger.warn({ err }, "Migration: could not ensure hear_about_us column");
+  }
+}
 
 const DEFAULT_CONFIRMATION_SUBJECT = "Booking Confirmed — {{orderReference}} — HR Analytics Summit 2026";
 

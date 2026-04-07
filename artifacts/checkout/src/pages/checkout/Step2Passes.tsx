@@ -252,6 +252,8 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
   const [promoError, setPromoError] = useState<string | null>(null);
   const [promoValidating, setPromoValidating] = useState(false);
 
+  const [hearAboutUs, setHearAboutUs] = useState<string>((booking as Record<string, unknown>).hearAboutUs as string ?? "");
+
   const calculatePricingMutation = useCalculatePricing();
   const queryClient = useQueryClient();
 
@@ -320,8 +322,9 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
         passType: selectedPass as "single" | "business",
         quantity,
         promoCode: appliedPromoCode ?? undefined,
+        hearAboutUs: hearAboutUs || undefined,
         currentStep: 3,
-      },
+      } as Parameters<typeof updateBooking.mutateAsync>[0]["data"],
     });
     queryClient.invalidateQueries({ queryKey: ["booking"] });
   };
@@ -646,6 +649,27 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
           <p className="text-sm text-muted-foreground pt-1">
             You'll add attendee details in the next step.
           </p>
+
+          {/* How did you hear about us */}
+          <div className="pt-4 space-y-1.5">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">How did you hear about the event?</p>
+            <select
+              value={hearAboutUs}
+              onChange={e => setHearAboutUs(e.target.value)}
+              className="w-full h-10 border border-input bg-white rounded-none px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">Select an option (optional)</option>
+              <option value="LinkedIn">LinkedIn</option>
+              <option value="Google / Search engine">Google / Search engine</option>
+              <option value="Email newsletter">Email newsletter</option>
+              <option value="Word of mouth / Colleague">Word of mouth / Colleague</option>
+              <option value="Previous attendee">I attended previously</option>
+              <option value="Industry publication or press">Industry publication or press</option>
+              <option value="Podcast">Podcast</option>
+              <option value="Social media">Social media</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
 
           {/* Promo code input */}
           <div className="pt-4 space-y-2">

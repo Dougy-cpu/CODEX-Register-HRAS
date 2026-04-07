@@ -1,6 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { seed } from "./lib/seed";
+import { seed, runMigrations } from "./lib/seed";
 
 const rawPort = process.env["PORT"];
 
@@ -23,5 +23,7 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
-  seed().catch((err) => logger.error({ err }, "Seed failed"));
+  runMigrations()
+    .then(() => seed())
+    .catch((err) => logger.error({ err }, "Startup failed"));
 });
