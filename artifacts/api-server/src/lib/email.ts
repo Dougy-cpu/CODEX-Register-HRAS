@@ -290,7 +290,7 @@ async function buildConfirmationEmailHtml(
   ].join("");
 
   const manageUrl = booking.managementToken
-    ? `${process.env.APP_BASE_URL || "https://hranalyticssummit.com/register"}/manage/${booking.managementToken}`
+    ? `${process.env.APP_BASE_URL || "https://register.hranalyticssummit.com"}/manage/${booking.managementToken}`
     : null;
   const managementLinkHtml = manageUrl ? buildManageLinkSection(manageUrl) : "";
 
@@ -862,7 +862,7 @@ export async function sendWelcomeEmail(
     }
 
     const settings = await getEventSettings();
-    const appBaseUrl = process.env.APP_BASE_URL || "https://hranalyticssummit.com/register";
+    const appBaseUrl = process.env.APP_BASE_URL || "https://register.hranalyticssummit.com";
 
     let manageLinkHtml = "";
     if (bookingId) {
