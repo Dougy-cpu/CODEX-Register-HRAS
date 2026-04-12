@@ -28,10 +28,15 @@ type FormValues = z.infer<typeof formSchema>;
 export default function Step1Lead({ sessionToken, booking }: { sessionToken: string, booking: BookingWithAttendees | undefined }) {
   const leadAttendee = booking?.attendees?.find((a) => a.isLead);
   
+  const passParam = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("pass")
+    : null;
+  const urlPreselect = passParam === "business" ? "consultant_vendor" : passParam === "hr" ? "hr_professional" : null;
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      attendeeType: booking?.attendeeType || "hr_professional",
+      attendeeType: booking?.attendeeType || urlPreselect || "hr_professional",
       firstName: leadAttendee?.firstName || "",
       lastName: leadAttendee?.lastName || "",
       jobTitle: leadAttendee?.jobTitle || "",
