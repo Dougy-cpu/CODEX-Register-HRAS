@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { seed, runMigrations } from "./lib/seed";
+import { checkSchemaConsistency } from "./lib/schema-check";
 
 const rawPort = process.env["PORT"];
 
@@ -24,6 +25,16 @@ app.listen(port, (err) => {
 
   logger.info({ port }, "Server listening");
   runMigrations()
-    .then(() => seed())
-    .catch((err) => logger.error({ err }, "Startup failed"));
+    .then(() => checkSchemaConsistency())
+    .then((schemaOk) => {
+      if (!schemaOk) {
+        logger.error("Aborting: database schema is out of date. Run 'pnpm --filter @workspace/db run push' then redeploy.");
+        process.exit(1);
+      }
+      return seed();
+    })
+    .catch((err) => {
+      logger.error({ err }, "Startup failed");
+      process.exit(1);
+    });
 });
