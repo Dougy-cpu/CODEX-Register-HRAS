@@ -208,9 +208,14 @@ router.post("/bookings/start", async (req, res): Promise<void> => {
     return { finalBooking, attendee };
   });
 
+  const allAttendees = await db
+    .select()
+    .from(attendeesTable)
+    .where(eq(attendeesTable.bookingId, finalBooking.id));
+
   res.status(200).json({
     ...formatBooking(finalBooking),
-    attendees: [formatAttendee(attendee)],
+    attendees: allAttendees.map(formatAttendee),
   });
 });
 

@@ -802,7 +802,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
           size="lg"
           className="px-10 h-14 text-lg bg-primary hover:bg-primary/90 text-white border-none"
           onClick={handleContinue}
-          disabled={calculatePricingMutation.isPending}
+          disabled={calculatePricingMutation.isPending || !booking.id}
         >
           Continue to Attendees
         </Button>

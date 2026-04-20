@@ -38,6 +38,7 @@ export default function CheckoutFlow() {
   const queryClient = useQueryClient();
   const [optimisticStep, setOptimisticStep] = useState<number | null>(null);
   const [optimisticBooking, setOptimisticBooking] = useState<BookingWithAttendees | null>(null);
+  const [step1Error, setStep1Error] = useState<string | null>(null);
 
   const isStripeReturn = typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).has(STRIPE_RETURN_PARAM);
@@ -118,6 +119,7 @@ export default function CheckoutFlow() {
   const onAdvance = (step: number | null, formData?: { attendeeType: string; sessionToken: string }) => {
     setOptimisticStep(step);
     if (step !== null && formData) {
+      setStep1Error(null);
       setOptimisticBooking({
         id: 0,
         sessionToken: formData.sessionToken,
@@ -186,7 +188,7 @@ export default function CheckoutFlow() {
   const renderStep = () => {
     switch (currentStep) {
       case 1:
-        return <Step1Lead sessionToken={sessionToken} booking={booking} onAdvance={onAdvance} />;
+        return <Step1Lead sessionToken={sessionToken} booking={booking} onAdvance={onAdvance} submitError={step1Error} onSubmitError={setStep1Error} />;
       case 2:
         return effectiveBooking ? <Step2Passes booking={effectiveBooking} /> : null;
       case 3:
@@ -196,7 +198,7 @@ export default function CheckoutFlow() {
       case 5:
         return effectiveBooking ? <Confirmation booking={effectiveBooking} /> : null;
       default:
-        return <Step1Lead sessionToken={sessionToken} booking={booking} onAdvance={onAdvance} />;
+        return <Step1Lead sessionToken={sessionToken} booking={booking} onAdvance={onAdvance} submitError={step1Error} onSubmitError={setStep1Error} />;
     }
   };
 

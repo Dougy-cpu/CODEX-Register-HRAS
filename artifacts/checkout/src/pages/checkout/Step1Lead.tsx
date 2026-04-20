@@ -8,7 +8,6 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useUpdateBooking, useCreateAttendee, useUpdateAttendee, customFetch } from "@workspace/api-client-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
 import type { BookingWithAttendees } from "@/types/booking";
 
 const formSchema = z.object({
@@ -26,13 +25,14 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-export default function Step1Lead({ sessionToken, booking, onAdvance }: {
+export default function Step1Lead({ sessionToken, booking, onAdvance, submitError, onSubmitError }: {
   sessionToken: string;
   booking: BookingWithAttendees | undefined;
   onAdvance: (step: number | null, formData?: { attendeeType: string; sessionToken: string }) => void;
+  submitError: string | null;
+  onSubmitError: (error: string | null) => void;
 }) {
   const leadAttendee = booking?.attendees?.find((a) => a.isLead);
-  const [submitError, setSubmitError] = useState<string | null>(null);
   
   const passParam = typeof window !== "undefined"
     ? new URLSearchParams(window.location.search).get("pass")
@@ -59,7 +59,7 @@ export default function Step1Lead({ sessionToken, booking, onAdvance }: {
   const updateAttendee = useUpdateAttendee();
 
   const onSubmit = async (data: FormValues) => {
-    setSubmitError(null);
+    onSubmitError(null);
     onAdvance(2, { attendeeType: data.attendeeType, sessionToken });
 
     try {
@@ -121,7 +121,7 @@ export default function Step1Lead({ sessionToken, booking, onAdvance }: {
       queryClient.invalidateQueries({ queryKey: ["booking"] });
     } catch {
       onAdvance(null);
-      setSubmitError("Something went wrong saving your details. Please try again.");
+      onSubmitError("Something went wrong saving your details. Please try again.");
     }
   };
 
