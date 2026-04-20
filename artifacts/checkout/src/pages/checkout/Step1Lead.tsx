@@ -5,9 +5,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useCreateBooking, useUpdateBooking, useCreateAttendee, useUpdateAttendee } from "@workspace/api-client-react";
+import { useUpdateBooking, useCreateAttendee, useUpdateAttendee, customFetch } from "@workspace/api-client-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import type { BookingWithAttendees } from "@/types/booking";
 
 const formSchema = z.object({
@@ -25,8 +26,13 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-export default function Step1Lead({ sessionToken, booking }: { sessionToken: string, booking: BookingWithAttendees | undefined }) {
+export default function Step1Lead({ sessionToken, booking, onAdvance }: {
+  sessionToken: string;
+  booking: BookingWithAttendees | undefined;
+  onAdvance: (step: number | null) => void;
+}) {
   const leadAttendee = booking?.attendees?.find((a) => a.isLead);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   
   const passParam = typeof window !== "undefined"
     ? new URLSearchParams(window.location.search).get("pass")
@@ -48,71 +54,75 @@ export default function Step1Lead({ sessionToken, booking }: { sessionToken: str
   });
 
   const queryClient = useQueryClient();
-  const createBooking = useCreateBooking();
   const updateBooking = useUpdateBooking();
   const createAttendee = useCreateAttendee();
   const updateAttendee = useUpdateAttendee();
 
   const onSubmit = async (data: FormValues) => {
-    let bookingId = booking?.id;
+    setSubmitError(null);
+    onAdvance(2);
 
-    if (!booking) {
-      // Create new booking
-      const newBooking = await createBooking.mutateAsync({
-        data: {
-          sessionToken,
-          attendeeType: data.attendeeType,
-          passType: "single", // default
-          quantity: 1, // default
-          currentStep: 2
+    try {
+      if (!booking) {
+        await customFetch("/api/bookings/start", {
+          method: "POST",
+          body: JSON.stringify({
+            sessionToken,
+            attendeeType: data.attendeeType,
+            passType: "single",
+            quantity: 1,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            jobTitle: data.jobTitle,
+            company: data.company,
+            workEmail: data.workEmail,
+            phone: data.phone || null,
+            gdprConsent: data.gdprConsent,
+          }),
+        });
+      } else {
+        await updateBooking.mutateAsync({
+          id: booking.id,
+          data: { attendeeType: data.attendeeType, currentStep: 2 }
+        });
+
+        if (!leadAttendee) {
+          await createAttendee.mutateAsync({
+            bookingId: booking.id,
+            data: {
+              isLead: true,
+              firstName: data.firstName,
+              lastName: data.lastName,
+              jobTitle: data.jobTitle,
+              company: data.company,
+              workEmail: data.workEmail,
+              phone: data.phone || null,
+              gdprConsent: data.gdprConsent,
+              seatIndex: 0
+            }
+          });
+        } else {
+          await updateAttendee.mutateAsync({
+            bookingId: booking.id,
+            attendeeId: leadAttendee.id,
+            data: {
+              firstName: data.firstName,
+              lastName: data.lastName,
+              jobTitle: data.jobTitle,
+              company: data.company,
+              workEmail: data.workEmail,
+              phone: data.phone || null,
+              gdprConsent: data.gdprConsent,
+            }
+          });
         }
-      });
-      bookingId = newBooking.id;
-    } else {
-      // Update existing booking (booking is non-null in this branch)
-      await updateBooking.mutateAsync({
-        id: booking.id,
-        data: {
-          attendeeType: data.attendeeType,
-          currentStep: 2
-        }
-      });
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["booking"] });
+    } catch {
+      onAdvance(null);
+      setSubmitError("Something went wrong saving your details. Please try again.");
     }
-
-    if (!leadAttendee) {
-      // Create lead attendee
-      await createAttendee.mutateAsync({
-        bookingId: bookingId!,
-        data: {
-          isLead: true,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          jobTitle: data.jobTitle,
-          company: data.company,
-          workEmail: data.workEmail,
-          phone: data.phone || null,
-          gdprConsent: data.gdprConsent,
-          seatIndex: 0
-        }
-      });
-    } else {
-      // Update lead attendee
-      await updateAttendee.mutateAsync({
-        bookingId: bookingId!,
-        attendeeId: leadAttendee.id,
-        data: {
-          firstName: data.firstName,
-          lastName: data.lastName,
-          jobTitle: data.jobTitle,
-          company: data.company,
-          workEmail: data.workEmail,
-          phone: data.phone || null,
-          gdprConsent: data.gdprConsent,
-        }
-      });
-    }
-
-    queryClient.invalidateQueries({ queryKey: ["booking"] });
   };
 
   return (
@@ -285,6 +295,12 @@ export default function Step1Lead({ sessionToken, booking }: { sessionToken: str
               />
             </div>
           </div>
+
+          {submitError && (
+            <div className="text-sm text-destructive border border-destructive/30 bg-destructive/5 rounded p-3">
+              {submitError}
+            </div>
+          )}
 
           <div className="flex justify-end pt-4">
             <Button type="submit" size="lg" className="px-10 h-14 text-lg bg-primary hover:bg-primary/90 text-white border-none">

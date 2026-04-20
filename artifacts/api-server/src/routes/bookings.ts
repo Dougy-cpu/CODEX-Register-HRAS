@@ -108,6 +108,127 @@ router.post("/bookings", async (req, res): Promise<void> => {
   res.status(201).json(formatBooking(booking));
 });
 
+router.post("/bookings/start", async (req, res): Promise<void> => {
+  const {
+    sessionToken,
+    attendeeType,
+    passType = "single",
+    quantity = 1,
+    firstName,
+    lastName,
+    jobTitle,
+    company,
+    workEmail,
+    phone,
+    gdprConsent,
+  } = req.body;
+
+  if (!sessionToken || !attendeeType || !firstName || !lastName || !jobTitle || !company || !workEmail) {
+    res.status(400).json({ error: "Missing required fields" });
+    return;
+  }
+
+  const [existing] = await db
+    .select()
+    .from(bookingsTable)
+    .where(eq(bookingsTable.sessionToken, sessionToken));
+
+  const pricing = await calculatePricing(passType, quantity);
+  let bookingId: number;
+
+  if (existing) {
+    const [updated] = await db
+      .update(bookingsTable)
+      .set({
+        passType,
+        attendeeType,
+        quantity,
+        subtotalAmount: pricing.subtotalAfterDiscounts.toString(),
+        vatAmount: pricing.vatAmount.toString(),
+        totalAmount: pricing.total.toString(),
+        groupDiscountAmount: pricing.groupDiscountAmount > 0 ? pricing.groupDiscountAmount.toString() : null,
+        currentStep: Math.max(2, existing.currentStep),
+      })
+      .where(eq(bookingsTable.id, existing.id))
+      .returning();
+    bookingId = updated.id;
+  } else {
+    const [booking] = await db
+      .insert(bookingsTable)
+      .values({
+        sessionToken,
+        passType,
+        attendeeType,
+        quantity,
+        status: "partial",
+        subtotalAmount: pricing.subtotalAfterDiscounts.toString(),
+        vatAmount: pricing.vatAmount.toString(),
+        totalAmount: pricing.total.toString(),
+        groupDiscountAmount: pricing.groupDiscountAmount > 0 ? pricing.groupDiscountAmount.toString() : null,
+        currentStep: 2,
+        managementToken: uuidv4(),
+      })
+      .returning();
+    bookingId = booking.id;
+  }
+
+  const existingAttendee = existing
+    ? await db
+        .select()
+        .from(attendeesTable)
+        .where(and(eq(attendeesTable.bookingId, bookingId), eq(attendeesTable.isLead, true)))
+        .then((rows) => rows[0])
+    : undefined;
+
+  let attendee: typeof attendeesTable.$inferSelect;
+
+  if (existingAttendee) {
+    const [updated] = await db
+      .update(attendeesTable)
+      .set({
+        firstName,
+        lastName,
+        jobTitle,
+        company,
+        workEmail,
+        phone: phone || null,
+        gdprConsent: gdprConsent ?? false,
+        gdprConsentAt: gdprConsent ? new Date() : null,
+      })
+      .where(eq(attendeesTable.id, existingAttendee.id))
+      .returning();
+    attendee = updated;
+  } else {
+    const [created] = await db
+      .insert(attendeesTable)
+      .values({
+        bookingId,
+        isLead: true,
+        firstName,
+        lastName,
+        jobTitle,
+        company,
+        workEmail,
+        phone: phone || null,
+        gdprConsent: gdprConsent ?? false,
+        gdprConsentAt: gdprConsent ? new Date() : null,
+        seatIndex: 0,
+      })
+      .returning();
+    attendee = created;
+  }
+
+  const [finalBooking] = await db
+    .select()
+    .from(bookingsTable)
+    .where(eq(bookingsTable.id, bookingId));
+
+  res.status(200).json({
+    ...formatBooking(finalBooking),
+    attendees: [formatAttendee(attendee)],
+  });
+});
+
 router.get("/bookings/by-session/:sessionToken", async (req, res): Promise<void> => {
   const { sessionToken } = req.params;
   const [booking] = await db

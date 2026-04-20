@@ -35,6 +35,7 @@ const POLL_TIMEOUT_MS = 60000;
 export default function CheckoutFlow() {
   const sessionToken = useBookingSession();
   const queryClient = useQueryClient();
+  const [optimisticStep, setOptimisticStep] = useState<number | null>(null);
 
   const isStripeReturn = typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).has(STRIPE_RETURN_PARAM);
@@ -105,6 +106,14 @@ export default function CheckoutFlow() {
     }
   }, [booking?.status, pollingForPayment]);
 
+  useEffect(() => {
+    if (optimisticStep !== null && booking?.currentStep && booking.currentStep >= optimisticStep) {
+      setOptimisticStep(null);
+    }
+  }, [booking?.currentStep, optimisticStep]);
+
+  const onAdvance = (step: number | null) => setOptimisticStep(step);
+
   if (isLoading && !booking) {
     return (
       <CheckoutLayout>
@@ -143,12 +152,12 @@ export default function CheckoutFlow() {
     );
   }
 
-  const currentStep = booking?.currentStep || 1;
+  const currentStep = optimisticStep ?? booking?.currentStep ?? 1;
 
   const renderStep = () => {
     switch (currentStep) {
       case 1:
-        return <Step1Lead sessionToken={sessionToken} booking={booking} />;
+        return <Step1Lead sessionToken={sessionToken} booking={booking} onAdvance={onAdvance} />;
       case 2:
         return <Step2Passes booking={booking!} />;
       case 3:
