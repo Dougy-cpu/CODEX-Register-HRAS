@@ -259,12 +259,27 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
       return;
     }
 
+    const rawPaymentIntent = (invoice as unknown as Record<string, unknown>).payment_intent;
+    const paymentIntentId: string | null =
+      typeof rawPaymentIntent === "string"
+        ? rawPaymentIntent
+        : rawPaymentIntent && typeof rawPaymentIntent === "object" && "id" in rawPaymentIntent
+          ? (rawPaymentIntent as { id: string }).id
+          : null;
+
     await db
       .update(bookingsTable)
-      .set({ status: "paid", updatedAt: new Date() })
+      .set({
+        status: "paid",
+        updatedAt: new Date(),
+        ...(paymentIntentId ? { paymentMethod: "card" as const, stripePaymentIntentId: paymentIntentId } : {}),
+      })
       .where(eq(bookingsTable.id, booking.id));
 
-    logger.info({ bookingId: booking.id, invoiceId, orderRef: booking.orderReference }, "invoice.paid: booking marked as paid");
+    logger.info(
+      { bookingId: booking.id, invoiceId, orderRef: booking.orderReference, paymentIntentId, paymentMethod: paymentIntentId ? "card" : booking.paymentMethod },
+      "invoice.paid: booking marked as paid"
+    );
 
     // Re-sync to Google Sheets so the status column reflects "paid"
     try {
