@@ -134,94 +134,79 @@ router.post("/bookings/start", async (req, res): Promise<void> => {
     .where(eq(bookingsTable.sessionToken, sessionToken));
 
   const pricing = await calculatePricing(passType, quantity);
-  let bookingId: number;
+  const gdprConsentAt = gdprConsent ? new Date() : null;
+  const managementToken = uuidv4();
 
-  if (existing) {
-    const [updated] = await db
-      .update(bookingsTable)
-      .set({
-        passType,
-        attendeeType,
-        quantity,
-        subtotalAmount: pricing.subtotalAfterDiscounts.toString(),
-        vatAmount: pricing.vatAmount.toString(),
-        totalAmount: pricing.total.toString(),
-        groupDiscountAmount: pricing.groupDiscountAmount > 0 ? pricing.groupDiscountAmount.toString() : null,
-        currentStep: Math.max(2, existing.currentStep),
-      })
-      .where(eq(bookingsTable.id, existing.id))
-      .returning();
-    bookingId = updated.id;
-  } else {
-    const [booking] = await db
-      .insert(bookingsTable)
-      .values({
-        sessionToken,
-        passType,
-        attendeeType,
-        quantity,
-        status: "partial",
-        subtotalAmount: pricing.subtotalAfterDiscounts.toString(),
-        vatAmount: pricing.vatAmount.toString(),
-        totalAmount: pricing.total.toString(),
-        groupDiscountAmount: pricing.groupDiscountAmount > 0 ? pricing.groupDiscountAmount.toString() : null,
-        currentStep: 2,
-        managementToken: uuidv4(),
-      })
-      .returning();
-    bookingId = booking.id;
-  }
+  const { finalBooking, attendee } = await db.transaction(async (tx) => {
+    let bookingId: number;
 
-  const existingAttendee = existing
-    ? await db
-        .select()
-        .from(attendeesTable)
-        .where(and(eq(attendeesTable.bookingId, bookingId), eq(attendeesTable.isLead, true)))
-        .then((rows) => rows[0])
-    : undefined;
+    if (existing) {
+      const [updated] = await tx
+        .update(bookingsTable)
+        .set({
+          passType,
+          attendeeType,
+          quantity,
+          subtotalAmount: pricing.subtotalAfterDiscounts.toString(),
+          vatAmount: pricing.vatAmount.toString(),
+          totalAmount: pricing.total.toString(),
+          groupDiscountAmount: pricing.groupDiscountAmount > 0 ? pricing.groupDiscountAmount.toString() : null,
+          currentStep: Math.max(2, existing.currentStep),
+        })
+        .where(eq(bookingsTable.id, existing.id))
+        .returning();
+      bookingId = updated.id;
+    } else {
+      const [created] = await tx
+        .insert(bookingsTable)
+        .values({
+          sessionToken,
+          passType,
+          attendeeType,
+          quantity,
+          status: "partial",
+          subtotalAmount: pricing.subtotalAfterDiscounts.toString(),
+          vatAmount: pricing.vatAmount.toString(),
+          totalAmount: pricing.total.toString(),
+          groupDiscountAmount: pricing.groupDiscountAmount > 0 ? pricing.groupDiscountAmount.toString() : null,
+          currentStep: 2,
+          managementToken,
+        })
+        .returning();
+      bookingId = created.id;
+    }
 
-  let attendee: typeof attendeesTable.$inferSelect;
+    const [existingAttendee] = existing
+      ? await tx
+          .select()
+          .from(attendeesTable)
+          .where(and(eq(attendeesTable.bookingId, bookingId), eq(attendeesTable.isLead, true)))
+      : [undefined];
 
-  if (existingAttendee) {
-    const [updated] = await db
-      .update(attendeesTable)
-      .set({
-        firstName,
-        lastName,
-        jobTitle,
-        company,
-        workEmail,
-        phone: phone || null,
-        gdprConsent: gdprConsent ?? false,
-        gdprConsentAt: gdprConsent ? new Date() : null,
-      })
-      .where(eq(attendeesTable.id, existingAttendee.id))
-      .returning();
-    attendee = updated;
-  } else {
-    const [created] = await db
-      .insert(attendeesTable)
-      .values({
-        bookingId,
-        isLead: true,
-        firstName,
-        lastName,
-        jobTitle,
-        company,
-        workEmail,
-        phone: phone || null,
-        gdprConsent: gdprConsent ?? false,
-        gdprConsentAt: gdprConsent ? new Date() : null,
-        seatIndex: 0,
-      })
-      .returning();
-    attendee = created;
-  }
+    let attendee: typeof attendeesTable.$inferSelect;
 
-  const [finalBooking] = await db
-    .select()
-    .from(bookingsTable)
-    .where(eq(bookingsTable.id, bookingId));
+    if (existingAttendee) {
+      const [updated] = await tx
+        .update(attendeesTable)
+        .set({ firstName, lastName, jobTitle, company, workEmail, phone: phone || null, gdprConsent: gdprConsent ?? false, gdprConsentAt })
+        .where(eq(attendeesTable.id, existingAttendee.id))
+        .returning();
+      attendee = updated;
+    } else {
+      const [created] = await tx
+        .insert(attendeesTable)
+        .values({ bookingId, isLead: true, firstName, lastName, jobTitle, company, workEmail, phone: phone || null, gdprConsent: gdprConsent ?? false, gdprConsentAt, seatIndex: 0 })
+        .returning();
+      attendee = created;
+    }
+
+    const [finalBooking] = await tx
+      .select()
+      .from(bookingsTable)
+      .where(eq(bookingsTable.id, bookingId));
+
+    return { finalBooking, attendee };
+  });
 
   res.status(200).json({
     ...formatBooking(finalBooking),

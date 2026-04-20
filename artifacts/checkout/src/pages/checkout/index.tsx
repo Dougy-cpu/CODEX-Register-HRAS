@@ -155,6 +155,13 @@ export default function CheckoutFlow() {
   const currentStep = optimisticStep ?? booking?.currentStep ?? 1;
 
   const renderStep = () => {
+    if (currentStep >= 2 && !booking) {
+      return (
+        <div className="flex justify-center py-20">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      );
+    }
     switch (currentStep) {
       case 1:
         return <Step1Lead sessionToken={sessionToken} booking={booking} onAdvance={onAdvance} />;
@@ -167,7 +174,7 @@ export default function CheckoutFlow() {
       case 5:
         return <Confirmation booking={booking!} />;
       default:
-        return <Step1Lead sessionToken={sessionToken} booking={booking} />;
+        return <Step1Lead sessionToken={sessionToken} booking={booking} onAdvance={onAdvance} />;
     }
   };
 
