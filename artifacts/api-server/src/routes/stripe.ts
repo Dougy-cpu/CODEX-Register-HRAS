@@ -373,7 +373,7 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
     if (booking) {
       // Attempt to retrieve the payment intent to get the specific decline reason
       let declineReason: string | undefined;
-      const piId = typeof invoice.payment_intent === "string" ? invoice.payment_intent : null;
+      const piId = typeof (invoice as unknown as Record<string, unknown>).payment_intent === "string" ? (invoice as unknown as Record<string, unknown>).payment_intent as string : null;
       if (piId && stripe) {
         try {
           const pi = await stripe.paymentIntents.retrieve(piId);
