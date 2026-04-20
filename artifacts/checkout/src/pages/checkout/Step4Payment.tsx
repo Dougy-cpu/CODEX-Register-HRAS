@@ -59,6 +59,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
         promoCode: booking.promoCode || undefined,
       }
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [booking.passType, booking.quantity]);
 
   // Abandonment detection: fire incomplete-ping when the user leaves without paying.

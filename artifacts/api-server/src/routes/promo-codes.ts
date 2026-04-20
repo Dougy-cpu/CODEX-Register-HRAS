@@ -1,20 +1,10 @@
 import { Router, type IRouter } from "express";
 import { eq, and, lte, gte, or, isNull } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { promoCodesTable, bookingsTable } from "@workspace/db";
-import { calculatePricing, PASS_PRICES } from "../lib/pricing";
+import { promoCodesTable } from "@workspace/db";
+import { PASS_PRICES } from "../lib/pricing";
 
 const router: IRouter = Router();
-
-function formatPromoCode(p: typeof promoCodesTable.$inferSelect) {
-  return {
-    ...p,
-    discountValue: parseFloat(p.discountValue.toString()),
-    validFrom: p.validFrom ? p.validFrom.toISOString() : null,
-    validUntil: p.validUntil ? p.validUntil.toISOString() : null,
-    createdAt: p.createdAt.toISOString(),
-  };
-}
 
 router.post("/promo-codes/validate", async (req, res): Promise<void> => {
   const { code, passType, quantity } = req.body;
@@ -60,7 +50,7 @@ router.post("/promo-codes/validate", async (req, res): Promise<void> => {
   }
 
   const baseSubtotal = passInfo.price * parseInt(quantity, 10);
-  let discountAmount = 0;
+  let discountAmount: number;
 
   if (promo.discountType === "percentage") {
     discountAmount = parseFloat(((baseSubtotal * parseFloat(promo.discountValue.toString())) / 100).toFixed(2));

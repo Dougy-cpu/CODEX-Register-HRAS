@@ -1,5 +1,4 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { discountTiersTable } from "@workspace/db";
 

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import AdminLayout from "@/components/layout/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Ticket, Infinity, AlertTriangle, Check, Plus, Trash2, GripVertical } from "lucide-react";
+import { Ticket, Infinity as InfinityIcon, AlertTriangle, Check, Plus, Trash2, GripVertical } from "lucide-react";
 
 interface PassInventoryRow {
   passType: string;
@@ -166,7 +166,7 @@ export default function AdminPasses() {
   const [invSaved, setInvSaved] = useState<Record<string, boolean>>({});
   const [invErrors, setInvErrors] = useState<Record<string, string>>({});
 
-  const [configs, setConfigs] = useState<Record<string, PassConfig | null>>({
+  const [_configs, setConfigs] = useState<Record<string, PassConfig | null>>({
     single: null,
     business: null,
   });
@@ -531,7 +531,7 @@ export default function AdminPasses() {
                           <div className="mt-4 flex items-center gap-2 text-sm">
                             {current === null ? (
                               <>
-                                <Infinity className="w-4 h-4 text-muted-foreground" />
+                                <InfinityIcon className="w-4 h-4 text-muted-foreground" />
                                 <span className="text-muted-foreground">Currently showing as <strong>unlimited</strong> on checkout</span>
                               </>
                             ) : current <= 10 ? (

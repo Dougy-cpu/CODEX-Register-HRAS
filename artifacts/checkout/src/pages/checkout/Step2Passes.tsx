@@ -274,6 +274,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
     calculatePricingMutation.mutate({
       data: { passType: selectedPass, quantity, promoCode: appliedPromoCode ?? undefined },
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPass, quantity, appliedPromoCode]);
 
   const currentPricing = calculatePricingMutation.data;
@@ -477,7 +478,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
 
               {/* Tier table */}
               <div className="space-y-1 text-xs">
-                {hrTierRows.map(({ key, label, note, active, isSpecial }) => (
+                {hrTierRows.map(({ key, label, note, active, isSpecial: _isSpecial }) => (
                   <div
                     key={key}
                     className={`flex justify-between px-2 py-1.5 transition-all ${

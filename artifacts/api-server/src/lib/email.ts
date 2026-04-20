@@ -1331,7 +1331,7 @@ export async function sendInvoiceReminder(bookingId: number): Promise<void> {
   `, settings);
 
   let pdfBuffer: Buffer | null = null;
-  let pdfFilename = `invoice-${orderRef}.pdf`;
+  const pdfFilename = `invoice-${orderRef}.pdf`;
   if (booking.stripeInvoicePdfUrl) {
     try {
       pdfBuffer = await downloadHttpsPdf(booking.stripeInvoicePdfUrl);

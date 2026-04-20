@@ -137,7 +137,7 @@ router.post("/bookings/start", async (req, res): Promise<void> => {
   const gdprConsentAt = gdprConsent ? new Date() : null;
   const managementToken = uuidv4();
 
-  const { finalBooking, attendee } = await db.transaction(async (tx) => {
+  const { finalBooking } = await db.transaction(async (tx) => {
     let bookingId: number;
 
     if (existing) {

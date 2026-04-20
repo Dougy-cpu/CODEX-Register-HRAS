@@ -184,6 +184,7 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
       }
     }, 1500);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formsData, tbcFlags]);
 
   const handleForMeToggle = (index: number, checked: boolean) => {

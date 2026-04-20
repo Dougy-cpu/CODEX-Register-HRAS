@@ -134,7 +134,7 @@ const generalApiLimiter = rateLimit({
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: { error: "Too many requests, please try again later." },
-  skip: (req) => !isProduction,
+  skip: (_req) => !isProduction,
 });
 
 const bookingCreationLimiter = rateLimit({
@@ -143,7 +143,7 @@ const bookingCreationLimiter = rateLimit({
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: { error: "Too many booking requests, please try again later." },
-  skip: (req) => !isProduction,
+  skip: (_req) => !isProduction,
 });
 
 const paymentLimiter = rateLimit({
@@ -152,7 +152,7 @@ const paymentLimiter = rateLimit({
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: { error: "Too many payment requests, please try again later." },
-  skip: (req) => !isProduction,
+  skip: (_req) => !isProduction,
 });
 
 // Apply general API limiter to all /api routes except the Stripe webhook,

@@ -70,7 +70,7 @@ router.post("/bookings/:bookingId/attendees", async (req, res): Promise<void> =>
 
   // Upsert: check if an attendee already exists for this booking at this seatIndex
   // (or as lead if isLead is true). Update instead of inserting to prevent duplicates.
-  const whereClause = !!isLead
+  const whereClause = isLead
     ? and(eq(attendeesTable.bookingId, bookingId), eq(attendeesTable.isLead, true))
     : and(eq(attendeesTable.bookingId, bookingId), eq(attendeesTable.seatIndex, resolvedSeatIndex));
 

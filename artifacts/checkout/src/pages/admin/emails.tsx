@@ -9,7 +9,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { useQueryClient } from "@tanstack/react-query";
 import { RefreshCcw, Send, Bold, Italic, Heading2, List, ListOrdered, Link2, Code, RotateCcw, ImageIcon, Upload, X, Loader2, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -537,7 +536,7 @@ function BrandingSettings() {
 
 export default function AdminEmails() {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
+
   const [activeTab, setActiveTab] = useState("branding");
   const [page, setPage] = useState(1);
   const [eventSettings, setEventSettings] = useState<EventSettingsData | null>(null);

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import Stripe from "stripe";
-import { eq, desc, ilike, or, and, sql, count } from "drizzle-orm";
+import { eq, desc, or, and, sql, count } from "drizzle-orm";
 import ExcelJS from "exceljs";
 import { db } from "@workspace/db";
 import {

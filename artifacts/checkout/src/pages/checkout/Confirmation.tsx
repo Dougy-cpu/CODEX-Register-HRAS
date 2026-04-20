@@ -10,8 +10,7 @@ interface ConfirmationProps {
 export default function Confirmation({ booking }: ConfirmationProps) {
   useEffect(() => {
     // If we landed here after stripe redirect, we might want to check the session_id
-    const urlParams = new URLSearchParams(window.location.search);
-    const sessionId = urlParams.get('session_id');
+    // session_id is available via new URLSearchParams(window.location.search).get('session_id') if needed
     // For now, assume backend webhook handles fulfillment, we just show success
   }, []);
 

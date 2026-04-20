@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { emailTemplatesTable, emailLogsTable, eventSettingsTable } from "@workspace/db";
-import { sendWelcomeEmail, wrapInBrandedLayout, getEventSettings } from "../lib/email";
+import { sendWelcomeEmail, getEventSettings } from "../lib/email";
 import { adminAuth } from "../middleware/admin-auth";
 
 const router: IRouter = Router();

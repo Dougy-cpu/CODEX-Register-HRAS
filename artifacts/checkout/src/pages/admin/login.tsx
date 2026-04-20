@@ -20,7 +20,7 @@ export default function AdminLogin() {
       });
       localStorage.setItem("admin_token", res.token);
       setLocation("/admin");
-    } catch (err) {
+    } catch (_err) {
       setError("Invalid password");
     }
   };
