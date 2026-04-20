@@ -128,12 +128,13 @@ async function logEmail(
 }
 
 export async function sendMail(options: {
-  to: string;
+  to: string | string[];
   subject: string;
   html: string;
   attachments?: Array<{ filename: string; content: Buffer; contentType: string }>;
   fromName?: string;
   fromEmail?: string;
+  bcc?: string | string[];
 }): Promise<boolean> {
   const transporter = createTransporter();
   if (!transporter) {
@@ -155,6 +156,7 @@ export async function sendMail(options: {
     await transporter.sendMail({
       from: `"${fromName}" <${fromEmail}>`,
       to: options.to,
+      bcc: options.bcc,
       subject: options.subject,
       html: options.html,
       attachments: nodemailerAttachments,
