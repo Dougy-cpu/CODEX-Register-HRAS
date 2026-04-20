@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useGetBookingBySession, useCreateBooking, useUpdateBooking, customFetch } from "@workspace/api-client-react";
+import { useGetBookingBySession, customFetch } from "@workspace/api-client-react";
+import type { BookingWithAttendees } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { v4 as uuidv4 } from "uuid";
 
@@ -36,6 +37,7 @@ export default function CheckoutFlow() {
   const sessionToken = useBookingSession();
   const queryClient = useQueryClient();
   const [optimisticStep, setOptimisticStep] = useState<number | null>(null);
+  const [optimisticBooking, setOptimisticBooking] = useState<BookingWithAttendees | null>(null);
 
   const isStripeReturn = typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).has(STRIPE_RETURN_PARAM);
@@ -109,10 +111,36 @@ export default function CheckoutFlow() {
   useEffect(() => {
     if (optimisticStep !== null && booking?.currentStep && booking.currentStep >= optimisticStep) {
       setOptimisticStep(null);
+      setOptimisticBooking(null);
     }
   }, [booking?.currentStep, optimisticStep]);
 
-  const onAdvance = (step: number | null) => setOptimisticStep(step);
+  const onAdvance = (step: number | null, formData?: { attendeeType: string; sessionToken: string }) => {
+    setOptimisticStep(step);
+    if (step !== null && formData) {
+      setOptimisticBooking({
+        id: 0,
+        sessionToken: formData.sessionToken,
+        status: "partial",
+        passType: "single",
+        attendeeType: formData.attendeeType as BookingWithAttendees["attendeeType"],
+        quantity: 1,
+        promoCode: null,
+        promoDiscountAmount: null,
+        groupDiscountAmount: null,
+        subtotalAmount: 0,
+        vatAmount: 0,
+        totalAmount: 0,
+        paymentMethod: null,
+        currentStep: 2,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        attendees: [],
+      } as BookingWithAttendees);
+    } else if (step === null) {
+      setOptimisticBooking(null);
+    }
+  };
 
   if (isLoading && !booking) {
     return (
@@ -153,26 +181,20 @@ export default function CheckoutFlow() {
   }
 
   const currentStep = optimisticStep ?? booking?.currentStep ?? 1;
+  const effectiveBooking = booking ?? optimisticBooking ?? undefined;
 
   const renderStep = () => {
-    if (currentStep >= 2 && !booking) {
-      return (
-        <div className="flex justify-center py-20">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      );
-    }
     switch (currentStep) {
       case 1:
         return <Step1Lead sessionToken={sessionToken} booking={booking} onAdvance={onAdvance} />;
       case 2:
-        return <Step2Passes booking={booking!} />;
+        return effectiveBooking ? <Step2Passes booking={effectiveBooking} /> : null;
       case 3:
-        return <Step3Attendees booking={booking!} />;
+        return effectiveBooking ? <Step3Attendees booking={effectiveBooking} /> : null;
       case 4:
-        return <Step4Payment booking={booking!} />;
+        return effectiveBooking ? <Step4Payment booking={effectiveBooking} /> : null;
       case 5:
-        return <Confirmation booking={booking!} />;
+        return effectiveBooking ? <Confirmation booking={effectiveBooking} /> : null;
       default:
         return <Step1Lead sessionToken={sessionToken} booking={booking} onAdvance={onAdvance} />;
     }

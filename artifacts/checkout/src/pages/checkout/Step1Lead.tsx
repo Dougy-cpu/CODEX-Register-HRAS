@@ -29,7 +29,7 @@ type FormValues = z.infer<typeof formSchema>;
 export default function Step1Lead({ sessionToken, booking, onAdvance }: {
   sessionToken: string;
   booking: BookingWithAttendees | undefined;
-  onAdvance: (step: number | null) => void;
+  onAdvance: (step: number | null, formData?: { attendeeType: string; sessionToken: string }) => void;
 }) {
   const leadAttendee = booking?.attendees?.find((a) => a.isLead);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -60,7 +60,7 @@ export default function Step1Lead({ sessionToken, booking, onAdvance }: {
 
   const onSubmit = async (data: FormValues) => {
     setSubmitError(null);
-    onAdvance(2);
+    onAdvance(2, { attendeeType: data.attendeeType, sessionToken });
 
     try {
       if (!booking) {
