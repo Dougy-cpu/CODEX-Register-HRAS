@@ -213,7 +213,7 @@ router.post("/bookings/start", async (req, res): Promise<void> => {
     .from(attendeesTable)
     .where(eq(attendeesTable.bookingId, finalBooking.id));
 
-  res.status(200).json({
+  res.status(existing ? 200 : 201).json({
     ...formatBooking(finalBooking),
     attendees: allAttendees.map(formatAttendee),
   });

@@ -118,7 +118,7 @@ export default function Step1Lead({ sessionToken, booking, onAdvance, submitErro
         }
       }
 
-      queryClient.invalidateQueries({ queryKey: ["booking"] });
+      queryClient.invalidateQueries({ queryKey: ["booking", sessionToken] });
     } catch {
       onAdvance(null);
       onSubmitError("Something went wrong saving your details. Please try again.");
