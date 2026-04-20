@@ -773,7 +773,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                     You're saving
                   </span>
                   <span className="text-lg font-bold">
-                    £{(currentPricing.savedAmount * (1 + currentPricing.vatRate)).toFixed(2)}
+                    £{currentPricing.savedAmount.toFixed(2)}
                   </span>
                 </motion.div>
               )}
