@@ -1318,7 +1318,7 @@ components:
           type: string
         discountType:
           type: string
-          enum: [percentage, fixed]
+          enum: [percentage, fixed, per_ticket]
         discountValue:
           type: number
         maxUses:
@@ -1340,6 +1340,14 @@ components:
             enum: [single, business]
         description:
           type: ["string", "null"]
+        oncePerCustomer:
+          type: boolean
+        minQuantity:
+          type: ["integer", "null"]
+        maxDiscountAmount:
+          type: ["number", "null"]
+        internalNote:
+          type: ["string", "null"]
         createdAt:
           type: string
           format: date-time
@@ -1351,6 +1359,7 @@ components:
         - usedCount
         - isActive
         - applicablePassTypes
+        - oncePerCustomer
         - createdAt
 
     CreatePromoCodeBody:
@@ -1360,7 +1369,7 @@ components:
           type: string
         discountType:
           type: string
-          enum: [percentage, fixed]
+          enum: [percentage, fixed, per_ticket]
         discountValue:
           type: number
         maxUses:
@@ -1379,6 +1388,14 @@ components:
             type: string
             enum: [single, business]
         description:
+          type: ["string", "null"]
+        oncePerCustomer:
+          type: boolean
+        minQuantity:
+          type: ["integer", "null"]
+        maxDiscountAmount:
+          type: ["number", "null"]
+        internalNote:
           type: ["string", "null"]
       required:
         - code
@@ -1392,7 +1409,7 @@ components:
           type: string
         discountType:
           type: string
-          enum: [percentage, fixed]
+          enum: [percentage, fixed, per_ticket]
         discountValue:
           type: number
         maxUses:
@@ -1412,6 +1429,14 @@ components:
             enum: [single, business]
         description:
           type: ["string", "null"]
+        oncePerCustomer:
+          type: boolean
+        minQuantity:
+          type: ["integer", "null"]
+        maxDiscountAmount:
+          type: ["number", "null"]
+        internalNote:
+          type: ["string", "null"]
 
     ValidatePromoCodeBody:
       type: object
@@ -1423,6 +1448,8 @@ components:
           enum: [single, business]
         quantity:
           type: integer
+        leadEmail:
+          type: ["string", "null"]
       required:
         - code
         - passType

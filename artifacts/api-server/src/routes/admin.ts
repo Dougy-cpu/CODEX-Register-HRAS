@@ -51,6 +51,7 @@ function formatPromoCode(p: typeof promoCodesTable.$inferSelect) {
   return {
     ...p,
     discountValue: parseFloat(p.discountValue.toString()),
+    maxDiscountAmount: p.maxDiscountAmount !== null ? parseFloat(p.maxDiscountAmount.toString()) : null,
     validFrom: p.validFrom ? p.validFrom.toISOString() : null,
     validUntil: p.validUntil ? p.validUntil.toISOString() : null,
     createdAt: p.createdAt.toISOString(),
@@ -449,7 +450,7 @@ router.get("/admin/promo-codes", adminAuth, async (_req, res): Promise<void> => 
 });
 
 router.post("/admin/promo-codes", adminAuth, async (req, res): Promise<void> => {
-  const { code, discountType, discountValue, maxUses, validFrom, validUntil, isActive, description, applicablePassTypes } = req.body;
+  const { code, discountType, discountValue, maxUses, validFrom, validUntil, isActive, description, applicablePassTypes, oncePerCustomer, minQuantity, maxDiscountAmount, internalNote } = req.body;
 
   if (!code || !discountType || discountValue === undefined) {
     res.status(400).json({ error: "code, discountType, and discountValue are required" });
@@ -472,6 +473,12 @@ router.post("/admin/promo-codes", adminAuth, async (req, res): Promise<void> => 
       isActive: isActive !== false,
       applicablePassTypes: passTypes,
       description: description || null,
+      oncePerCustomer: oncePerCustomer === true,
+      minQuantity: minQuantity ?? null,
+      maxDiscountAmount: maxDiscountAmount !== undefined && maxDiscountAmount !== null
+        ? maxDiscountAmount.toString()
+        : null,
+      internalNote: internalNote || null,
     })
     .returning();
 
@@ -488,7 +495,7 @@ router.patch("/admin/promo-codes/:id", adminAuth, async (req, res): Promise<void
     return;
   }
 
-  const { code, discountType, discountValue, maxUses, validFrom, validUntil, isActive, description, applicablePassTypes } = req.body;
+  const { code, discountType, discountValue, maxUses, validFrom, validUntil, isActive, description, applicablePassTypes, oncePerCustomer, minQuantity, maxDiscountAmount, internalNote } = req.body;
 
   const updateData: Partial<typeof promoCodesTable.$inferInsert> = {};
   if (code !== undefined) updateData.code = (code as string).toUpperCase();
@@ -502,6 +509,12 @@ router.patch("/admin/promo-codes/:id", adminAuth, async (req, res): Promise<void
   if (Array.isArray(applicablePassTypes) && applicablePassTypes.length > 0) {
     updateData.applicablePassTypes = applicablePassTypes;
   }
+  if (oncePerCustomer !== undefined) updateData.oncePerCustomer = oncePerCustomer === true;
+  if (minQuantity !== undefined) updateData.minQuantity = minQuantity;
+  if (maxDiscountAmount !== undefined) {
+    updateData.maxDiscountAmount = maxDiscountAmount === null ? null : maxDiscountAmount.toString();
+  }
+  if (internalNote !== undefined) updateData.internalNote = internalNote;
 
   const [updated] = await db
     .update(promoCodesTable)

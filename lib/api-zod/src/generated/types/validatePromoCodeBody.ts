@@ -11,4 +11,6 @@ export interface ValidatePromoCodeBody {
   code: string;
   passType: ValidatePromoCodeBodyPassType;
   quantity: number;
+  /** @nullable */
+  leadEmail?: string | null;
 }

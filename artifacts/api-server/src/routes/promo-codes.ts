@@ -1,18 +1,20 @@
 import { Router, type IRouter } from "express";
-import { eq, and, lte, gte, or, isNull } from "drizzle-orm";
+import { eq, and, lte, gte, or, isNull, inArray } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { promoCodesTable } from "@workspace/db";
+import { promoCodesTable, bookingsTable, attendeesTable } from "@workspace/db";
 import { PASS_PRICES } from "../lib/pricing";
 
 const router: IRouter = Router();
 
 router.post("/promo-codes/validate", async (req, res): Promise<void> => {
-  const { code, passType, quantity } = req.body;
+  const { code, passType, quantity, leadEmail } = req.body;
 
   if (!code || !passType || !quantity) {
     res.status(400).json({ error: "code, passType, and quantity are required" });
     return;
   }
+
+  const qty = parseInt(quantity, 10);
 
   const now = new Date();
   const [promo] = await db
@@ -43,20 +45,42 @@ router.post("/promo-codes/validate", async (req, res): Promise<void> => {
     return;
   }
 
+  if (promo.minQuantity !== null && qty < promo.minQuantity) {
+    res.status(400).json({
+      error: `This promo code requires a minimum of ${promo.minQuantity} ${promo.minQuantity === 1 ? "ticket" : "tickets"}`,
+    });
+    return;
+  }
+
+  if (promo.oncePerCustomer) {
+    const email = typeof leadEmail === "string" ? leadEmail.trim().toLowerCase() : "";
+    if (email) {
+      const used = await isCodeUsedByEmail(promo.code, email);
+      if (used) {
+        res.status(400).json({ error: "This promo code has already been used on a previous booking with this email" });
+        return;
+      }
+    }
+  }
+
   const passInfo = PASS_PRICES[passType as string];
   if (!passInfo) {
     res.status(400).json({ error: "Invalid pass type" });
     return;
   }
 
-  const baseSubtotal = passInfo.price * parseInt(quantity, 10);
+  const baseSubtotal = passInfo.price * qty;
   let discountAmount: number;
 
   if (promo.discountType === "percentage") {
     discountAmount = parseFloat(((baseSubtotal * parseFloat(promo.discountValue.toString())) / 100).toFixed(2));
+    if (promo.maxDiscountAmount !== null) {
+      const cap = parseFloat(promo.maxDiscountAmount.toString());
+      if (discountAmount > cap) discountAmount = cap;
+    }
   } else if (promo.discountType === "per_ticket") {
     discountAmount = Math.min(
-      parseFloat((parseFloat(promo.discountValue.toString()) * parseInt(quantity, 10)).toFixed(2)),
+      parseFloat((parseFloat(promo.discountValue.toString()) * qty).toFixed(2)),
       baseSubtotal
     );
   } else {
@@ -72,5 +96,34 @@ router.post("/promo-codes/validate", async (req, res): Promise<void> => {
     message: promo.description || null,
   });
 });
+
+// Returns true if the given normalised email is the lead attendee on any
+// paid/invoiced booking that already used this promo code.
+export async function isCodeUsedByEmail(code: string, normalisedEmail: string, excludeBookingId?: number): Promise<boolean> {
+  if (!normalisedEmail) return false;
+  const matchingBookings = await db
+    .select({ id: bookingsTable.id })
+    .from(bookingsTable)
+    .where(
+      and(
+        eq(bookingsTable.promoCode, code.toUpperCase()),
+        inArray(bookingsTable.status, ["paid", "invoiced"]),
+      )
+    );
+  const bookingIds = matchingBookings
+    .map((b) => b.id)
+    .filter((id) => id !== excludeBookingId);
+  if (bookingIds.length === 0) return false;
+  const leads = await db
+    .select({ workEmail: attendeesTable.workEmail, bookingId: attendeesTable.bookingId })
+    .from(attendeesTable)
+    .where(
+      and(
+        eq(attendeesTable.isLead, true),
+        inArray(attendeesTable.bookingId, bookingIds),
+      )
+    );
+  return leads.some((l) => (l.workEmail || "").trim().toLowerCase() === normalisedEmail);
+}
 
 export default router;

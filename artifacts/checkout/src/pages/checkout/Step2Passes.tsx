@@ -249,8 +249,11 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
 
   const [promoInput, setPromoInput] = useState<string>("");
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(booking.promoCode ?? null);
+  const [appliedViaLink, setAppliedViaLink] = useState<boolean>(false);
   const [promoError, setPromoError] = useState<string | null>(null);
   const [promoValidating, setPromoValidating] = useState(false);
+
+  const leadEmail = booking.attendees?.find((a) => a.isLead)?.workEmail ?? null;
 
   const [hearAboutUs, setHearAboutUs] = useState<string>((booking as Record<string, unknown>).hearAboutUs as string ?? "");
 
@@ -279,42 +282,80 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
 
   const currentPricing = calculatePricingMutation.data;
 
-  const handleApplyPromo = async () => {
-    const code = promoInput.trim().toUpperCase();
-    if (!code) return;
-    setPromoValidating(true);
-    setPromoError(null);
+  const validatePromo = async (codeToValidate: string): Promise<{ ok: boolean; code?: string; error?: string }> => {
     try {
       const res = await customFetch(`/api/promo-codes/validate`, {
         method: "POST",
-        body: JSON.stringify({ code, passType: selectedPass, quantity }),
+        body: JSON.stringify({
+          code: codeToValidate,
+          passType: selectedPass,
+          quantity,
+          leadEmail: leadEmail ?? undefined,
+        }),
       });
       const data = res as { valid?: boolean; error?: string; code?: string } | null;
-      if (data?.valid && data?.code) {
-        setAppliedPromoCode(data.code);
-        setPromoInput("");
-      } else {
-        setPromoError(
-          typeof data?.error === "string" ? data.error : "Invalid promo code"
-        );
-      }
+      if (data?.valid && data?.code) return { ok: true, code: data.code };
+      return { ok: false, error: typeof data?.error === "string" ? data.error : "Invalid promo code" };
     } catch (e: unknown) {
       const err = e as Record<string, unknown> | null;
       const apiMsg = err?.data && typeof (err.data as Record<string, unknown>)?.error === "string"
         ? (err.data as Record<string, unknown>).error as string
         : null;
       const fallbackMsg = typeof err?.message === "string" ? err.message : null;
-      setPromoError(apiMsg || fallbackMsg || "Invalid or expired promo code");
-    } finally {
-      setPromoValidating(false);
+      return { ok: false, error: apiMsg || fallbackMsg || "Invalid or expired promo code" };
+    }
+  };
+
+  const handleApplyPromo = async () => {
+    const code = promoInput.trim().toUpperCase();
+    if (!code) return;
+    setPromoValidating(true);
+    setPromoError(null);
+    const result = await validatePromo(code);
+    setPromoValidating(false);
+    if (result.ok && result.code) {
+      setAppliedPromoCode(result.code);
+      setAppliedViaLink(false);
+      setPromoInput("");
+    } else {
+      setPromoError(result.error ?? "Invalid promo code");
     }
   };
 
   const handleRemovePromo = () => {
     setAppliedPromoCode(null);
+    setAppliedViaLink(false);
     setPromoInput("");
     setPromoError(null);
   };
+
+  // Auto-apply ?promo=CODE from URL on mount (and re-run on quantity/pass change so
+  // a refresh re-applies it, but never overrides a manually-applied code).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const urlCode = new URLSearchParams(window.location.search).get("promo");
+    if (!urlCode) return;
+    const normalised = urlCode.trim().toUpperCase();
+    if (!normalised) return;
+    if (appliedPromoCode === normalised) return;
+    if (appliedPromoCode && !appliedViaLink) return; // user has applied a different code manually
+    let cancelled = false;
+    (async () => {
+      const result = await validatePromo(normalised);
+      if (cancelled) return;
+      if (result.ok && result.code) {
+        setAppliedPromoCode(result.code);
+        setAppliedViaLink(true);
+        setPromoError(null);
+      } else {
+        setAppliedPromoCode(null);
+        setAppliedViaLink(false);
+        setPromoError(result.error ?? "Invalid promo code");
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPass, quantity, leadEmail]);
 
   const handleContinue = async () => {
     await updateBooking.mutateAsync({
@@ -677,7 +718,14 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
             {appliedPromoCode ? (
               <div className="flex items-center gap-2 bg-green-50 border border-green-200 px-3 py-2 text-sm font-semibold text-green-800">
                 <Tag className="w-4 h-4 shrink-0" />
-                <span className="flex-1">Code <span className="font-mono">{appliedPromoCode}</span> applied</span>
+                <span className="flex-1">
+                  Code <span className="font-mono">{appliedPromoCode}</span> applied
+                  {appliedViaLink && (
+                    <span className="ml-2 inline-block text-[10px] uppercase tracking-wider font-bold bg-green-200 text-green-900 px-1.5 py-0.5 rounded-sm">
+                      Applied via link
+                    </span>
+                  )}
+                </span>
                 <button
                   type="button"
                   onClick={handleRemovePromo}

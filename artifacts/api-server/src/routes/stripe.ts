@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { bookingsTable, attendeesTable, promoCodesTable } from "@workspace/db";
+import { isCodeUsedByEmail } from "./promo-codes";
 import {
   sendBookingEmails,
   sendOrganiserNotification,
@@ -48,6 +49,17 @@ let cachedVatRateId: string | null = null;
 
 const router: IRouter = Router();
 
+async function isPromoOncePerCustomerViolation(bookingId: number, promoCode: string | null): Promise<boolean> {
+  if (!promoCode) return false;
+  const [promo] = await db.select().from(promoCodesTable).where(eq(promoCodesTable.code, promoCode));
+  if (!promo?.oncePerCustomer) return false;
+  const allAttendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
+  const leadAttendee = allAttendees.find((a) => a.isLead) || allAttendees[0];
+  const email = (leadAttendee?.workEmail || "").trim().toLowerCase();
+  if (!email) return false;
+  return await isCodeUsedByEmail(promoCode, email, bookingId);
+}
+
 function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) return null;
@@ -82,6 +94,11 @@ router.post("/stripe/create-checkout-session", async (req, res): Promise<void> =
   const ownsBooking = sessionHeader && booking.sessionToken && sessionHeader === booking.sessionToken;
   if (!ownsBooking) {
     res.status(403).json({ error: "Forbidden — invalid booking session" });
+    return;
+  }
+
+  if (await isPromoOncePerCustomerViolation(booking.id, booking.promoCode)) {
+    res.status(400).json({ error: "This promo code has already been used on a previous booking with this email" });
     return;
   }
 
@@ -626,6 +643,11 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
       invoiceReference: booking.orderReference || "",
       alreadyProcessed: true,
     });
+    return;
+  }
+
+  if (await isPromoOncePerCustomerViolation(booking.id, booking.promoCode)) {
+    res.status(400).json({ error: "This promo code has already been used on a previous booking with this email" });
     return;
   }
 

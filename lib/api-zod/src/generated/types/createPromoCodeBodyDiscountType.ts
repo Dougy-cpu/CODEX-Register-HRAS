@@ -12,4 +12,5 @@ export type CreatePromoCodeBodyDiscountType =
 export const CreatePromoCodeBodyDiscountType = {
   percentage: "percentage",
   fixed: "fixed",
+  per_ticket: "per_ticket",
 } as const;

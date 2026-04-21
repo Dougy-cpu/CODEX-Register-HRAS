@@ -3,6 +3,8 @@ import { eq, and } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { bookingsTable, attendeesTable, eventSettingsTable } from "@workspace/db";
 import { calculatePricing } from "../lib/pricing";
+import { promoCodesTable } from "@workspace/db";
+import { isCodeUsedByEmail } from "./promo-codes";
 import { v4 as uuidv4 } from "uuid";
 import { deriveAdminToken, getAdminPassword } from "../middleware/admin-auth";
 import { sendIncompleteFormNotification, sendBookingEmails, sendOrganiserNotification } from "../lib/email";
@@ -452,6 +454,18 @@ router.post("/bookings/:id/confirm-free", async (req, res): Promise<void> => {
   if (pricing.total > 0) {
     res.status(400).json({ error: "Booking total is not zero — payment required" });
     return;
+  }
+
+  if (existing.promoCode) {
+    const [promo] = await db.select().from(promoCodesTable).where(eq(promoCodesTable.code, existing.promoCode));
+    if (promo?.oncePerCustomer) {
+      const [lead] = await db.select().from(attendeesTable).where(and(eq(attendeesTable.bookingId, id), eq(attendeesTable.isLead, true)));
+      const email = (lead?.workEmail || "").trim().toLowerCase();
+      if (email && await isCodeUsedByEmail(existing.promoCode, email)) {
+        res.status(400).json({ error: "This promo code has already been used on a previous booking with this email" });
+        return;
+      }
+    }
   }
 
   const orderRef = await generateOrderRef(id);

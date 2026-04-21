@@ -12,4 +12,5 @@ export type UpdatePromoCodeBodyDiscountType =
 export const UpdatePromoCodeBodyDiscountType = {
   percentage: "percentage",
   fixed: "fixed",
+  per_ticket: "per_ticket",
 } as const;

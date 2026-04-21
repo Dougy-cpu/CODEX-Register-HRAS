@@ -315,6 +315,7 @@ export type PromoCodeDiscountType =
 export const PromoCodeDiscountType = {
   percentage: "percentage",
   fixed: "fixed",
+  per_ticket: "per_ticket",
 } as const;
 
 export type PromoCodeApplicablePassTypesItem =
@@ -341,6 +342,13 @@ export interface PromoCode {
   applicablePassTypes: PromoCodeApplicablePassTypesItem[];
   /** @nullable */
   description?: string | null;
+  oncePerCustomer: boolean;
+  /** @nullable */
+  minQuantity?: number | null;
+  /** @nullable */
+  maxDiscountAmount?: number | null;
+  /** @nullable */
+  internalNote?: string | null;
   createdAt: string;
 }
 
@@ -350,6 +358,7 @@ export type CreatePromoCodeBodyDiscountType =
 export const CreatePromoCodeBodyDiscountType = {
   percentage: "percentage",
   fixed: "fixed",
+  per_ticket: "per_ticket",
 } as const;
 
 export type CreatePromoCodeBodyApplicablePassTypesItem =
@@ -374,6 +383,13 @@ export interface CreatePromoCodeBody {
   applicablePassTypes?: CreatePromoCodeBodyApplicablePassTypesItem[];
   /** @nullable */
   description?: string | null;
+  oncePerCustomer?: boolean;
+  /** @nullable */
+  minQuantity?: number | null;
+  /** @nullable */
+  maxDiscountAmount?: number | null;
+  /** @nullable */
+  internalNote?: string | null;
 }
 
 export type UpdatePromoCodeBodyDiscountType =
@@ -382,6 +398,7 @@ export type UpdatePromoCodeBodyDiscountType =
 export const UpdatePromoCodeBodyDiscountType = {
   percentage: "percentage",
   fixed: "fixed",
+  per_ticket: "per_ticket",
 } as const;
 
 export type UpdatePromoCodeBodyApplicablePassTypesItem =
@@ -406,6 +423,13 @@ export interface UpdatePromoCodeBody {
   applicablePassTypes?: UpdatePromoCodeBodyApplicablePassTypesItem[];
   /** @nullable */
   description?: string | null;
+  oncePerCustomer?: boolean;
+  /** @nullable */
+  minQuantity?: number | null;
+  /** @nullable */
+  maxDiscountAmount?: number | null;
+  /** @nullable */
+  internalNote?: string | null;
 }
 
 export type ValidatePromoCodeBodyPassType =
@@ -420,6 +444,8 @@ export interface ValidatePromoCodeBody {
   code: string;
   passType: ValidatePromoCodeBodyPassType;
   quantity: number;
+  /** @nullable */
+  leadEmail?: string | null;
 }
 
 export interface PromoCodeValidationResult {

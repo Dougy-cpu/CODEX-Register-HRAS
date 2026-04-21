@@ -99,6 +99,10 @@ export async function calculatePricing(
         promoDiscountAmount = parseFloat(
           ((afterGroupDiscount * parseFloat(promo.discountValue.toString())) / 100).toFixed(2)
         );
+        if (promo.maxDiscountAmount !== null) {
+          const cap = parseFloat(promo.maxDiscountAmount.toString());
+          if (promoDiscountAmount > cap) promoDiscountAmount = cap;
+        }
       } else if (promo.discountType === "per_ticket") {
         promoDiscountAmount = Math.min(
           parseFloat((parseFloat(promo.discountValue.toString()) * quantity).toFixed(2)),

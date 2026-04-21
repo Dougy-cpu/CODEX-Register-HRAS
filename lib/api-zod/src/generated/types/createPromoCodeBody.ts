@@ -22,4 +22,11 @@ export interface CreatePromoCodeBody {
   applicablePassTypes?: CreatePromoCodeBodyApplicablePassTypesItem[];
   /** @nullable */
   description?: string | null;
+  oncePerCustomer?: boolean;
+  /** @nullable */
+  minQuantity?: number | null;
+  /** @nullable */
+  maxDiscountAmount?: number | null;
+  /** @nullable */
+  internalNote?: string | null;
 }
