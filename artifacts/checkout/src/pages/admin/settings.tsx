@@ -31,22 +31,61 @@ interface EventSettings {
   socialDescription: string | null;
 }
 
-// Convert ISO timestamp from server to value for <input type="datetime-local">.
-// datetime-local expects YYYY-MM-DDTHH:mm (no timezone). We render in the
-// browser's local timezone for editing convenience.
-function isoToLocalInput(iso: string | null | undefined): string {
+// Compute a timezone's UTC offset (in minutes) for a given UTC instant.
+// Uses Intl.DateTimeFormat to render the moment in the target tz then diff.
+function tzOffsetMinutes(tz: string, utcDate: Date): number {
+  try {
+    const fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz, hourCycle: "h23",
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit",
+    });
+    const parts = fmt.formatToParts(utcDate);
+    const map: Record<string, string> = {};
+    for (const p of parts) if (p.type !== "literal") map[p.type] = p.value;
+    const asUtc = Date.UTC(
+      Number(map.year), Number(map.month) - 1, Number(map.day),
+      Number(map.hour), Number(map.minute), Number(map.second),
+    );
+    return (asUtc - utcDate.getTime()) / 60000;
+  } catch {
+    return 0;
+  }
+}
+
+// Convert a UTC ISO string into a "YYYY-MM-DDTHH:mm" wall-clock string in tz,
+// suitable for <input type="datetime-local"> value.
+function isoToTzWallClock(iso: string | null | undefined, tz: string): string {
   if (!iso) return "";
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "";
-  const pad = (n: number) => (n < 10 ? `0${n}` : String(n));
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  try {
+    const fmt = new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz, hourCycle: "h23",
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit",
+    });
+    const parts = fmt.formatToParts(d);
+    const map: Record<string, string> = {};
+    for (const p of parts) if (p.type !== "literal") map[p.type] = p.value;
+    return `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}`;
+  } catch {
+    return "";
+  }
 }
 
-function localInputToIso(value: string): string | null {
+// Interpret a "YYYY-MM-DDTHH:mm" wall-clock value as being in tz, return UTC ISO.
+// Iterates twice to settle DST boundaries.
+function tzWallClockToIso(value: string, tz: string): string | null {
   if (!value) return null;
-  const d = new Date(value);
-  if (isNaN(d.getTime())) return null;
-  return d.toISOString();
+  const naiveUtc = new Date(value + ":00Z").getTime();
+  if (isNaN(naiveUtc)) return null;
+  let utc = naiveUtc;
+  for (let i = 0; i < 2; i++) {
+    const offset = tzOffsetMinutes(tz, new Date(utc));
+    utc = naiveUtc - offset * 60000;
+  }
+  return new Date(utc).toISOString();
 }
 
 const DEFAULT_LOCKED_MESSAGE =
@@ -315,6 +354,7 @@ export default function AdminSettings() {
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Event Date</label>
                   <Input value={form.eventDate} onChange={e => setForm(f => ({ ...f, eventDate: e.target.value }))} />
+                  <p className="mt-1 text-[11px] text-muted-foreground leading-snug">Display label only (shown in emails &amp; receipts). The exact start/end times for calendar invites live in the Calendar &amp; Scheduling section below.</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -368,34 +408,33 @@ export default function AdminSettings() {
             </div>
           </form>
 
-          {/* ── Calendar & Scheduling ── */}
+          {/* ── Event Times ── */}
           <div className="bg-white border border-border">
             <div className="px-6 py-4 border-b border-border flex items-center gap-3">
               <CalendarDays className="w-5 h-5 text-primary" />
-              <h2 className="font-bold text-base">Calendar &amp; Scheduling</h2>
+              <h2 className="font-bold text-base">Event Times</h2>
             </div>
             <div className="p-6 space-y-6">
               <p className="text-sm text-muted-foreground">
-                Configure exact start/end times so attendees can add the event to Google Calendar, Outlook, or download an <code className="text-xs bg-muted px-1 py-0.5 rounded">.ics</code> file. The <code className="text-xs bg-muted px-1 py-0.5 rounded">{"{{calendarLinks}}"}</code> placeholder in the welcome &amp; confirmation emails will only render once start &amp; end times are set.
+                Times entered here are interpreted in <code className="text-xs bg-muted px-1 py-0.5 rounded">{form.eventTimezone || "Europe/London"}</code> and used to build the Google / Outlook / .ics calendar invites. The <code className="text-xs bg-muted px-1 py-0.5 rounded">{"{{eventCalendarLinks}}"}</code> placeholder in welcome &amp; confirmation emails renders once both start &amp; end are set.
               </p>
 
               <div className="space-y-4">
-                <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Main Event</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Starts At</label>
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Starts At ({form.eventTimezone || "Europe/London"})</label>
                     <Input
                       type="datetime-local"
-                      value={isoToLocalInput(form.eventStartAt)}
-                      onChange={e => setForm(f => ({ ...f, eventStartAt: localInputToIso(e.target.value) }))}
+                      value={isoToTzWallClock(form.eventStartAt, form.eventTimezone || "Europe/London")}
+                      onChange={e => setForm(f => ({ ...f, eventStartAt: tzWallClockToIso(e.target.value, f.eventTimezone || "Europe/London") }))}
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Ends At</label>
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Ends At ({form.eventTimezone || "Europe/London"})</label>
                     <Input
                       type="datetime-local"
-                      value={isoToLocalInput(form.eventEndAt)}
-                      onChange={e => setForm(f => ({ ...f, eventEndAt: localInputToIso(e.target.value) }))}
+                      value={isoToTzWallClock(form.eventEndAt, form.eventTimezone || "Europe/London")}
+                      onChange={e => setForm(f => ({ ...f, eventEndAt: tzWallClockToIso(e.target.value, f.eventTimezone || "Europe/London") }))}
                     />
                   </div>
                 </div>
@@ -406,6 +445,7 @@ export default function AdminSettings() {
                     onChange={e => setForm(f => ({ ...f, eventTimezone: e.target.value }))}
                     placeholder="Europe/London"
                   />
+                  <p className="mt-1 text-[11px] text-muted-foreground leading-snug">Examples: Europe/London, America/New_York, Asia/Singapore. Recipients' calendar apps will translate to their own local time automatically.</p>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Description (shown in calendar invite)</label>
@@ -446,16 +486,16 @@ export default function AdminSettings() {
                         <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Starts At</label>
                         <Input
                           type="datetime-local"
-                          value={isoToLocalInput(form.socialStartAt)}
-                          onChange={e => setForm(f => ({ ...f, socialStartAt: localInputToIso(e.target.value) }))}
+                          value={isoToTzWallClock(form.socialStartAt, form.eventTimezone || "Europe/London")}
+                          onChange={e => setForm(f => ({ ...f, socialStartAt: tzWallClockToIso(e.target.value, f.eventTimezone || "Europe/London") }))}
                         />
                       </div>
                       <div>
                         <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Ends At</label>
                         <Input
                           type="datetime-local"
-                          value={isoToLocalInput(form.socialEndAt)}
-                          onChange={e => setForm(f => ({ ...f, socialEndAt: localInputToIso(e.target.value) }))}
+                          value={isoToTzWallClock(form.socialEndAt, form.eventTimezone || "Europe/London")}
+                          onChange={e => setForm(f => ({ ...f, socialEndAt: tzWallClockToIso(e.target.value, f.eventTimezone || "Europe/London") }))}
                         />
                       </div>
                     </div>

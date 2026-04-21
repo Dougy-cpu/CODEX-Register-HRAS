@@ -37,7 +37,8 @@ const DEFAULT_CONFIRMATION_BODY = `
   <strong>Venue:</strong> {{eventVenue}}, {{eventVenuePostcode}}
 </div>
 
-{{calendarLinks}}
+{{eventCalendarLinks}}
+{{socialCalendarLinks}}
 
 <h3 style="margin-top: 28px; margin-bottom: 12px; color: #000;">Update Attendee Details Anytime</h3>
 <p style="margin: 0 0 16px; color: #444; line-height: 1.6;">You have a secure self-service link to manage all your attendee information. You can fill in placeholder seats, update existing details, add dietary requirements — all without logging in. Need to share registration with colleagues? Forward them the link to enter their own details.</p>
@@ -76,7 +77,8 @@ const DEFAULT_WELCOME_BODY = `
 
 <p>Your conference pass and receipt are included in the accompanying email. Please bring a digital or printed copy for check-in.</p>
 
-{{calendarLinks}}
+{{eventCalendarLinks}}
+{{socialCalendarLinks}}
 
 {{managementLink}}
 

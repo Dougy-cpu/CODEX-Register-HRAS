@@ -287,8 +287,18 @@ router.post("/email-templates/:type/test-send", adminAuth, async (req, res): Pro
       "{{managementLink}}": sampleManagementLink,
       "{{invoicePaymentButton}}": "",
       "{{total}}": "£238.80",
-      "{{calendarLinks}}": (await import("../lib/email")).buildCalendarLinksSection(settings),
     };
+    const { getCalendarPlaceholders } = await import("../lib/email");
+    const calPh = getCalendarPlaceholders(settings);
+    testVars["{{eventCalendarLinks}}"] = calPh.eventCalendarLinks;
+    testVars["{{socialCalendarLinks}}"] = calPh.socialCalendarLinks;
+    testVars["{{calendarLinks}}"] = calPh.calendarLinks;
+    testVars["{{googleCalendarUrl}}"] = calPh.googleCalendarUrl;
+    testVars["{{outlookCalendarUrl}}"] = calPh.outlookCalendarUrl;
+    testVars["{{icsCalendarUrl}}"] = calPh.icsCalendarUrl;
+    testVars["{{socialGoogleCalendarUrl}}"] = calPh.socialGoogleCalendarUrl;
+    testVars["{{socialOutlookCalendarUrl}}"] = calPh.socialOutlookCalendarUrl;
+    testVars["{{socialIcsCalendarUrl}}"] = calPh.socialIcsCalendarUrl;
 
     let personalised = template.htmlBody;
     for (const [key, val] of Object.entries(testVars)) {

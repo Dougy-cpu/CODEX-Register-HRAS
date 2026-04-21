@@ -334,8 +334,17 @@ async function buildConfirmationEmailHtml(
         "{{eventVenuePostcode}}": settings.eventVenuePostcode || "EC2M 3TQ",
         "{{managementLink}}": managementLinkHtml,
         "{{invoicePaymentButton}}": invoicePaymentButtonHtml,
-        "{{calendarLinks}}": buildCalendarLinksSection(settings),
       };
+      const calPh = getCalendarPlaceholders(settings);
+      vars["{{eventCalendarLinks}}"] = calPh.eventCalendarLinks;
+      vars["{{socialCalendarLinks}}"] = calPh.socialCalendarLinks;
+      vars["{{calendarLinks}}"] = calPh.calendarLinks;
+      vars["{{googleCalendarUrl}}"] = calPh.googleCalendarUrl;
+      vars["{{outlookCalendarUrl}}"] = calPh.outlookCalendarUrl;
+      vars["{{icsCalendarUrl}}"] = calPh.icsCalendarUrl;
+      vars["{{socialGoogleCalendarUrl}}"] = calPh.socialGoogleCalendarUrl;
+      vars["{{socialOutlookCalendarUrl}}"] = calPh.socialOutlookCalendarUrl;
+      vars["{{socialIcsCalendarUrl}}"] = calPh.socialIcsCalendarUrl;
 
       let body = dbTemplate.htmlBody;
       for (const [placeholder, value] of Object.entries(vars)) {
@@ -839,39 +848,94 @@ function formatCalendarRangeLabel(start: Date, end: Date, tz: string): string {
   }
 }
 
-export function buildCalendarLinksSection(settings: EventSettings): string {
+export type CalendarPlaceholders = {
+  eventCalendarLinks: string;
+  socialCalendarLinks: string;
+  calendarLinks: string; // backward-compat: event + social concatenated
+  googleCalendarUrl: string;
+  outlookCalendarUrl: string;
+  icsCalendarUrl: string;
+  socialGoogleCalendarUrl: string;
+  socialOutlookCalendarUrl: string;
+  socialIcsCalendarUrl: string;
+};
+
+function renderCalendarBlockHtml(opts: {
+  heading: string;
+  title: string;
+  subtitle: string;
+  google: string;
+  outlook: string;
+  icsUrl: string;
+}): string {
+  return `
+    <div style="margin:24px 0;">
+      <h3 style="margin:0 0 8px;color:#000;">${opts.heading}</h3>
+      <div style="border:1px solid #DEDDDC;border-radius:6px;padding:18px 20px;margin:12px 0;background:#fff;">
+        <p style="margin:0 0 4px;font-weight:700;font-size:15px;color:#000;">${opts.title}</p>
+        <p style="margin:0 0 14px;font-size:13px;color:#666;">${opts.subtitle}</p>
+        <p style="margin:0;">
+          <a href="${opts.google}" style="display:inline-block;background:#E74F3E;color:#fff;padding:9px 18px;border-radius:300px;text-decoration:none;font-weight:600;font-size:13px;margin:4px 6px 4px 0;">Add to Google Calendar</a>
+          <a href="${opts.outlook}" style="display:inline-block;background:#1a1a1a;color:#fff;padding:9px 18px;border-radius:300px;text-decoration:none;font-weight:600;font-size:13px;margin:4px 6px 4px 0;">Add to Outlook</a>
+          <a href="${opts.icsUrl}" style="display:inline-block;background:#fff;color:#000;border:1px solid #000;padding:8px 18px;border-radius:300px;text-decoration:none;font-weight:600;font-size:13px;margin:4px 6px 4px 0;">Download .ics (Apple / other)</a>
+        </p>
+      </div>
+    </div>`;
+}
+
+function renderSocialTbcHtml(): string {
+  return `
+    <div style="margin:24px 0;">
+      <h3 style="margin:0 0 8px;color:#000;">Pre-event social</h3>
+      <div style="border:1px dashed #DEDDDC;border-radius:6px;padding:18px 20px;margin:12px 0;background:#FCFBFA;">
+        <p style="margin:0;font-size:14px;color:#444;line-height:1.5;">
+          Details to follow — we'll be in touch closer to the date with the time, venue, and an invite you can pop in your calendar.
+        </p>
+      </div>
+    </div>`;
+}
+
+export function getCalendarPlaceholders(settings: EventSettings): CalendarPlaceholders {
   const appBaseUrl = process.env.APP_BASE_URL || "https://register.hranalyticssummit.com";
   const tz = settings.eventTimezone || "Europe/London";
 
-  type Block = { title: string; subtitle: string; google: string; outlook: string; icsUrl: string };
-  const blocks: Block[] = [];
+  let eventCalendarLinks = "";
+  let googleCalendarUrl = "";
+  let outlookCalendarUrl = "";
+  let icsCalendarUrl = "";
 
-  // Main event block — only render if both start and end are configured
   if (settings.eventStartAt && settings.eventEndAt) {
     const start = new Date(settings.eventStartAt);
     const end = new Date(settings.eventEndAt);
     const eventName = settings.eventName || "HR Analytics Summit";
     const location = [settings.eventVenue, settings.eventVenuePostcode].filter(Boolean).join(", ") || null;
-    const description = settings.eventDescription || null;
     const ev: CalendarEvent = {
       uid: `main-${start.getTime()}@hranalyticssummit.com`,
       title: eventName,
-      description,
+      description: settings.eventDescription || null,
       location,
       startAt: start,
       endAt: end,
       url: settings.orgWebsite,
     };
-    blocks.push({
+    googleCalendarUrl = buildGoogleCalendarUrl(ev);
+    outlookCalendarUrl = buildOutlookCalendarUrl(ev);
+    icsCalendarUrl = `${appBaseUrl}/api/calendar/main.ics`;
+    eventCalendarLinks = renderCalendarBlockHtml({
+      heading: "Save the date",
       title: eventName,
       subtitle: formatCalendarRangeLabel(start, end, tz) + (location ? ` · ${location}` : ""),
-      google: buildGoogleCalendarUrl(ev),
-      outlook: buildOutlookCalendarUrl(ev),
-      icsUrl: `${appBaseUrl}/api/calendar/main.ics`,
+      google: googleCalendarUrl,
+      outlook: outlookCalendarUrl,
+      icsUrl: icsCalendarUrl,
     });
   }
 
-  // Optional pre-event social
+  let socialCalendarLinks = renderSocialTbcHtml();
+  let socialGoogleCalendarUrl = "";
+  let socialOutlookCalendarUrl = "";
+  let socialIcsCalendarUrl = "";
+
   if (settings.socialEnabled && settings.socialStartAt && settings.socialEndAt) {
     const start = new Date(settings.socialStartAt);
     const end = new Date(settings.socialEndAt);
@@ -885,34 +949,35 @@ export function buildCalendarLinksSection(settings: EventSettings): string {
       endAt: end,
       url: settings.orgWebsite,
     };
-    blocks.push({
+    socialGoogleCalendarUrl = buildGoogleCalendarUrl(ev);
+    socialOutlookCalendarUrl = buildOutlookCalendarUrl(ev);
+    socialIcsCalendarUrl = `${appBaseUrl}/api/calendar/social.ics`;
+    socialCalendarLinks = renderCalendarBlockHtml({
+      heading: "Pre-event social",
       title: name,
       subtitle: formatCalendarRangeLabel(start, end, tz) + (settings.socialVenue ? ` · ${settings.socialVenue}` : ""),
-      google: buildGoogleCalendarUrl(ev),
-      outlook: buildOutlookCalendarUrl(ev),
-      icsUrl: `${appBaseUrl}/api/calendar/social.ics`,
+      google: socialGoogleCalendarUrl,
+      outlook: socialOutlookCalendarUrl,
+      icsUrl: socialIcsCalendarUrl,
     });
   }
 
-  if (blocks.length === 0) return "";
+  return {
+    eventCalendarLinks,
+    socialCalendarLinks,
+    calendarLinks: eventCalendarLinks + socialCalendarLinks,
+    googleCalendarUrl,
+    outlookCalendarUrl,
+    icsCalendarUrl,
+    socialGoogleCalendarUrl,
+    socialOutlookCalendarUrl,
+    socialIcsCalendarUrl,
+  };
+}
 
-  const blockHtml = blocks.map((b) => `
-    <div style="border:1px solid #DEDDDC;border-radius:6px;padding:18px 20px;margin:12px 0;background:#fff;">
-      <p style="margin:0 0 4px;font-weight:700;font-size:15px;color:#000;">${b.title}</p>
-      <p style="margin:0 0 14px;font-size:13px;color:#666;">${b.subtitle}</p>
-      <p style="margin:0;">
-        <a href="${b.google}" style="display:inline-block;background:#E74F3E;color:#fff;padding:9px 18px;border-radius:300px;text-decoration:none;font-weight:600;font-size:13px;margin:4px 6px 4px 0;">Add to Google Calendar</a>
-        <a href="${b.outlook}" style="display:inline-block;background:#1a1a1a;color:#fff;padding:9px 18px;border-radius:300px;text-decoration:none;font-weight:600;font-size:13px;margin:4px 6px 4px 0;">Add to Outlook</a>
-        <a href="${b.icsUrl}" style="display:inline-block;background:#fff;color:#000;border:1px solid #000;padding:8px 18px;border-radius:300px;text-decoration:none;font-weight:600;font-size:13px;margin:4px 6px 4px 0;">Download .ics (Apple / other)</a>
-      </p>
-    </div>`).join("");
-
-  return `
-    <div style="margin:24px 0;">
-      <h3 style="margin:0 0 8px;color:#000;">Save the date${blocks.length > 1 ? "s" : ""}</h3>
-      <p style="margin:0 0 6px;font-size:14px;color:#444;">Add the event to your calendar so you don't miss anything.</p>
-      ${blockHtml}
-    </div>`;
+// Backward-compat shim — returns combined block
+export function buildCalendarLinksSection(settings: EventSettings): string {
+  return getCalendarPlaceholders(settings).calendarLinks;
 }
 
 function buildManageLinkSection(manageUrl: string): string {
@@ -976,13 +1041,21 @@ export async function sendWelcomeEmail(
       }
     }
 
-    const calendarLinksHtml = buildCalendarLinksSection(settings);
+    const calPh = getCalendarPlaceholders(settings);
 
     const personalised = template.htmlBody
       .replace(/\{\{firstName\}\}/g, firstName)
       .replace(/\{\{name\}\}/g, firstName)
       .replace(/\{\{managementLink\}\}/g, manageLinkHtml)
-      .replace(/\{\{calendarLinks\}\}/g, calendarLinksHtml);
+      .replace(/\{\{eventCalendarLinks\}\}/g, calPh.eventCalendarLinks)
+      .replace(/\{\{socialCalendarLinks\}\}/g, calPh.socialCalendarLinks)
+      .replace(/\{\{calendarLinks\}\}/g, calPh.calendarLinks)
+      .replace(/\{\{googleCalendarUrl\}\}/g, calPh.googleCalendarUrl)
+      .replace(/\{\{outlookCalendarUrl\}\}/g, calPh.outlookCalendarUrl)
+      .replace(/\{\{icsCalendarUrl\}\}/g, calPh.icsCalendarUrl)
+      .replace(/\{\{socialGoogleCalendarUrl\}\}/g, calPh.socialGoogleCalendarUrl)
+      .replace(/\{\{socialOutlookCalendarUrl\}\}/g, calPh.socialOutlookCalendarUrl)
+      .replace(/\{\{socialIcsCalendarUrl\}\}/g, calPh.socialIcsCalendarUrl);
 
     const html = wrapInBrandedLayout(personalised, settings);
 
