@@ -471,53 +471,51 @@ export default function AdminSettings() {
                     <span className="font-semibold">Enabled</span>
                   </label>
                 </div>
-                {form.socialEnabled && (
-                  <>
+                <fieldset disabled={!form.socialEnabled} className={form.socialEnabled ? "space-y-4" : "space-y-4 opacity-50"}>
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Event Name</label>
+                    <Input
+                      value={form.socialName ?? ""}
+                      onChange={e => setForm(f => ({ ...f, socialName: e.target.value || null }))}
+                      placeholder="Pre-Summit Drinks"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Event Name</label>
+                      <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Starts At</label>
                       <Input
-                        value={form.socialName ?? ""}
-                        onChange={e => setForm(f => ({ ...f, socialName: e.target.value || null }))}
-                        placeholder="Pre-Summit Drinks"
+                        type="datetime-local"
+                        value={isoToTzWallClock(form.socialStartAt, form.eventTimezone || "Europe/London")}
+                        onChange={e => setForm(f => ({ ...f, socialStartAt: tzWallClockToIso(e.target.value, f.eventTimezone || "Europe/London") }))}
                       />
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Starts At</label>
-                        <Input
-                          type="datetime-local"
-                          value={isoToTzWallClock(form.socialStartAt, form.eventTimezone || "Europe/London")}
-                          onChange={e => setForm(f => ({ ...f, socialStartAt: tzWallClockToIso(e.target.value, f.eventTimezone || "Europe/London") }))}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Ends At</label>
-                        <Input
-                          type="datetime-local"
-                          value={isoToTzWallClock(form.socialEndAt, form.eventTimezone || "Europe/London")}
-                          onChange={e => setForm(f => ({ ...f, socialEndAt: tzWallClockToIso(e.target.value, f.eventTimezone || "Europe/London") }))}
-                        />
-                      </div>
-                    </div>
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Venue</label>
+                      <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Ends At</label>
                       <Input
-                        value={form.socialVenue ?? ""}
-                        onChange={e => setForm(f => ({ ...f, socialVenue: e.target.value || null }))}
-                        placeholder="The Botanist, Broadgate Circle"
+                        type="datetime-local"
+                        value={isoToTzWallClock(form.socialEndAt, form.eventTimezone || "Europe/London")}
+                        onChange={e => setForm(f => ({ ...f, socialEndAt: tzWallClockToIso(e.target.value, f.eventTimezone || "Europe/London") }))}
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Description</label>
-                      <Textarea
-                        rows={2}
-                        value={form.socialDescription ?? ""}
-                        onChange={e => setForm(f => ({ ...f, socialDescription: e.target.value || null }))}
-                        placeholder="Drinks &amp; networking the evening before the summit."
-                      />
-                    </div>
-                  </>
-                )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Venue</label>
+                    <Input
+                      value={form.socialVenue ?? ""}
+                      onChange={e => setForm(f => ({ ...f, socialVenue: e.target.value || null }))}
+                      placeholder="The Botanist, Broadgate Circle"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Description</label>
+                    <Textarea
+                      rows={2}
+                      value={form.socialDescription ?? ""}
+                      onChange={e => setForm(f => ({ ...f, socialDescription: e.target.value || null }))}
+                      placeholder="Drinks &amp; networking the evening before the summit."
+                    />
+                  </div>
+                </fieldset>
               </div>
 
               {calError && <p className="text-sm text-destructive">{calError}</p>}
