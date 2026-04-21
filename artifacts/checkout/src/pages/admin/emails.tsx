@@ -171,7 +171,7 @@ const TEMPLATE_ATTACHMENTS: Record<TemplateType, string[]> = {
   invoice_reminder: ["Invoice PDF (itemised, with bank transfer and company details)"],
 };
 
-function TemplateEditor({ type, settings }: { type: TemplateType; settings: EventSettingsData | null }) {
+function TemplateEditor({ type }: { type: TemplateType }) {
   const { toast } = useToast();
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [subject, setSubject] = useState("");
@@ -714,7 +714,6 @@ export default function AdminEmails() {
 
   const [activeTab, setActiveTab] = useState("branding");
   const [page, setPage] = useState(1);
-  const [eventSettings, setEventSettings] = useState<EventSettingsData | null>(null);
 
   const { data: logsData, isLoading: logsLoading } = useListEmailLogs(
     { page, limit: 20 },
@@ -724,19 +723,6 @@ export default function AdminEmails() {
   const resendEmails = useResendBookingEmails();
   const [sendingLogIds, setSendingLogIds] = useState<Set<number>>(new Set());
   const [sentLogIds, setSentLogIds] = useState<Set<number>>(new Set());
-
-  // Load event settings for template preview
-  useEffect(() => {
-    async function load() {
-      try {
-        const resp = await fetch(`${API_BASE}/admin/event-settings`, {
-          headers: { "x-admin-token": getAdminToken() },
-        });
-        if (resp.ok) setEventSettings(await resp.json());
-      } catch { /* ignore */ }
-    }
-    load();
-  }, []);
 
   const handleResend = async (logId: number, bookingId: number) => {
     if (sendingLogIds.has(logId)) return;
@@ -770,15 +756,15 @@ export default function AdminEmails() {
         </TabsContent>
 
         <TabsContent value="welcome">
-          <TemplateEditor type="welcome" settings={eventSettings} />
+          <TemplateEditor type="welcome" />
         </TabsContent>
 
         <TabsContent value="confirmation">
-          <TemplateEditor type="confirmation" settings={eventSettings} />
+          <TemplateEditor type="confirmation" />
         </TabsContent>
 
         <TabsContent value="invoice_reminder">
-          <TemplateEditor type="invoice_reminder" settings={eventSettings} />
+          <TemplateEditor type="invoice_reminder" />
         </TabsContent>
 
         <TabsContent value="logs">

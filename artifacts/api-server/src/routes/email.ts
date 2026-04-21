@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { emailTemplatesTable, emailLogsTable, eventSettingsTable } from "@workspace/db";
-import { sendWelcomeEmail, getEventSettings } from "../lib/email";
+import { getEventSettings } from "../lib/email";
 import { adminAuth } from "../middleware/admin-auth";
 
 const router: IRouter = Router();
@@ -329,43 +329,40 @@ router.post("/email-templates/:type/test-send", adminAuth, async (req, res): Pro
     return;
   }
 
-  if (type === "welcome") {
-    await sendWelcomeEmail(null, toName || "Test User", toEmail);
-  } else {
-    // For other types, fetch template and send preview
-    const [template] = await db
-      .select()
-      .from(emailTemplatesTable)
-      .where(eq(emailTemplatesTable.type, type));
+  // All template types go through the same render path so test-sends and the
+  // live preview stay in lockstep — admins see exactly what recipients will.
+  const [template] = await db
+    .select()
+    .from(emailTemplatesTable)
+    .where(eq(emailTemplatesTable.type, type));
 
-    if (!template) {
-      res.status(404).json({ error: `No ${type} template found` });
-      return;
-    }
-
-    const settings = await getEventSettings();
-    const { sendMail, wrapInBrandedLayout: wrap } = await import("../lib/email");
-    const { vars, subjectVars } = await buildSampleVars(type, toName, toEmail);
-
-    let personalised = template.htmlBody;
-    for (const [key, val] of Object.entries(vars)) {
-      personalised = personalised.replaceAll(key, val);
-    }
-
-    let subject = template.subject;
-    for (const [key, val] of Object.entries(subjectVars)) {
-      subject = subject.replaceAll(key, val);
-    }
-
-    const html = wrap(personalised, settings);
-    await sendMail({
-      to: toEmail,
-      subject: `[TEST] ${subject}`,
-      html,
-      fromName: settings.fromName,
-      fromEmail: settings.fromEmail,
-    });
+  if (!template) {
+    res.status(404).json({ error: `No ${type} template found` });
+    return;
   }
+
+  const settings = await getEventSettings();
+  const { sendMail, wrapInBrandedLayout: wrap } = await import("../lib/email");
+  const { vars, subjectVars } = await buildSampleVars(type, toName, toEmail);
+
+  let personalised = template.htmlBody;
+  for (const [key, val] of Object.entries(vars)) {
+    personalised = personalised.replaceAll(key, val);
+  }
+
+  let subject = template.subject;
+  for (const [key, val] of Object.entries(subjectVars)) {
+    subject = subject.replaceAll(key, val);
+  }
+
+  const html = wrap(personalised, settings);
+  await sendMail({
+    to: toEmail,
+    subject: `[TEST] ${subject}`,
+    html,
+    fromName: settings.fromName,
+    fromEmail: settings.fromEmail,
+  });
 
   res.json({ success: true, message: `Test email sent to ${toEmail}` });
 });
