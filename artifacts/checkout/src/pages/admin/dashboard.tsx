@@ -19,7 +19,19 @@ type RegRow = {
   billingEmail?: string | null;
   billingPhone?: string | null;
   billingCompany?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 };
+
+function fmtDate(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleString("en-GB", {
+    day: "numeric", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
 
 function StatusBadge({ status }: { status: string }) {
   const cls =
@@ -47,6 +59,7 @@ function CompletedTable({ rows }: { rows: RegRow[] }) {
               <th className="px-6 py-4">Pass</th>
               <th className="px-6 py-4">Total</th>
               <th className="px-6 py-4">Status</th>
+              <th className="px-6 py-4">Date</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border bg-white">
@@ -65,11 +78,14 @@ function CompletedTable({ rows }: { rows: RegRow[] }) {
                 <td className="px-6 py-4">
                   <StatusBadge status={reg.status} />
                 </td>
+                <td className="px-6 py-4 text-xs text-muted-foreground whitespace-nowrap">
+                  {fmtDate(reg.createdAt)}
+                </td>
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">
+                <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
                   No completed registrations yet.
                 </td>
               </tr>
@@ -93,6 +109,7 @@ function PartialsTable({ rows }: { rows: RegRow[] }) {
               <th className="px-6 py-4">Company</th>
               <th className="px-6 py-4">Contact</th>
               <th className="px-6 py-4">Pass</th>
+              <th className="px-6 py-4">Last Seen</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border bg-white">
@@ -118,12 +135,15 @@ function PartialsTable({ rows }: { rows: RegRow[] }) {
                       <span className="text-muted-foreground ml-1">(×{reg.quantity})</span>
                     )}
                   </td>
+                  <td className="px-6 py-4 text-xs text-muted-foreground whitespace-nowrap">
+                    {fmtDate(reg.updatedAt)}
+                  </td>
                 </tr>
               );
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">
+                <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
                   No partial checkouts at the moment.
                 </td>
               </tr>

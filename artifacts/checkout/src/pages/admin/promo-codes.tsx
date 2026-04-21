@@ -22,8 +22,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Trash2, Plus, Pencil } from "lucide-react";
+import { Trash2, Plus, Pencil, Link2, Check } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+
+function CopyLinkButton({ code }: { code: string }) {
+  const base = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}`;
+  const url = `${base}/?promo=${encodeURIComponent(code)}`;
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button variant="ghost" size="icon" onClick={handleCopy} aria-label="Copy auto-apply link">
+          {copied ? <Check className="w-4 h-4 text-green-600" /> : <Link2 className="w-4 h-4" />}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-sm break-all font-mono text-xs">{url}</TooltipContent>
+    </Tooltip>
+  );
+}
 
 const promoSchema = z.object({
   code: z.string().min(1, "Code is required").toUpperCase(),
@@ -459,6 +481,7 @@ export default function AdminPromoCodes() {
                   <TableHead>Note</TableHead>
                   <TableHead>Usage</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Link</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -502,6 +525,9 @@ export default function AdminPromoCodes() {
                         onCheckedChange={(val) => toggleActive(promo.id, val)}
                       />
                     </TableCell>
+                    <TableCell>
+                      <CopyLinkButton code={promo.code} />
+                    </TableCell>
                     <TableCell className="text-right">
                       <Button
                         variant="ghost"
@@ -525,7 +551,7 @@ export default function AdminPromoCodes() {
                 ))}
                 {data?.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                       No promo codes created yet.
                     </TableCell>
                   </TableRow>
