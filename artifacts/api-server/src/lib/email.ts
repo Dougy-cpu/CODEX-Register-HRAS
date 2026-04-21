@@ -910,7 +910,7 @@ export function getCalendarPlaceholders(settings: EventSettings): CalendarPlaceh
     const eventName = settings.eventName || "HR Analytics Summit";
     const location = [settings.eventVenue, settings.eventVenuePostcode].filter(Boolean).join(", ") || null;
     const ev: CalendarEvent = {
-      uid: `main-${start.getTime()}@hranalyticssummit.com`,
+      uid: `event-settings-${settings.id}-main@hranalyticssummit.com`,
       title: eventName,
       description: settings.eventDescription || null,
       location,
@@ -918,7 +918,7 @@ export function getCalendarPlaceholders(settings: EventSettings): CalendarPlaceh
       endAt: end,
       url: settings.orgWebsite,
     };
-    googleCalendarUrl = buildGoogleCalendarUrl(ev);
+    googleCalendarUrl = buildGoogleCalendarUrl(ev, tz);
     outlookCalendarUrl = buildOutlookCalendarUrl(ev);
     icsCalendarUrl = `${appBaseUrl}/api/calendar/main.ics`;
     eventCalendarLinks = renderCalendarBlockHtml({
@@ -941,7 +941,7 @@ export function getCalendarPlaceholders(settings: EventSettings): CalendarPlaceh
     const end = new Date(settings.socialEndAt);
     const name = settings.socialName || "Pre-Event Social";
     const ev: CalendarEvent = {
-      uid: `social-${start.getTime()}@hranalyticssummit.com`,
+      uid: `event-settings-${settings.id}-social@hranalyticssummit.com`,
       title: name,
       description: settings.socialDescription || null,
       location: settings.socialVenue || null,
@@ -949,7 +949,7 @@ export function getCalendarPlaceholders(settings: EventSettings): CalendarPlaceh
       endAt: end,
       url: settings.orgWebsite,
     };
-    socialGoogleCalendarUrl = buildGoogleCalendarUrl(ev);
+    socialGoogleCalendarUrl = buildGoogleCalendarUrl(ev, tz);
     socialOutlookCalendarUrl = buildOutlookCalendarUrl(ev);
     socialIcsCalendarUrl = `${appBaseUrl}/api/calendar/social.ics`;
     socialCalendarLinks = renderCalendarBlockHtml({

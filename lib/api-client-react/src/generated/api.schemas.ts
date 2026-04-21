@@ -109,13 +109,9 @@ export interface Booking {
   /** @nullable */
   billingCountry?: string | null;
   /** @nullable */
-  billingPhone?: string | null;
-  /** @nullable */
   billingVatNumber?: string | null;
   /** @nullable */
   invoiceDueDate?: string | null;
-  /** @nullable */
-  managementToken?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -239,8 +235,6 @@ export interface UpdateBookingBody {
   billingPostcode?: string | null;
   /** @nullable */
   billingCountry?: string | null;
-  /** @nullable */
-  billingPhone?: string | null;
   /** @nullable */
   billingVatNumber?: string | null;
   /** @nullable */
@@ -607,6 +601,81 @@ export interface RegistrationList {
   total: number;
   page: number;
   limit: number;
+}
+
+/**
+ * Configurable per-event branding, scheduling and contact details.
+ */
+export interface EventSettings {
+  id: number;
+  eventName: string;
+  /** Display label only (shown in emails). Real start and end times live in the eventStartAt and eventEndAt fields. */
+  eventDate: string;
+  eventVenue: string;
+  eventVenuePostcode: string;
+  orgName: string;
+  orgAddress: string;
+  orgWebsite: string;
+  logoDataUrl?: string | null;
+  fromName: string;
+  fromEmail: string;
+  attendeeChangesLocked: boolean;
+  attendeeChangesLockedMessage?: string | null;
+  refPrefix: string;
+  refOffset: number;
+  notifyCompleteSubject?: string | null;
+  notifyIncompleteSubject?: string | null;
+  notifyAttendeeSubject?: string | null;
+  /** ISO-8601 UTC start of the main event. Used for calendar links. */
+  eventStartAt?: string | null;
+  eventEndAt?: string | null;
+  /** IANA timezone identifier, default Europe London. */
+  eventTimezone: string;
+  eventDescription?: string | null;
+  /** When false the social block in emails reads as a placeholder note (details to follow). */
+  socialEnabled: boolean;
+  socialName?: string | null;
+  socialStartAt?: string | null;
+  socialEndAt?: string | null;
+  socialVenue?: string | null;
+  socialDescription?: string | null;
+  updatedAt: string;
+}
+
+/**
+ * Partial-update payload. Any field omitted is left unchanged. Datetime
+fields accept ISO-8601 strings, `null`, or empty strings (treated as
+null).
+
+ */
+export interface EventSettingsUpdate {
+  eventName?: string;
+  eventDate?: string;
+  eventVenue?: string;
+  eventVenuePostcode?: string;
+  orgName?: string;
+  orgAddress?: string;
+  orgWebsite?: string;
+  logoDataUrl?: string | null;
+  fromName?: string;
+  fromEmail?: string;
+  attendeeChangesLocked?: boolean;
+  attendeeChangesLockedMessage?: string | null;
+  refPrefix?: string;
+  refOffset?: number;
+  notifyCompleteSubject?: string | null;
+  notifyIncompleteSubject?: string | null;
+  notifyAttendeeSubject?: string | null;
+  eventStartAt?: string | null;
+  eventEndAt?: string | null;
+  eventTimezone?: string;
+  eventDescription?: string | null;
+  socialEnabled?: boolean;
+  socialName?: string | null;
+  socialStartAt?: string | null;
+  socialEndAt?: string | null;
+  socialVenue?: string | null;
+  socialDescription?: string | null;
 }
 
 export type AdminStatsPassCounts = {

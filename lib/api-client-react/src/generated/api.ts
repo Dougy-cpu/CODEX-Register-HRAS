@@ -34,6 +34,8 @@ import type {
   EmailLogList,
   EmailTemplate,
   ErrorResponse,
+  EventSettings,
+  EventSettingsUpdate,
   ExportRegistrationsParams,
   GetBookingPricingParams,
   HealthStatus,
@@ -64,6 +66,166 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+/**
+ * Returns an RFC-5545 iCalendar file for the main summit event. Public
+endpoint — no authentication. Returns 404 with a plain-text body when
+the event start/end times have not been configured in admin settings.
+
+ * @summary Download .ics file for the main event
+ */
+export const getDownloadMainCalendarIcsUrl = () => {
+  return `/api/calendar/main.ics`;
+};
+
+export const downloadMainCalendarIcs = async (
+  options?: RequestInit,
+): Promise<string> => {
+  return customFetch<string>(getDownloadMainCalendarIcsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getDownloadMainCalendarIcsQueryKey = () => {
+  return [`/api/calendar/main.ics`] as const;
+};
+
+export const getDownloadMainCalendarIcsQueryOptions = <
+  TData = Awaited<ReturnType<typeof downloadMainCalendarIcs>>,
+  TError = ErrorType<string>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof downloadMainCalendarIcs>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getDownloadMainCalendarIcsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof downloadMainCalendarIcs>>
+  > = ({ signal }) => downloadMainCalendarIcs({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof downloadMainCalendarIcs>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type DownloadMainCalendarIcsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof downloadMainCalendarIcs>>
+>;
+export type DownloadMainCalendarIcsQueryError = ErrorType<string>;
+
+/**
+ * @summary Download .ics file for the main event
+ */
+
+export function useDownloadMainCalendarIcs<
+  TData = Awaited<ReturnType<typeof downloadMainCalendarIcs>>,
+  TError = ErrorType<string>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof downloadMainCalendarIcs>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getDownloadMainCalendarIcsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns an RFC-5545 iCalendar file for the optional pre-event social.
+Public endpoint — no authentication. Returns 404 with a plain-text
+body when the social is not enabled or its times are unset.
+
+ * @summary Download .ics file for the pre-event social
+ */
+export const getDownloadSocialCalendarIcsUrl = () => {
+  return `/api/calendar/social.ics`;
+};
+
+export const downloadSocialCalendarIcs = async (
+  options?: RequestInit,
+): Promise<string> => {
+  return customFetch<string>(getDownloadSocialCalendarIcsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getDownloadSocialCalendarIcsQueryKey = () => {
+  return [`/api/calendar/social.ics`] as const;
+};
+
+export const getDownloadSocialCalendarIcsQueryOptions = <
+  TData = Awaited<ReturnType<typeof downloadSocialCalendarIcs>>,
+  TError = ErrorType<string>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof downloadSocialCalendarIcs>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getDownloadSocialCalendarIcsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof downloadSocialCalendarIcs>>
+  > = ({ signal }) => downloadSocialCalendarIcs({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof downloadSocialCalendarIcs>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type DownloadSocialCalendarIcsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof downloadSocialCalendarIcs>>
+>;
+export type DownloadSocialCalendarIcsQueryError = ErrorType<string>;
+
+/**
+ * @summary Download .ics file for the pre-event social
+ */
+
+export function useDownloadSocialCalendarIcs<
+  TData = Awaited<ReturnType<typeof downloadSocialCalendarIcs>>,
+  TError = ErrorType<string>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof downloadSocialCalendarIcs>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getDownloadSocialCalendarIcsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * Returns server health status
@@ -2682,6 +2844,173 @@ export function useExportRegistrations<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Get event/organisation settings (admin)
+ */
+export const getGetAdminEventSettingsUrl = () => {
+  return `/api/admin/event-settings`;
+};
+
+export const getAdminEventSettings = async (
+  options?: RequestInit,
+): Promise<EventSettings> => {
+  return customFetch<EventSettings>(getGetAdminEventSettingsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAdminEventSettingsQueryKey = () => {
+  return [`/api/admin/event-settings`] as const;
+};
+
+export const getGetAdminEventSettingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminEventSettings>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminEventSettings>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAdminEventSettingsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAdminEventSettings>>
+  > = ({ signal }) => getAdminEventSettings({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminEventSettings>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAdminEventSettingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminEventSettings>>
+>;
+export type GetAdminEventSettingsQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get event/organisation settings (admin)
+ */
+
+export function useGetAdminEventSettings<
+  TData = Awaited<ReturnType<typeof getAdminEventSettings>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminEventSettings>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAdminEventSettingsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Partial update — any field omitted is left unchanged. Calendar
+timestamps (`eventStartAt`, `eventEndAt`, `socialStartAt`,
+`socialEndAt`) accept ISO-8601 strings, `null`, or empty strings
+(treated as null).
+
+ * @summary Update event/organisation settings (admin)
+ */
+export const getUpdateAdminEventSettingsUrl = () => {
+  return `/api/admin/event-settings`;
+};
+
+export const updateAdminEventSettings = async (
+  eventSettingsUpdate: EventSettingsUpdate,
+  options?: RequestInit,
+): Promise<EventSettings> => {
+  return customFetch<EventSettings>(getUpdateAdminEventSettingsUrl(), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(eventSettingsUpdate),
+  });
+};
+
+export const getUpdateAdminEventSettingsMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAdminEventSettings>>,
+    TError,
+    { data: BodyType<EventSettingsUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAdminEventSettings>>,
+  TError,
+  { data: BodyType<EventSettingsUpdate> },
+  TContext
+> => {
+  const mutationKey = ["updateAdminEventSettings"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAdminEventSettings>>,
+    { data: BodyType<EventSettingsUpdate> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateAdminEventSettings(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateAdminEventSettingsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateAdminEventSettings>>
+>;
+export type UpdateAdminEventSettingsMutationBody =
+  BodyType<EventSettingsUpdate>;
+export type UpdateAdminEventSettingsMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Update event/organisation settings (admin)
+ */
+export const useUpdateAdminEventSettings = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAdminEventSettings>>,
+    TError,
+    { data: BodyType<EventSettingsUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateAdminEventSettings>>,
+  TError,
+  { data: BodyType<EventSettingsUpdate> },
+  TContext
+> => {
+  return useMutation(getUpdateAdminEventSettingsMutationOptions(options));
+};
 
 /**
  * @summary Get dashboard stats (admin)

@@ -783,6 +783,149 @@ export const ExportRegistrationsQueryParams = zod.object({
 });
 
 /**
+ * @summary Get event/organisation settings (admin)
+ */
+export const GetAdminEventSettingsResponse = zod
+  .object({
+    id: zod.number(),
+    eventName: zod.string(),
+    eventDate: zod
+      .string()
+      .describe(
+        "Display label only (shown in emails). Real start and end times live in the eventStartAt and eventEndAt fields.",
+      ),
+    eventVenue: zod.string(),
+    eventVenuePostcode: zod.string(),
+    orgName: zod.string(),
+    orgAddress: zod.string(),
+    orgWebsite: zod.string(),
+    logoDataUrl: zod.string().nullish(),
+    fromName: zod.string(),
+    fromEmail: zod.string(),
+    attendeeChangesLocked: zod.boolean(),
+    attendeeChangesLockedMessage: zod.string().nullish(),
+    refPrefix: zod.string(),
+    refOffset: zod.number(),
+    notifyCompleteSubject: zod.string().nullish(),
+    notifyIncompleteSubject: zod.string().nullish(),
+    notifyAttendeeSubject: zod.string().nullish(),
+    eventStartAt: zod.coerce
+      .date()
+      .nullish()
+      .describe(
+        "ISO-8601 UTC start of the main event. Used for calendar links.",
+      ),
+    eventEndAt: zod.coerce.date().nullish(),
+    eventTimezone: zod
+      .string()
+      .describe("IANA timezone identifier, default Europe London."),
+    eventDescription: zod.string().nullish(),
+    socialEnabled: zod
+      .boolean()
+      .describe(
+        "When false the social block in emails reads as a placeholder note (details to follow).",
+      ),
+    socialName: zod.string().nullish(),
+    socialStartAt: zod.coerce.date().nullish(),
+    socialEndAt: zod.coerce.date().nullish(),
+    socialVenue: zod.string().nullish(),
+    socialDescription: zod.string().nullish(),
+    updatedAt: zod.coerce.date(),
+  })
+  .describe("Configurable per-event branding, scheduling and contact details.");
+
+/**
+ * Partial update — any field omitted is left unchanged. Calendar
+timestamps (`eventStartAt`, `eventEndAt`, `socialStartAt`,
+`socialEndAt`) accept ISO-8601 strings, `null`, or empty strings
+(treated as null).
+
+ * @summary Update event/organisation settings (admin)
+ */
+export const UpdateAdminEventSettingsBody = zod
+  .object({
+    eventName: zod.string().optional(),
+    eventDate: zod.string().optional(),
+    eventVenue: zod.string().optional(),
+    eventVenuePostcode: zod.string().optional(),
+    orgName: zod.string().optional(),
+    orgAddress: zod.string().optional(),
+    orgWebsite: zod.string().optional(),
+    logoDataUrl: zod.string().nullish(),
+    fromName: zod.string().optional(),
+    fromEmail: zod.string().optional(),
+    attendeeChangesLocked: zod.boolean().optional(),
+    attendeeChangesLockedMessage: zod.string().nullish(),
+    refPrefix: zod.string().optional(),
+    refOffset: zod.number().optional(),
+    notifyCompleteSubject: zod.string().nullish(),
+    notifyIncompleteSubject: zod.string().nullish(),
+    notifyAttendeeSubject: zod.string().nullish(),
+    eventStartAt: zod.coerce.date().nullish(),
+    eventEndAt: zod.coerce.date().nullish(),
+    eventTimezone: zod.string().optional(),
+    eventDescription: zod.string().nullish(),
+    socialEnabled: zod.boolean().optional(),
+    socialName: zod.string().nullish(),
+    socialStartAt: zod.coerce.date().nullish(),
+    socialEndAt: zod.coerce.date().nullish(),
+    socialVenue: zod.string().nullish(),
+    socialDescription: zod.string().nullish(),
+  })
+  .describe(
+    "Partial-update payload. Any field omitted is left unchanged. Datetime\nfields accept ISO-8601 strings, `null`, or empty strings (treated as\nnull).\n",
+  );
+
+export const UpdateAdminEventSettingsResponse = zod
+  .object({
+    id: zod.number(),
+    eventName: zod.string(),
+    eventDate: zod
+      .string()
+      .describe(
+        "Display label only (shown in emails). Real start and end times live in the eventStartAt and eventEndAt fields.",
+      ),
+    eventVenue: zod.string(),
+    eventVenuePostcode: zod.string(),
+    orgName: zod.string(),
+    orgAddress: zod.string(),
+    orgWebsite: zod.string(),
+    logoDataUrl: zod.string().nullish(),
+    fromName: zod.string(),
+    fromEmail: zod.string(),
+    attendeeChangesLocked: zod.boolean(),
+    attendeeChangesLockedMessage: zod.string().nullish(),
+    refPrefix: zod.string(),
+    refOffset: zod.number(),
+    notifyCompleteSubject: zod.string().nullish(),
+    notifyIncompleteSubject: zod.string().nullish(),
+    notifyAttendeeSubject: zod.string().nullish(),
+    eventStartAt: zod.coerce
+      .date()
+      .nullish()
+      .describe(
+        "ISO-8601 UTC start of the main event. Used for calendar links.",
+      ),
+    eventEndAt: zod.coerce.date().nullish(),
+    eventTimezone: zod
+      .string()
+      .describe("IANA timezone identifier, default Europe London."),
+    eventDescription: zod.string().nullish(),
+    socialEnabled: zod
+      .boolean()
+      .describe(
+        "When false the social block in emails reads as a placeholder note (details to follow).",
+      ),
+    socialName: zod.string().nullish(),
+    socialStartAt: zod.coerce.date().nullish(),
+    socialEndAt: zod.coerce.date().nullish(),
+    socialVenue: zod.string().nullish(),
+    socialDescription: zod.string().nullish(),
+    updatedAt: zod.coerce.date(),
+  })
+  .describe("Configurable per-event branding, scheduling and contact details.");
+
+/**
  * @summary Get dashboard stats (admin)
  */
 export const GetAdminStatsResponse = zod.object({

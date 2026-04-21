@@ -37,6 +37,8 @@ export * from "./emailLogStatus";
 export * from "./emailLogType";
 export * from "./emailTemplate";
 export * from "./errorResponse";
+export * from "./eventSettings";
+export * from "./eventSettingsUpdate";
 export * from "./exportRegistrationsParams";
 export * from "./getBookingPricingParams";
 export * from "./healthStatus";

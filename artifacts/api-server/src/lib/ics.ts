@@ -77,8 +77,10 @@ export function buildIcs(event: CalendarEvent): string {
   return lines.map(foldLine).join("\r\n") + "\r\n";
 }
 
-// Google Calendar quick-add URL
-export function buildGoogleCalendarUrl(event: CalendarEvent): string {
+// Google Calendar quick-add URL.
+// `tz` (IANA timezone) is optional but recommended — when supplied Google
+// renders the event in that timezone instead of the viewer's local one.
+export function buildGoogleCalendarUrl(event: CalendarEvent, tz?: string): string {
   const dates = `${formatIcsUtc(event.startAt)}/${formatIcsUtc(event.endAt)}`;
   const params = new URLSearchParams({
     action: "TEMPLATE",
@@ -87,6 +89,7 @@ export function buildGoogleCalendarUrl(event: CalendarEvent): string {
   });
   if (event.description) params.set("details", event.description);
   if (event.location) params.set("location", event.location);
+  if (tz) params.set("ctz", tz);
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
