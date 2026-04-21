@@ -113,18 +113,10 @@ export async function seed() {
       });
       logger.info("Seeded welcome email template");
     } else {
-      // Update existing template with latest content
-      await db
-        .update(emailTemplatesTable)
-        .set({
-          subject: DEFAULT_WELCOME_SUBJECT,
-          htmlBody: DEFAULT_WELCOME_BODY,
-        })
-        .where(eq(emailTemplatesTable.type, "welcome"));
-      logger.info("Updated welcome email template");
+      logger.debug("Welcome email template already present, skipping seed");
     }
 
-    // Seed/update confirmation email template
+    // Seed confirmation email template (insert-only; never overwrite admin edits)
     const existingConfirmation = await db
       .select()
       .from(emailTemplatesTable)
@@ -138,14 +130,7 @@ export async function seed() {
       });
       logger.info("Seeded confirmation email template");
     } else {
-      await db
-        .update(emailTemplatesTable)
-        .set({
-          subject: DEFAULT_CONFIRMATION_SUBJECT,
-          htmlBody: DEFAULT_CONFIRMATION_BODY,
-        })
-        .where(eq(emailTemplatesTable.type, "confirmation"));
-      logger.info("Updated confirmation email template");
+      logger.debug("Confirmation email template already present, skipping seed");
     }
 
     const existingTiers = await db.select().from(discountTiersTable);
