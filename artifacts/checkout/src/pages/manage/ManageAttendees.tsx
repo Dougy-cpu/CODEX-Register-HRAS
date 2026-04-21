@@ -393,7 +393,7 @@ export default function ManageAttendees() {
           <p className="text-sm text-muted-foreground">
             Order reference: <span className="font-mono font-semibold text-foreground">{booking.orderReference || "PENDING"}</span>
             {" · "}
-            {booking.quantity} {booking.passType === "single" ? "Single Pass" : booking.passType === "team" ? "Team Pass" : "Business Pass"}{booking.quantity !== 1 ? "es" : ""}
+            {booking.quantity} {booking.passType === "single" ? "Single Pass" : "Business Pass"}{booking.quantity !== 1 ? "es" : ""}
           </p>
         </div>
 

@@ -228,7 +228,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
             <h3 className="text-xl font-bold mb-6">Order Summary</h3>
             <div className="space-y-4">
               <div className="flex justify-between text-base">
-                <span>{booking.quantity} × {booking.passType === "single" ? "Single Pass" : booking.passType === "team" ? "Team Pass" : "Business Pass"}</span>
+                <span>{booking.quantity} × {booking.passType === "single" ? "Single Pass" : "Business Pass"}</span>
                 <span>£{currentPricing.baseSubtotal.toFixed(2)}</span>
               </div>
               {currentPricing.groupDiscountAmount > 0 && (
@@ -479,7 +479,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
           {currentPricing ? (
             <div className="space-y-4">
               <div className="flex justify-between text-base">
-                <span>{booking.quantity} × {booking.passType === "single" ? "Single Pass" : booking.passType === "team" ? "Team Pass" : "Business Pass"}</span>
+                <span>{booking.quantity} × {booking.passType === "single" ? "Single Pass" : "Business Pass"}</span>
                 <span>£{currentPricing.baseSubtotal.toFixed(2)}</span>
               </div>
               

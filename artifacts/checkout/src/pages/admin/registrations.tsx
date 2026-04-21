@@ -214,10 +214,10 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
           <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">Promo Code</p>
           <p className="font-medium">{data?.promoCode || "—"}</p>
         </div>
-        {(data as Record<string, unknown>)?.hearAboutUs && (
+        {Boolean((data as unknown as Record<string, unknown> | undefined)?.hearAboutUs) && (
           <div className="bg-white border border-border p-3 col-span-2 md:col-span-4">
             <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">How they heard about us</p>
-            <p className="font-medium">{(data as Record<string, unknown>).hearAboutUs as string}</p>
+            <p className="font-medium">{(data as unknown as Record<string, unknown>).hearAboutUs as string}</p>
           </div>
         )}
       </div>

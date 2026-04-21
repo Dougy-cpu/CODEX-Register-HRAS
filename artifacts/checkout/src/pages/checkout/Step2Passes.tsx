@@ -238,7 +238,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
   const resolveInitialPass = (): PricingRequestPassType => {
     const stored = booking.passType as PricingRequestPassType;
     if (isVendor) return "business";
-    if (isHR && (stored === "business" || stored === "team")) return "single";
+    if (isHR && stored === "business") return "single";
     return stored || "single";
   };
 
@@ -255,7 +255,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
 
   const leadEmail = booking.attendees?.find((a) => a.isLead)?.workEmail ?? null;
 
-  const [hearAboutUs, setHearAboutUs] = useState<string>((booking as Record<string, unknown>).hearAboutUs as string ?? "");
+  const [hearAboutUs, setHearAboutUs] = useState<string>((booking as unknown as Record<string, unknown>).hearAboutUs as string ?? "");
 
   const calculatePricingMutation = useCalculatePricing();
   const queryClient = useQueryClient();

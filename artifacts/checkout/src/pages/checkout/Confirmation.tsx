@@ -79,7 +79,7 @@ export default function Confirmation({ booking }: ConfirmationProps) {
           <div>
             <h3 className="text-sm text-muted-foreground font-bold uppercase tracking-wider mb-2">Registration</h3>
             <div className="flex justify-between items-end border-b border-border pb-2 mb-2">
-              <span className="font-bold text-lg">{booking.quantity} × {booking.passType === "single" ? "Single Pass" : booking.passType === "team" ? "Team Pass" : "Business Pass"}</span>
+              <span className="font-bold text-lg">{booking.quantity} × {booking.passType === "single" ? "Single Pass" : "Business Pass"}</span>
               <span className="font-bold text-lg">£{booking.totalAmount.toFixed(2)}</span>
             </div>
           </div>

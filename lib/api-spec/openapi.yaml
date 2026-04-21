@@ -1037,6 +1037,10 @@ components:
           type: ["string", "null"]
         billingVatNumber:
           type: ["string", "null"]
+        billingPhone:
+          type: ["string", "null"]
+        managementToken:
+          type: ["string", "null"]
         invoiceDueDate:
           type: ["string", "null"]
           format: date-time

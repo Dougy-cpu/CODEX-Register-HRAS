@@ -265,7 +265,7 @@ function FeedCard({ item }: { item: FeedItem }) {
           <div className="mt-1 text-sm text-red-600">
             {String(item.data.emailType || "Email")} to{" "}
             {String(item.data.toEmail || "unknown")}
-            {item.data.error && (
+            {Boolean(item.data.error) && (
               <span className="block text-xs text-red-500 mt-0.5">
                 {String(item.data.error)}
               </span>
