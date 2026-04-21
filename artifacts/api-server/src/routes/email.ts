@@ -39,7 +39,16 @@ router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> =
     attendeeChangesLocked, attendeeChangesLockedMessage,
     refPrefix, refOffset,
     notifyCompleteSubject, notifyIncompleteSubject, notifyAttendeeSubject,
+    eventStartAt, eventEndAt, eventTimezone, eventDescription,
+    socialEnabled, socialName, socialStartAt, socialEndAt, socialVenue, socialDescription,
   } = req.body;
+
+  function parseTs(v: unknown): Date | null | undefined {
+    if (v === undefined) return undefined;
+    if (v === null || v === "") return null;
+    const d = new Date(String(v));
+    return isNaN(d.getTime()) ? null : d;
+  }
 
   const existing = await db.select().from(eventSettingsTable);
 
@@ -65,6 +74,16 @@ router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> =
         ...(notifyCompleteSubject !== undefined && { notifyCompleteSubject: notifyCompleteSubject || null }),
         ...(notifyIncompleteSubject !== undefined && { notifyIncompleteSubject: notifyIncompleteSubject || null }),
         ...(notifyAttendeeSubject !== undefined && { notifyAttendeeSubject: notifyAttendeeSubject || null }),
+        ...(eventStartAt !== undefined && { eventStartAt: parseTs(eventStartAt) }),
+        ...(eventEndAt !== undefined && { eventEndAt: parseTs(eventEndAt) }),
+        ...(eventTimezone !== undefined && { eventTimezone: String(eventTimezone).trim() || "Europe/London" }),
+        ...(eventDescription !== undefined && { eventDescription: eventDescription || null }),
+        ...(socialEnabled !== undefined && { socialEnabled: socialEnabled === true }),
+        ...(socialName !== undefined && { socialName: socialName || null }),
+        ...(socialStartAt !== undefined && { socialStartAt: parseTs(socialStartAt) }),
+        ...(socialEndAt !== undefined && { socialEndAt: parseTs(socialEndAt) }),
+        ...(socialVenue !== undefined && { socialVenue: socialVenue || null }),
+        ...(socialDescription !== undefined && { socialDescription: socialDescription || null }),
       })
       .where(eq(eventSettingsTable.id, existing[0].id))
       .returning());
@@ -84,6 +103,16 @@ router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> =
         fromEmail: fromEmail || "noreply@hranalyticssummit.com",
         attendeeChangesLocked: attendeeChangesLocked === true,
         attendeeChangesLockedMessage: attendeeChangesLockedMessage || null,
+        eventStartAt: parseTs(eventStartAt) ?? null,
+        eventEndAt: parseTs(eventEndAt) ?? null,
+        eventTimezone: (typeof eventTimezone === "string" && eventTimezone.trim()) || "Europe/London",
+        eventDescription: eventDescription || null,
+        socialEnabled: socialEnabled === true,
+        socialName: socialName || null,
+        socialStartAt: parseTs(socialStartAt) ?? null,
+        socialEndAt: parseTs(socialEndAt) ?? null,
+        socialVenue: socialVenue || null,
+        socialDescription: socialDescription || null,
       })
       .returning());
   }
@@ -258,6 +287,7 @@ router.post("/email-templates/:type/test-send", adminAuth, async (req, res): Pro
       "{{managementLink}}": sampleManagementLink,
       "{{invoicePaymentButton}}": "",
       "{{total}}": "£238.80",
+      "{{calendarLinks}}": (await import("../lib/email")).buildCalendarLinksSection(settings),
     };
 
     let personalised = template.htmlBody;

@@ -3,7 +3,7 @@ import AdminLayout from "@/components/layout/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, Lock, Unlock, Settings2, Loader2, Globe, ShieldCheck } from "lucide-react";
+import { Check, Lock, Unlock, Settings2, Loader2, Globe, ShieldCheck, CalendarDays } from "lucide-react";
 
 interface EventSettings {
   eventName: string;
@@ -19,6 +19,34 @@ interface EventSettings {
   attendeeChangesLockedMessage: string | null;
   refPrefix: string;
   refOffset: number;
+  eventStartAt: string | null;
+  eventEndAt: string | null;
+  eventTimezone: string;
+  eventDescription: string | null;
+  socialEnabled: boolean;
+  socialName: string | null;
+  socialStartAt: string | null;
+  socialEndAt: string | null;
+  socialVenue: string | null;
+  socialDescription: string | null;
+}
+
+// Convert ISO timestamp from server to value for <input type="datetime-local">.
+// datetime-local expects YYYY-MM-DDTHH:mm (no timezone). We render in the
+// browser's local timezone for editing convenience.
+function isoToLocalInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const pad = (n: number) => (n < 10 ? `0${n}` : String(n));
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function localInputToIso(value: string): string | null {
+  if (!value) return null;
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return null;
+  return d.toISOString();
 }
 
 const DEFAULT_LOCKED_MESSAGE =
@@ -77,7 +105,21 @@ export default function AdminSettings() {
     attendeeChangesLockedMessage: null,
     refPrefix: "HRAS26",
     refOffset: 6541,
+    eventStartAt: null,
+    eventEndAt: null,
+    eventTimezone: "Europe/London",
+    eventDescription: null,
+    socialEnabled: false,
+    socialName: null,
+    socialStartAt: null,
+    socialEndAt: null,
+    socialVenue: null,
+    socialDescription: null,
   });
+
+  const [calSaving, setCalSaving] = useState(false);
+  const [calSaved, setCalSaved] = useState(false);
+  const [calError, setCalError] = useState("");
 
   const [refSaving, setRefSaving] = useState(false);
   const [refSaved, setRefSaved] = useState(false);
@@ -114,6 +156,16 @@ export default function AdminSettings() {
             attendeeChangesLockedMessage: lockState.message,
             refPrefix: data.refPrefix ?? "HRAS26",
             refOffset: data.refOffset ?? 6541,
+            eventStartAt: data.eventStartAt ?? null,
+            eventEndAt: data.eventEndAt ?? null,
+            eventTimezone: data.eventTimezone ?? "Europe/London",
+            eventDescription: data.eventDescription ?? null,
+            socialEnabled: data.socialEnabled ?? false,
+            socialName: data.socialName ?? null,
+            socialStartAt: data.socialStartAt ?? null,
+            socialEndAt: data.socialEndAt ?? null,
+            socialVenue: data.socialVenue ?? null,
+            socialDescription: data.socialDescription ?? null,
           });
         }
       })
@@ -179,6 +231,38 @@ export default function AdminSettings() {
       }
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveCalendar = async () => {
+    setCalSaving(true);
+    setCalError("");
+    setCalSaved(false);
+    try {
+      const res = await adminFetch("/api/admin/event-settings", {
+        method: "PUT",
+        body: JSON.stringify({
+          eventStartAt: form.eventStartAt,
+          eventEndAt: form.eventEndAt,
+          eventTimezone: form.eventTimezone,
+          eventDescription: form.eventDescription,
+          socialEnabled: form.socialEnabled,
+          socialName: form.socialName,
+          socialStartAt: form.socialStartAt,
+          socialEndAt: form.socialEndAt,
+          socialVenue: form.socialVenue,
+          socialDescription: form.socialDescription,
+        }),
+      });
+      if (res.ok) {
+        setCalSaved(true);
+        setTimeout(() => setCalSaved(false), 2500);
+      } else {
+        const body = await res.json().catch(() => ({}));
+        setCalError(body.error || "Failed to save");
+      }
+    } finally {
+      setCalSaving(false);
     }
   };
 
@@ -283,6 +367,135 @@ export default function AdminSettings() {
               </div>
             </div>
           </form>
+
+          {/* ── Calendar & Scheduling ── */}
+          <div className="bg-white border border-border">
+            <div className="px-6 py-4 border-b border-border flex items-center gap-3">
+              <CalendarDays className="w-5 h-5 text-primary" />
+              <h2 className="font-bold text-base">Calendar &amp; Scheduling</h2>
+            </div>
+            <div className="p-6 space-y-6">
+              <p className="text-sm text-muted-foreground">
+                Configure exact start/end times so attendees can add the event to Google Calendar, Outlook, or download an <code className="text-xs bg-muted px-1 py-0.5 rounded">.ics</code> file. The <code className="text-xs bg-muted px-1 py-0.5 rounded">{"{{calendarLinks}}"}</code> placeholder in the welcome &amp; confirmation emails will only render once start &amp; end times are set.
+              </p>
+
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Main Event</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Starts At</label>
+                    <Input
+                      type="datetime-local"
+                      value={isoToLocalInput(form.eventStartAt)}
+                      onChange={e => setForm(f => ({ ...f, eventStartAt: localInputToIso(e.target.value) }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Ends At</label>
+                    <Input
+                      type="datetime-local"
+                      value={isoToLocalInput(form.eventEndAt)}
+                      onChange={e => setForm(f => ({ ...f, eventEndAt: localInputToIso(e.target.value) }))}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Timezone (IANA)</label>
+                  <Input
+                    value={form.eventTimezone}
+                    onChange={e => setForm(f => ({ ...f, eventTimezone: e.target.value }))}
+                    placeholder="Europe/London"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Description (shown in calendar invite)</label>
+                  <Textarea
+                    rows={3}
+                    value={form.eventDescription ?? ""}
+                    onChange={e => setForm(f => ({ ...f, eventDescription: e.target.value || null }))}
+                    placeholder="Join the UK's leading HR analytics conference…"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4 pt-2 border-t border-border">
+                <div className="flex items-center justify-between pt-4">
+                  <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Pre-Event Social (Optional)</h3>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.socialEnabled}
+                      onChange={e => setForm(f => ({ ...f, socialEnabled: e.target.checked }))}
+                      className="w-4 h-4 accent-primary"
+                    />
+                    <span className="font-semibold">Enabled</span>
+                  </label>
+                </div>
+                {form.socialEnabled && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Event Name</label>
+                      <Input
+                        value={form.socialName ?? ""}
+                        onChange={e => setForm(f => ({ ...f, socialName: e.target.value || null }))}
+                        placeholder="Pre-Summit Drinks"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Starts At</label>
+                        <Input
+                          type="datetime-local"
+                          value={isoToLocalInput(form.socialStartAt)}
+                          onChange={e => setForm(f => ({ ...f, socialStartAt: localInputToIso(e.target.value) }))}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Ends At</label>
+                        <Input
+                          type="datetime-local"
+                          value={isoToLocalInput(form.socialEndAt)}
+                          onChange={e => setForm(f => ({ ...f, socialEndAt: localInputToIso(e.target.value) }))}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Venue</label>
+                      <Input
+                        value={form.socialVenue ?? ""}
+                        onChange={e => setForm(f => ({ ...f, socialVenue: e.target.value || null }))}
+                        placeholder="The Botanist, Broadgate Circle"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Description</label>
+                      <Textarea
+                        rows={2}
+                        value={form.socialDescription ?? ""}
+                        onChange={e => setForm(f => ({ ...f, socialDescription: e.target.value || null }))}
+                        placeholder="Drinks &amp; networking the evening before the summit."
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {calError && <p className="text-sm text-destructive">{calError}</p>}
+
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  onClick={handleSaveCalendar}
+                  disabled={calSaving}
+                  className={`h-10 px-6 ${calSaved ? "bg-green-600 hover:bg-green-700" : "bg-primary hover:bg-primary/90"} text-white`}
+                >
+                  {calSaved ? (
+                    <span className="flex items-center gap-1.5"><Check className="w-4 h-4" /> Saved</span>
+                  ) : calSaving ? "Saving…" : "Save Calendar Settings"}
+                </Button>
+              </div>
+            </div>
+          </div>
 
           {/* ── Attendee Self-Service ── */}
           <div className="bg-white border border-border">

@@ -10,6 +10,7 @@ import { emailLogsTable, emailTemplatesTable, bookingsTable, attendeesTable, not
 import type { EventSettings } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { generatePdfReceipt } from "./pdf";
+import { buildGoogleCalendarUrl, buildOutlookCalendarUrl, type CalendarEvent } from "./ics";
 
 async function downloadHttpsPdf(url: string, redirectsLeft = 5): Promise<Buffer | null> {
   return new Promise((resolve) => {
@@ -71,6 +72,16 @@ const defaultSettings: Omit<EventSettings, "id" | "updatedAt"> = {
   notifyCompleteSubject: null,
   notifyIncompleteSubject: null,
   notifyAttendeeSubject: null,
+  eventStartAt: null,
+  eventEndAt: null,
+  eventTimezone: "Europe/London",
+  eventDescription: null,
+  socialEnabled: false,
+  socialName: null,
+  socialStartAt: null,
+  socialEndAt: null,
+  socialVenue: null,
+  socialDescription: null,
 };
 
 export async function getEventSettings(): Promise<EventSettings> {
@@ -323,6 +334,7 @@ async function buildConfirmationEmailHtml(
         "{{eventVenuePostcode}}": settings.eventVenuePostcode || "EC2M 3TQ",
         "{{managementLink}}": managementLinkHtml,
         "{{invoicePaymentButton}}": invoicePaymentButtonHtml,
+        "{{calendarLinks}}": buildCalendarLinksSection(settings),
       };
 
       let body = dbTemplate.htmlBody;
@@ -813,6 +825,96 @@ async function getOrganiserEmails(): Promise<string[]> {
   return recipients;
 }
 
+function formatCalendarRangeLabel(start: Date, end: Date, tz: string): string {
+  try {
+    const dateFmt = new Intl.DateTimeFormat("en-GB", {
+      weekday: "short", day: "2-digit", month: "short", year: "numeric", timeZone: tz,
+    });
+    const timeFmt = new Intl.DateTimeFormat("en-GB", {
+      hour: "2-digit", minute: "2-digit", hour12: false, timeZone: tz,
+    });
+    return `${dateFmt.format(start)} · ${timeFmt.format(start)}–${timeFmt.format(end)}`;
+  } catch {
+    return `${start.toUTCString()} – ${end.toUTCString()}`;
+  }
+}
+
+export function buildCalendarLinksSection(settings: EventSettings): string {
+  const appBaseUrl = process.env.APP_BASE_URL || "https://register.hranalyticssummit.com";
+  const tz = settings.eventTimezone || "Europe/London";
+
+  type Block = { title: string; subtitle: string; google: string; outlook: string; icsUrl: string };
+  const blocks: Block[] = [];
+
+  // Main event block — only render if both start and end are configured
+  if (settings.eventStartAt && settings.eventEndAt) {
+    const start = new Date(settings.eventStartAt);
+    const end = new Date(settings.eventEndAt);
+    const eventName = settings.eventName || "HR Analytics Summit";
+    const location = [settings.eventVenue, settings.eventVenuePostcode].filter(Boolean).join(", ") || null;
+    const description = settings.eventDescription || null;
+    const ev: CalendarEvent = {
+      uid: `main-${start.getTime()}@hranalyticssummit.com`,
+      title: eventName,
+      description,
+      location,
+      startAt: start,
+      endAt: end,
+      url: settings.orgWebsite,
+    };
+    blocks.push({
+      title: eventName,
+      subtitle: formatCalendarRangeLabel(start, end, tz) + (location ? ` · ${location}` : ""),
+      google: buildGoogleCalendarUrl(ev),
+      outlook: buildOutlookCalendarUrl(ev),
+      icsUrl: `${appBaseUrl}/api/calendar/main.ics`,
+    });
+  }
+
+  // Optional pre-event social
+  if (settings.socialEnabled && settings.socialStartAt && settings.socialEndAt) {
+    const start = new Date(settings.socialStartAt);
+    const end = new Date(settings.socialEndAt);
+    const name = settings.socialName || "Pre-Event Social";
+    const ev: CalendarEvent = {
+      uid: `social-${start.getTime()}@hranalyticssummit.com`,
+      title: name,
+      description: settings.socialDescription || null,
+      location: settings.socialVenue || null,
+      startAt: start,
+      endAt: end,
+      url: settings.orgWebsite,
+    };
+    blocks.push({
+      title: name,
+      subtitle: formatCalendarRangeLabel(start, end, tz) + (settings.socialVenue ? ` · ${settings.socialVenue}` : ""),
+      google: buildGoogleCalendarUrl(ev),
+      outlook: buildOutlookCalendarUrl(ev),
+      icsUrl: `${appBaseUrl}/api/calendar/social.ics`,
+    });
+  }
+
+  if (blocks.length === 0) return "";
+
+  const blockHtml = blocks.map((b) => `
+    <div style="border:1px solid #DEDDDC;border-radius:6px;padding:18px 20px;margin:12px 0;background:#fff;">
+      <p style="margin:0 0 4px;font-weight:700;font-size:15px;color:#000;">${b.title}</p>
+      <p style="margin:0 0 14px;font-size:13px;color:#666;">${b.subtitle}</p>
+      <p style="margin:0;">
+        <a href="${b.google}" style="display:inline-block;background:#E74F3E;color:#fff;padding:9px 18px;border-radius:300px;text-decoration:none;font-weight:600;font-size:13px;margin:4px 6px 4px 0;">Add to Google Calendar</a>
+        <a href="${b.outlook}" style="display:inline-block;background:#1a1a1a;color:#fff;padding:9px 18px;border-radius:300px;text-decoration:none;font-weight:600;font-size:13px;margin:4px 6px 4px 0;">Add to Outlook</a>
+        <a href="${b.icsUrl}" style="display:inline-block;background:#fff;color:#000;border:1px solid #000;padding:8px 18px;border-radius:300px;text-decoration:none;font-weight:600;font-size:13px;margin:4px 6px 4px 0;">Download .ics (Apple / other)</a>
+      </p>
+    </div>`).join("");
+
+  return `
+    <div style="margin:24px 0;">
+      <h3 style="margin:0 0 8px;color:#000;">Save the date${blocks.length > 1 ? "s" : ""}</h3>
+      <p style="margin:0 0 6px;font-size:14px;color:#444;">Add the event to your calendar so you don't miss anything.</p>
+      ${blockHtml}
+    </div>`;
+}
+
 function buildManageLinkSection(manageUrl: string): string {
   return `
     <div style="margin: 28px 0; background: #fff8f7; border: 2px solid #E74F3E; border-radius: 6px; overflow: hidden;">
@@ -874,10 +976,13 @@ export async function sendWelcomeEmail(
       }
     }
 
+    const calendarLinksHtml = buildCalendarLinksSection(settings);
+
     const personalised = template.htmlBody
       .replace(/\{\{firstName\}\}/g, firstName)
       .replace(/\{\{name\}\}/g, firstName)
-      .replace(/\{\{managementLink\}\}/g, manageLinkHtml);
+      .replace(/\{\{managementLink\}\}/g, manageLinkHtml)
+      .replace(/\{\{calendarLinks\}\}/g, calendarLinksHtml);
 
     const html = wrapInBrandedLayout(personalised, settings);
 

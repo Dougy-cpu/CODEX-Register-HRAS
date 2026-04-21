@@ -8,6 +8,7 @@ import discountTiersRouter from "./discount-tiers";
 import stripeRouter from "./stripe";
 import emailRouter from "./email";
 import adminRouter from "./admin";
+import calendarRouter from "./calendar";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(discountTiersRouter);
 router.use(stripeRouter);
 router.use(emailRouter);
 router.use(adminRouter);
+router.use(calendarRouter);
 
 export default router;

@@ -24,6 +24,18 @@ export const eventSettingsTable = pgTable("event_settings", {
   notifyCompleteSubject: text("notify_complete_subject"),
   notifyIncompleteSubject: text("notify_incomplete_subject"),
   notifyAttendeeSubject: text("notify_attendee_subject"),
+  // Calendar / scheduling — used to generate Google/Outlook/ICS calendar links
+  eventStartAt: timestamp("event_start_at", { withTimezone: true }),
+  eventEndAt: timestamp("event_end_at", { withTimezone: true }),
+  eventTimezone: text("event_timezone").notNull().default("Europe/London"),
+  eventDescription: text("event_description"),
+  // Optional pre-event social / community gathering
+  socialEnabled: boolean("social_enabled").notNull().default(false),
+  socialName: text("social_name"),
+  socialStartAt: timestamp("social_start_at", { withTimezone: true }),
+  socialEndAt: timestamp("social_end_at", { withTimezone: true }),
+  socialVenue: text("social_venue"),
+  socialDescription: text("social_description"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
 

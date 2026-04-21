@@ -79,6 +79,7 @@ const TEMPLATE_VARIABLES: Record<TemplateType, TemplateVariable[]> = {
   welcome: [
     { tag: "{{firstName}}", label: "First Name", description: "Recipient's first name" },
     { tag: "{{managementLink}}", label: "Manage Attendees Button", description: "Secure self-service button to manage attendee details — auto-generates a unique link per booking" },
+    { tag: "{{calendarLinks}}", label: "Calendar Links", description: "Add-to-calendar buttons (Google, Outlook, .ics) for the main event and the optional pre-event social. Hidden if event start/end times aren't set in Settings." },
   ],
   confirmation: [
     { tag: "{{firstName}}", label: "First Name", description: "Lead attendee's first name" },
@@ -93,6 +94,7 @@ const TEMPLATE_VARIABLES: Record<TemplateType, TemplateVariable[]> = {
     { tag: "{{eventVenuePostcode}}", label: "Venue Postcode", description: "Venue postcode (from Settings)" },
     { tag: "{{managementLink}}", label: "Manage Attendees Button", description: "Secure self-service button — lets the booking contact manage all attendee details" },
     { tag: "{{invoicePaymentButton}}", label: "Invoice Pay Button", description: "Online payment button — only rendered for invoice bookings, empty for card payments" },
+    { tag: "{{calendarLinks}}", label: "Calendar Links", description: "Add-to-calendar buttons (Google, Outlook, .ics) for the main event and the optional pre-event social. Hidden if event start/end times aren't set in Settings." },
   ],
   invoice_reminder: [
     { tag: "{{firstName}}", label: "First Name", description: "Recipient's first name" },
