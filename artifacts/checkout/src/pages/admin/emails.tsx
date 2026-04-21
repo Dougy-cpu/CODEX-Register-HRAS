@@ -432,13 +432,18 @@ function TemplateEditor({ type }: { type: TemplateType }) {
                   onToggleHtmlMode={handleToggleHtmlMode}
                 />
                 {htmlMode ? (
-                  <Textarea
-                    value={rawHtml}
-                    onChange={e => setRawHtml(e.target.value)}
-                    className="font-mono text-xs leading-relaxed min-h-[400px] border-0 rounded-none focus-visible:ring-0 resize-y"
-                    spellCheck={false}
-                    placeholder="Raw HTML — full control over markup. Switch back to Visual to use rich-text editing."
-                  />
+                  <>
+                    <Textarea
+                      value={rawHtml}
+                      onChange={e => setRawHtml(e.target.value)}
+                      className="font-mono text-xs leading-relaxed min-h-[400px] border-0 rounded-none focus-visible:ring-0 resize-y"
+                      spellCheck={false}
+                      placeholder="Raw HTML — full control over markup. Switch back to Visual to use rich-text editing."
+                    />
+                    <p className="text-[11px] text-amber-700 bg-amber-50 border-t border-amber-200 px-3 py-1.5 leading-snug">
+                      Heads up: switching back to Visual may simplify advanced HTML (TipTap can strip unknown tags or attributes). Save first if you want to keep the raw version exactly as written.
+                    </p>
+                  </>
                 ) : (
                   <EditorContent editor={editor} />
                 )}
@@ -499,7 +504,7 @@ function TemplateEditor({ type }: { type: TemplateType }) {
                     className="bg-white border border-slate-200 shadow-sm"
                     style={{
                       width: previewViewport === "mobile" ? "375px" : "100%",
-                      maxWidth: previewViewport === "mobile" ? "375px" : "640px",
+                      maxWidth: previewViewport === "mobile" ? "375px" : "600px",
                       minHeight: "600px",
                       height: "100%",
                     }}
