@@ -192,6 +192,12 @@ function TemplateEditor({ type }: { type: TemplateType }) {
   const [previewViewport, setPreviewViewport] = useState<"desktop" | "mobile">("desktop");
   const previewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Recipient name used for the live preview ({{firstName}}, attendee row, etc).
+  // Admins can type a name freely or pick from the most recent bookings so the
+  // preview reads like the real thing instead of "Test User".
+  const [previewName, setPreviewName] = useState<string>("");
+  const [recentBookings, setRecentBookings] = useState<{ id: number; leadName: string | null; orderReference: string | null }[]>([]);
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ link: { openOnClick: false } }),
@@ -229,6 +235,32 @@ function TemplateEditor({ type }: { type: TemplateType }) {
     if (editor) loadTemplate();
   }, [type, editor]);
 
+  // Pull a small set of recent bookings so the admin can preview the email as
+  // a real recipient instead of "Test User". We only need the lead name + ref.
+  useEffect(() => {
+    let cancelled = false;
+    async function loadRecent() {
+      try {
+        const resp = await fetch(`${API_BASE}/admin/registrations?page=1&limit=10`, {
+          headers: { "x-admin-token": getAdminToken() },
+        });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (cancelled) return;
+        const items = (data.registrations || [])
+          .map((r: { id: number; leadName: string | null; orderReference: string | null }) => ({
+            id: r.id,
+            leadName: r.leadName,
+            orderReference: r.orderReference,
+          }))
+          .filter((r: { leadName: string | null }) => r.leadName && r.leadName.trim());
+        setRecentBookings(items);
+      } catch { /* ignore */ }
+    }
+    loadRecent();
+    return () => { cancelled = true; };
+  }, []);
+
   // Toggle between Visual (TipTap) and Source (HTML textarea) modes.
   // Push the latest content across so neither side loses work.
   const handleToggleHtmlMode = useCallback(() => {
@@ -256,7 +288,7 @@ function TemplateEditor({ type }: { type: TemplateType }) {
         body: JSON.stringify({
           subject: subjectOverride ?? subject,
           htmlBody: bodyOverride ?? getCurrentBody(),
-          toName: testName || undefined,
+          toName: previewName || undefined,
         }),
       });
       if (resp.ok) {
@@ -266,7 +298,7 @@ function TemplateEditor({ type }: { type: TemplateType }) {
       }
     } catch { /* ignore */ }
     setIsPreviewLoading(false);
-  }, [type, subject, getCurrentBody, testName]);
+  }, [type, subject, getCurrentBody, previewName]);
 
   // Debounce-refresh the preview whenever the body or subject changes.
   // We poll the editor body (TipTap doesn't expose a stable change ref here).
@@ -282,7 +314,7 @@ function TemplateEditor({ type }: { type: TemplateType }) {
     if (isLoading) return;
     triggerPreviewRefresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subject, rawHtml, htmlMode, isLoading]);
+  }, [subject, rawHtml, htmlMode, isLoading, previewName]);
 
   // Listen for TipTap content updates so the preview keeps up when typing in Visual mode.
   useEffect(() => {
@@ -489,6 +521,43 @@ function TemplateEditor({ type }: { type: TemplateType }) {
                       <RefreshCcw className="w-4 h-4" />
                     </button>
                   </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 px-3 py-2 text-xs border-b border-border bg-white">
+                  <span className="font-bold uppercase tracking-wider text-slate-500">Preview as:</span>
+                  <Input
+                    type="text"
+                    value={previewName}
+                    onChange={e => setPreviewName(e.target.value)}
+                    placeholder="Test User"
+                    className="h-7 text-xs w-44"
+                  />
+                  {recentBookings.length > 0 && (
+                    <select
+                      value=""
+                      onChange={e => {
+                        const name = e.target.value;
+                        if (name) setPreviewName(name);
+                      }}
+                      className="h-7 text-xs border border-input bg-background rounded px-2"
+                      title="Pick a recent booking's lead name"
+                    >
+                      <option value="">Recent bookings…</option>
+                      {recentBookings.map(b => (
+                        <option key={b.id} value={b.leadName || ""}>
+                          {b.leadName}{b.orderReference ? ` — ${b.orderReference}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {previewName && (
+                    <button
+                      type="button"
+                      onClick={() => setPreviewName("")}
+                      className="text-[11px] text-slate-500 hover:text-slate-700 underline"
+                    >
+                      Reset
+                    </button>
+                  )}
                 </div>
                 {previewSubject && (
                   <div className="px-3 py-2 text-xs border-b border-border bg-white">
