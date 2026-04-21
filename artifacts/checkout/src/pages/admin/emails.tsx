@@ -8,8 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCcw, Send, Bold, Italic, Heading2, List, ListOrdered, Link2, Code, RotateCcw, ImageIcon, Upload, X, Loader2, CheckCircle2 } from "lucide-react";
+import { RefreshCcw, Send, Bold, Italic, Heading2, List, ListOrdered, Link2, Code, RotateCcw, ImageIcon, Upload, X, Loader2, CheckCircle2, FileCode2, Eye, Smartphone, Monitor } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const API_BASE = `${import.meta.env.BASE_URL}api`;
@@ -20,7 +21,17 @@ function getAdminToken() {
 
 // ─── TipTap Toolbar ───────────────────────────────────────────────────────────
 
-function TipTapToolbar({ editor, onImageUpload }: { editor: ReturnType<typeof useEditor>; onImageUpload: () => void }) {
+function TipTapToolbar({
+  editor,
+  onImageUpload,
+  htmlMode,
+  onToggleHtmlMode,
+}: {
+  editor: ReturnType<typeof useEditor>;
+  onImageUpload: () => void;
+  htmlMode: boolean;
+  onToggleHtmlMode: () => void;
+}) {
   if (!editor) return null;
 
   const handleSetLink = () => {
@@ -29,32 +40,59 @@ function TipTapToolbar({ editor, onImageUpload }: { editor: ReturnType<typeof us
     else editor.chain().focus().unsetLink().run();
   };
 
-  const btn = (active: boolean, onClick: () => void, title: string, children: React.ReactNode) => (
+  const btn = (
+    active: boolean,
+    onClick: () => void,
+    title: string,
+    children: React.ReactNode,
+    disabled = false,
+  ) => (
     <button
       type="button"
       title={title}
       onClick={onClick}
-      className={`p-1.5 rounded text-sm transition-colors ${active ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground hover:text-foreground"}`}
+      disabled={disabled}
+      className={`p-1.5 rounded text-sm transition-colors ${
+        disabled
+          ? "text-muted-foreground/30 cursor-not-allowed"
+          : active
+          ? "bg-primary/10 text-primary"
+          : "hover:bg-muted text-muted-foreground hover:text-foreground"
+      }`}
     >
       {children}
     </button>
   );
 
+  const fmtDisabled = htmlMode;
+
   return (
-    <div className="flex flex-wrap gap-0.5 p-2 border-b border-border bg-muted/30">
-      {btn(editor.isActive("bold"), () => editor.chain().focus().toggleBold().run(), "Bold", <Bold className="w-4 h-4" />)}
-      {btn(editor.isActive("italic"), () => editor.chain().focus().toggleItalic().run(), "Italic", <Italic className="w-4 h-4" />)}
+    <div className="flex flex-wrap items-center gap-0.5 p-2 border-b border-border bg-muted/30">
+      {btn(editor.isActive("bold"), () => editor.chain().focus().toggleBold().run(), "Bold", <Bold className="w-4 h-4" />, fmtDisabled)}
+      {btn(editor.isActive("italic"), () => editor.chain().focus().toggleItalic().run(), "Italic", <Italic className="w-4 h-4" />, fmtDisabled)}
       <span className="w-px bg-border mx-1 self-stretch" />
-      {btn(editor.isActive("heading", { level: 2 }), () => editor.chain().focus().toggleHeading({ level: 2 }).run(), "Heading 2", <Heading2 className="w-4 h-4" />)}
+      {btn(editor.isActive("heading", { level: 2 }), () => editor.chain().focus().toggleHeading({ level: 2 }).run(), "Heading 2", <Heading2 className="w-4 h-4" />, fmtDisabled)}
       <span className="w-px bg-border mx-1 self-stretch" />
-      {btn(editor.isActive("bulletList"), () => editor.chain().focus().toggleBulletList().run(), "Bullet List", <List className="w-4 h-4" />)}
-      {btn(editor.isActive("orderedList"), () => editor.chain().focus().toggleOrderedList().run(), "Ordered List", <ListOrdered className="w-4 h-4" />)}
+      {btn(editor.isActive("bulletList"), () => editor.chain().focus().toggleBulletList().run(), "Bullet List", <List className="w-4 h-4" />, fmtDisabled)}
+      {btn(editor.isActive("orderedList"), () => editor.chain().focus().toggleOrderedList().run(), "Ordered List", <ListOrdered className="w-4 h-4" />, fmtDisabled)}
       <span className="w-px bg-border mx-1 self-stretch" />
-      {btn(editor.isActive("link"), handleSetLink, "Link", <Link2 className="w-4 h-4" />)}
-      {btn(editor.isActive("code"), () => editor.chain().focus().toggleCode().run(), "Inline Code", <Code className="w-4 h-4" />)}
+      {btn(editor.isActive("link"), handleSetLink, "Link", <Link2 className="w-4 h-4" />, fmtDisabled)}
+      {btn(editor.isActive("code"), () => editor.chain().focus().toggleCode().run(), "Inline Code", <Code className="w-4 h-4" />, fmtDisabled)}
       {btn(false, onImageUpload, "Insert Image", <ImageIcon className="w-4 h-4" />)}
       <span className="w-px bg-border mx-1 self-stretch" />
-      {btn(false, () => editor.chain().focus().undo().run(), "Undo", <RotateCcw className="w-4 h-4" />)}
+      {btn(false, () => editor.chain().focus().undo().run(), "Undo", <RotateCcw className="w-4 h-4" />, fmtDisabled)}
+      <span className="ml-auto" />
+      <button
+        type="button"
+        title={htmlMode ? "Switch to Visual editor" : "Switch to HTML / Source editor"}
+        onClick={onToggleHtmlMode}
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-semibold transition-colors ${
+          htmlMode ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground hover:text-foreground"
+        }`}
+      >
+        <FileCode2 className="w-4 h-4" />
+        {htmlMode ? "Visual" : "Source"}
+      </button>
     </div>
   );
 }
@@ -137,12 +175,22 @@ function TemplateEditor({ type, settings }: { type: TemplateType; settings: Even
   const { toast } = useToast();
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [subject, setSubject] = useState("");
-  const [showPreview, setShowPreview] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [testEmail, setTestEmail] = useState("");
   const [testName, setTestName] = useState("");
   const [isSendingTest, setIsSendingTest] = useState(false);
+
+  // Source/HTML mode state
+  const [htmlMode, setHtmlMode] = useState(false);
+  const [rawHtml, setRawHtml] = useState("");
+
+  // Live preview state
+  const [previewHtml, setPreviewHtml] = useState<string>("");
+  const [previewSubject, setPreviewSubject] = useState<string>("");
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [previewViewport, setPreviewViewport] = useState<"desktop" | "mobile">("desktop");
+  const previewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const editor = useEditor({
     extensions: [
@@ -155,6 +203,12 @@ function TemplateEditor({ type, settings }: { type: TemplateType; settings: Even
     },
   });
 
+  // Helper: get the current body text depending on which mode the admin is in.
+  const getCurrentBody = useCallback(() => {
+    if (htmlMode) return rawHtml;
+    return editor?.getHTML() || "";
+  }, [editor, htmlMode, rawHtml]);
+
   useEffect(() => {
     async function loadTemplate() {
       setIsLoading(true);
@@ -166,6 +220,8 @@ function TemplateEditor({ type, settings }: { type: TemplateType; settings: Even
           const data = await resp.json();
           setSubject(data.subject || "");
           if (editor && data.htmlBody) editor.commands.setContent(data.htmlBody);
+          // Seed rawHtml so toggling to Source mode before any edit shows real content.
+          setRawHtml(data.htmlBody || "");
         }
       } catch { /* ignore */ }
       setIsLoading(false);
@@ -173,55 +229,88 @@ function TemplateEditor({ type, settings }: { type: TemplateType; settings: Even
     if (editor) loadTemplate();
   }, [type, editor]);
 
-  const previewHtml = useCallback(() => {
-    if (!settings || !editor) return "";
-    const logoDataUrl = settings.logoDataUrl;
-    const eventName = settings.eventName || "Your Event";
-    const eventDate = settings.eventDate || "";
-    const eventVenue = settings.eventVenue || "";
-    const orgName = settings.orgName || "";
-    const orgAddress = settings.orgAddress || "";
-    const orgWebsite = settings.orgWebsite || "";
+  // Toggle between Visual (TipTap) and Source (HTML textarea) modes.
+  // Push the latest content across so neither side loses work.
+  const handleToggleHtmlMode = useCallback(() => {
+    if (!editor) return;
+    if (!htmlMode) {
+      // Visual -> Source: take the editor's current HTML.
+      setRawHtml(editor.getHTML());
+      setHtmlMode(true);
+    } else {
+      // Source -> Visual: push raw HTML back into TipTap. TipTap may strip
+      // unknown tags/attributes; that's expected and matches editor capability.
+      editor.commands.setContent(rawHtml);
+      setHtmlMode(false);
+    }
+  }, [editor, htmlMode, rawHtml]);
 
-    const headerContent = logoDataUrl
-      ? `<img src="${logoDataUrl}" alt="${eventName}" style="max-height:60px;max-width:200px;" />`
-      : `<strong style="font-size:20px;color:#E74F3E;">${eventName}</strong>`;
+  // Fetch the live preview from the server, which uses the same render path
+  // as the real send so what admins see matches what recipients receive.
+  const fetchPreview = useCallback(async (bodyOverride?: string, subjectOverride?: string) => {
+    setIsPreviewLoading(true);
+    try {
+      const resp = await fetch(`${API_BASE}/email-templates/${type}/preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-token": getAdminToken() },
+        body: JSON.stringify({
+          subject: subjectOverride ?? subject,
+          htmlBody: bodyOverride ?? getCurrentBody(),
+          toName: testName || undefined,
+        }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        setPreviewHtml(data.html || "");
+        setPreviewSubject(data.subject || "");
+      }
+    } catch { /* ignore */ }
+    setIsPreviewLoading(false);
+  }, [type, subject, getCurrentBody, testName]);
 
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8">
-<style>
-  body{margin:0;background:#FCFBFA;font-family:Figtree,Arial,sans-serif;font-size:15px;color:#000}
-  .wrapper{max-width:600px;margin:40px auto;background:#fff;border:1px solid #e5e5e5}
-  .header{background:#FCFBFA;padding:24px 32px;border-bottom:2px solid #E74F3E;text-align:center}
-  .content{padding:32px}
-  .footer{background:#1a1a1a;color:#ccc;padding:24px 32px;text-align:center;font-size:12px}
-  .footer a{color:#F48847;text-decoration:none}
-  h2{color:#000}
-  .info-box{background:#FCFBFA;border:1px solid #DEDDDC;padding:16px 20px;border-radius:4px;margin:16px 0}
-</style></head>
-<body><div class="wrapper">
-  <div class="header">
-    ${headerContent}
-    <div style="font-size:13px;color:#666;margin-top:4px">${eventDate}${eventDate && eventVenue ? " · " : ""}${eventVenue}</div>
-  </div>
-  <div class="content">${editor.getHTML()}</div>
-  <div class="footer">
-    <p>&copy; 2026 ${eventName}. All rights reserved.</p>
-    <p><a href="${orgWebsite}">${orgWebsite.replace(/^https?:\/\//, "")}</a></p>
-    <p style="font-size:11px;color:#999">${orgName} · ${orgAddress}</p>
-  </div>
-</div></body></html>`;
-  }, [editor, settings]);
+  // Debounce-refresh the preview whenever the body or subject changes.
+  // We poll the editor body (TipTap doesn't expose a stable change ref here).
+  const triggerPreviewRefresh = useCallback(() => {
+    if (previewDebounceRef.current) clearTimeout(previewDebounceRef.current);
+    previewDebounceRef.current = setTimeout(() => {
+      void fetchPreview();
+    }, 400);
+  }, [fetchPreview]);
+
+  // Initial preview load + refresh when subject/rawHtml/htmlMode change.
+  useEffect(() => {
+    if (isLoading) return;
+    triggerPreviewRefresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subject, rawHtml, htmlMode, isLoading]);
+
+  // Listen for TipTap content updates so the preview keeps up when typing in Visual mode.
+  useEffect(() => {
+    if (!editor || htmlMode) return;
+    const handler = () => triggerPreviewRefresh();
+    editor.on("update", handler);
+    return () => {
+      editor.off("update", handler);
+    };
+  }, [editor, htmlMode, triggerPreviewRefresh]);
 
   const handleSave = async () => {
     if (!editor) return;
     setIsSaving(true);
     try {
+      const body = getCurrentBody();
       const resp = await fetch(`${API_BASE}/email-templates/${type}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", "x-admin-token": getAdminToken() },
-        body: JSON.stringify({ subject, htmlBody: editor.getHTML() }),
+        body: JSON.stringify({ subject, htmlBody: body }),
       });
       if (!resp.ok) throw new Error("Failed to save");
+      // After save, sync the other view so both modes show the canonical body.
+      if (htmlMode) {
+        editor.commands.setContent(body);
+      } else {
+        setRawHtml(body);
+      }
       toast({ title: "Template Saved", description: `${TEMPLATE_LABELS[type]} template updated successfully.` });
     } catch {
       toast({ title: "Save Failed", description: "Could not save the template.", variant: "destructive" });
@@ -301,12 +390,7 @@ function TemplateEditor({ type, settings }: { type: TemplateType; settings: Even
           </div>
 
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-bold uppercase tracking-wider">Email Body</label>
-              <Button variant="outline" size="sm" onClick={() => setShowPreview(p => !p)} className="text-xs">
-                {showPreview ? "Edit" : "Preview"}
-              </Button>
-            </div>
+            <label className="text-sm font-bold uppercase tracking-wider">Email Body</label>
             <div className="border border-border rounded bg-slate-50 p-3 space-y-2">
               <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
                 Available Variables — click to insert at cursor
@@ -318,7 +402,9 @@ function TemplateEditor({ type, settings }: { type: TemplateType; settings: Even
                     type="button"
                     title={v.description}
                     onClick={() => {
-                      if (!showPreview && editor) {
+                      if (htmlMode) {
+                        setRawHtml(prev => prev + v.tag);
+                      } else if (editor) {
                         editor.chain().focus().insertContent(v.tag).run();
                       }
                     }}
@@ -332,24 +418,95 @@ function TemplateEditor({ type, settings }: { type: TemplateType; settings: Even
                   </button>
                 ))}
               </div>
-              {showPreview && (
-                <p className="text-xs text-slate-400 italic">Switch to Edit mode to insert variables.</p>
-              )}
             </div>
             <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageFileChange} />
-            {showPreview ? (
-              <iframe
-                className="border border-border rounded w-full min-h-[500px]"
-                sandbox="allow-same-origin"
-                srcDoc={previewHtml()}
-                title="Email Preview"
-              />
-            ) : (
-              <div className="border border-border rounded overflow-hidden bg-white">
-                <TipTapToolbar editor={editor} onImageUpload={handleImageUpload} />
-                <EditorContent editor={editor} />
+
+            {/* Editor + Live Preview side-by-side on lg+, stacked below */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Editor pane */}
+              <div className="border border-border rounded overflow-hidden bg-white flex flex-col">
+                <TipTapToolbar
+                  editor={editor}
+                  onImageUpload={handleImageUpload}
+                  htmlMode={htmlMode}
+                  onToggleHtmlMode={handleToggleHtmlMode}
+                />
+                {htmlMode ? (
+                  <Textarea
+                    value={rawHtml}
+                    onChange={e => setRawHtml(e.target.value)}
+                    className="font-mono text-xs leading-relaxed min-h-[400px] border-0 rounded-none focus-visible:ring-0 resize-y"
+                    spellCheck={false}
+                    placeholder="Raw HTML — full control over markup. Switch back to Visual to use rich-text editing."
+                  />
+                ) : (
+                  <EditorContent editor={editor} />
+                )}
               </div>
-            )}
+
+              {/* Preview pane */}
+              <div className="border border-border rounded overflow-hidden bg-slate-100 flex flex-col">
+                <div className="flex items-center justify-between gap-2 p-2 border-b border-border bg-muted/30">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                    <Eye className="w-4 h-4" />
+                    <span>Live Preview</span>
+                    {isPreviewLoading && (
+                      <span className="flex items-center gap-1 text-[10px] font-normal text-slate-400 ml-1">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Updating…
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      title="Desktop preview (600px)"
+                      onClick={() => setPreviewViewport("desktop")}
+                      className={`p-1.5 rounded transition-colors ${previewViewport === "desktop" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"}`}
+                    >
+                      <Monitor className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      title="Mobile preview (375px)"
+                      onClick={() => setPreviewViewport("mobile")}
+                      className={`p-1.5 rounded transition-colors ${previewViewport === "mobile" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"}`}
+                    >
+                      <Smartphone className="w-4 h-4" />
+                    </button>
+                    <span className="w-px bg-border mx-1 self-stretch" />
+                    <button
+                      type="button"
+                      title="Refresh preview"
+                      onClick={() => fetchPreview()}
+                      className="p-1.5 rounded text-muted-foreground hover:bg-muted transition-colors"
+                    >
+                      <RefreshCcw className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                {previewSubject && (
+                  <div className="px-3 py-2 text-xs border-b border-border bg-white">
+                    <span className="font-bold uppercase tracking-wider text-slate-500 mr-2">Subject:</span>
+                    <span className="text-slate-700">{previewSubject}</span>
+                  </div>
+                )}
+                <div className="flex-1 overflow-auto p-3 flex justify-center">
+                  <iframe
+                    title="Email Preview"
+                    sandbox="allow-popups"
+                    srcDoc={previewHtml}
+                    className="bg-white border border-slate-200 shadow-sm"
+                    style={{
+                      width: previewViewport === "mobile" ? "375px" : "100%",
+                      maxWidth: previewViewport === "mobile" ? "375px" : "640px",
+                      minHeight: "600px",
+                      height: "100%",
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

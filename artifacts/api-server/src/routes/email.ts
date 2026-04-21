@@ -228,6 +228,98 @@ router.put("/email-templates/:type", adminAuth, async (req, res): Promise<void> 
   res.json(formatTemplate(updated));
 });
 
+// Build a sample placeholder map for previews / test sends so admins see
+// exactly what recipients would. Shared by /preview and /test-send so the
+// two stay in lockstep.
+async function buildSampleVars(
+  type: "welcome" | "confirmation" | "invoice_reminder",
+  toName: string | undefined,
+  toEmail: string,
+): Promise<{ vars: Record<string, string>; subjectVars: Record<string, string> }> {
+  const settings = await getEventSettings();
+  const { getCalendarPlaceholders } = await import("../lib/email");
+
+  const sampleAttendeeRows = `
+      <tr>
+        <td style="padding:8px 4px;border-bottom:1px solid #eee;">✓ Lead</td>
+        <td style="padding:8px 4px;border-bottom:1px solid #eee;">${toName || "Test User"}</td>
+        <td style="padding:8px 4px;border-bottom:1px solid #eee;">Head of People Analytics</td>
+        <td style="padding:8px 4px;border-bottom:1px solid #eee;">Acme Corp Ltd</td>
+        <td style="padding:8px 4px;border-bottom:1px solid #eee;">${toEmail}</td>
+        <td style="padding:8px 4px;border-bottom:1px solid #eee;">—</td>
+      </tr>`;
+
+  const sampleAttendeesTable = `<table width="100%" cellspacing="0" cellpadding="0" style="font-size:14px;">
+      <thead><tr style="background:#f5f5f5;">
+        <th style="padding:8px 4px;text-align:left;">Lead</th>
+        <th style="padding:8px 4px;text-align:left;">Name</th>
+        <th style="padding:8px 4px;text-align:left;">Job Title</th>
+        <th style="padding:8px 4px;text-align:left;">Company</th>
+        <th style="padding:8px 4px;text-align:left;">Email</th>
+        <th style="padding:8px 4px;text-align:left;">Phone</th>
+      </tr></thead>
+      <tbody>${sampleAttendeeRows}</tbody>
+    </table>`;
+
+  const samplePriceSummary = `
+      <div class="price-row"><span>Subtotal (excl. VAT)</span><span>£199.00</span></div>
+      <div class="price-row"><span>VAT (20%)</span><span>£39.80</span></div>
+      <div class="price-total"><span>Total</span><span>£238.80</span></div>`;
+
+  const sampleManagementLink = `<div style="background:#fff8f7;border:2px solid #E74F3E;border-radius:6px;padding:20px;margin:24px 0;">
+      <p style="margin:0 0 12px;font-weight:700;color:#E74F3E;font-size:15px;">📋 Your Attendee Management Link</p>
+      <ul style="margin:0 0 12px;padding-left:20px;color:#444;line-height:1.8;">
+        <li>Fill in or update any attendee details</li>
+        <li>No login required — just use the secure link</li>
+      </ul>
+      <p style="margin:0 0 12px;text-align:center;"><a href="#" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;border-radius:4px;">[SAMPLE LINK — not active in preview]</a></p>
+    </div>`;
+
+  const vars: Record<string, string> = type === "invoice_reminder" ? {
+    "{{firstName}}": toName?.split(" ")[0] || "Test",
+    "{{recipientName}}": toName || "Test User",
+    "{{orderReference}}": "HRAS26-TEST-001",
+    "{{dueDate}}": "30 April 2026",
+    "{{payOnlineButton}}": `<p style="margin:24px 0;text-align:center;"><a href="#" style="display:inline-block;background:#E74F3E;color:#fff;padding:14px 32px;text-decoration:none;font-weight:bold;font-size:15px;border-radius:4px;">Pay Invoice Online →</a></p>`,
+    "{{payOnlineUrl}}": "#",
+  } : {
+    "{{firstName}}": toName?.split(" ")[0] || toName || "Test",
+    "{{name}}": toName || "Test User",
+    "{{orderReference}}": "HRAS26-TEST-001",
+    "{{passLabel}}": "HR Professional Pass",
+    "{{passType}}": "HR Professional Pass",
+    "{{quantity}}": "1",
+    "{{quantityLabel}}": "pass",
+    "{{attendeesTable}}": sampleAttendeesTable,
+    "{{priceSummary}}": samplePriceSummary,
+    "{{eventDate}}": settings.eventDate || "Thursday, 3 September 2026",
+    "{{eventVenue}}": settings.eventVenue || "155 Bishopsgate, London",
+    "{{eventVenuePostcode}}": settings.eventVenuePostcode || "EC2M 3TQ",
+    "{{managementLink}}": sampleManagementLink,
+    "{{invoicePaymentButton}}": "",
+    "{{total}}": "£238.80",
+  };
+
+  const calPh = getCalendarPlaceholders(settings);
+  vars["{{eventCalendarLinks}}"] = calPh.eventCalendarLinks;
+  vars["{{socialCalendarLinks}}"] = calPh.socialCalendarLinks;
+  vars["{{calendarLinks}}"] = calPh.calendarLinks;
+  vars["{{googleCalendarUrl}}"] = calPh.googleCalendarUrl;
+  vars["{{outlookCalendarUrl}}"] = calPh.outlookCalendarUrl;
+  vars["{{icsCalendarUrl}}"] = calPh.icsCalendarUrl;
+  vars["{{socialGoogleCalendarUrl}}"] = calPh.socialGoogleCalendarUrl;
+  vars["{{socialOutlookCalendarUrl}}"] = calPh.socialOutlookCalendarUrl;
+  vars["{{socialIcsCalendarUrl}}"] = calPh.socialIcsCalendarUrl;
+
+  const subjectVars: Record<string, string> = {
+    "{{orderReference}}": "HRAS26-TEST-001",
+    "{{recipientName}}": toName || "Test User",
+    "{{firstName}}": toName?.split(" ")[0] || "Test",
+  };
+
+  return { vars, subjectVars };
+}
+
 router.post("/email-templates/:type/test-send", adminAuth, async (req, res): Promise<void> => {
   const type = req.params.type as "welcome" | "confirmation" | "invoice_reminder";
   const { toEmail, toName } = req.body;
@@ -253,89 +345,13 @@ router.post("/email-templates/:type/test-send", adminAuth, async (req, res): Pro
 
     const settings = await getEventSettings();
     const { sendMail, wrapInBrandedLayout: wrap } = await import("../lib/email");
-
-    const sampleAttendeeRows = `
-      <tr>
-        <td style="padding:8px 4px;border-bottom:1px solid #eee;">✓ Lead</td>
-        <td style="padding:8px 4px;border-bottom:1px solid #eee;">${toName || "Test User"}</td>
-        <td style="padding:8px 4px;border-bottom:1px solid #eee;">Head of People Analytics</td>
-        <td style="padding:8px 4px;border-bottom:1px solid #eee;">Acme Corp Ltd</td>
-        <td style="padding:8px 4px;border-bottom:1px solid #eee;">${toEmail}</td>
-        <td style="padding:8px 4px;border-bottom:1px solid #eee;">—</td>
-      </tr>`;
-
-    const sampleAttendeesTable = `<table width="100%" cellspacing="0" cellpadding="0" style="font-size:14px;">
-      <thead><tr style="background:#f5f5f5;">
-        <th style="padding:8px 4px;text-align:left;">Lead</th>
-        <th style="padding:8px 4px;text-align:left;">Name</th>
-        <th style="padding:8px 4px;text-align:left;">Job Title</th>
-        <th style="padding:8px 4px;text-align:left;">Company</th>
-        <th style="padding:8px 4px;text-align:left;">Email</th>
-        <th style="padding:8px 4px;text-align:left;">Phone</th>
-      </tr></thead>
-      <tbody>${sampleAttendeeRows}</tbody>
-    </table>`;
-
-    const samplePriceSummary = `
-      <div class="price-row"><span>Subtotal (excl. VAT)</span><span>£199.00</span></div>
-      <div class="price-row"><span>VAT (20%)</span><span>£39.80</span></div>
-      <div class="price-total"><span>Total</span><span>£238.80</span></div>`;
-
-    const sampleManagementLink = `<div style="background:#fff8f7;border:2px solid #E74F3E;border-radius:6px;padding:20px;margin:24px 0;">
-      <p style="margin:0 0 12px;font-weight:700;color:#E74F3E;font-size:15px;">📋 Your Attendee Management Link</p>
-      <ul style="margin:0 0 12px;padding-left:20px;color:#444;line-height:1.8;">
-        <li>Fill in or update any attendee details</li>
-        <li>No login required — just use the secure link</li>
-      </ul>
-      <p style="margin:0 0 12px;text-align:center;"><a href="#" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;border-radius:4px;">[SAMPLE LINK — not active in test]</a></p>
-    </div>`;
-
-    const testVars: Record<string, string> = type === "invoice_reminder" ? {
-      "{{firstName}}": toName?.split(" ")[0] || "Test",
-      "{{recipientName}}": toName || "Test User",
-      "{{orderReference}}": "HRAS26-TEST-001",
-      "{{dueDate}}": "30 April 2026",
-      "{{payOnlineButton}}": `<p style="margin:24px 0;text-align:center;"><a href="#" style="display:inline-block;background:#E74F3E;color:#fff;padding:14px 32px;text-decoration:none;font-weight:bold;font-size:15px;border-radius:4px;">Pay Invoice Online →</a></p>`,
-      "{{payOnlineUrl}}": "#",
-    } : {
-      "{{firstName}}": toName?.split(" ")[0] || toName || "Test",
-      "{{name}}": toName || "Test User",
-      "{{orderReference}}": "HRAS26-TEST-001",
-      "{{passLabel}}": "HR Professional Pass",
-      "{{passType}}": "HR Professional Pass",
-      "{{quantity}}": "1",
-      "{{quantityLabel}}": "pass",
-      "{{attendeesTable}}": sampleAttendeesTable,
-      "{{priceSummary}}": samplePriceSummary,
-      "{{eventDate}}": settings.eventDate || "Thursday, 3 September 2026",
-      "{{eventVenue}}": settings.eventVenue || "155 Bishopsgate, London",
-      "{{eventVenuePostcode}}": settings.eventVenuePostcode || "EC2M 3TQ",
-      "{{managementLink}}": sampleManagementLink,
-      "{{invoicePaymentButton}}": "",
-      "{{total}}": "£238.80",
-    };
-    const { getCalendarPlaceholders } = await import("../lib/email");
-    const calPh = getCalendarPlaceholders(settings);
-    testVars["{{eventCalendarLinks}}"] = calPh.eventCalendarLinks;
-    testVars["{{socialCalendarLinks}}"] = calPh.socialCalendarLinks;
-    testVars["{{calendarLinks}}"] = calPh.calendarLinks;
-    testVars["{{googleCalendarUrl}}"] = calPh.googleCalendarUrl;
-    testVars["{{outlookCalendarUrl}}"] = calPh.outlookCalendarUrl;
-    testVars["{{icsCalendarUrl}}"] = calPh.icsCalendarUrl;
-    testVars["{{socialGoogleCalendarUrl}}"] = calPh.socialGoogleCalendarUrl;
-    testVars["{{socialOutlookCalendarUrl}}"] = calPh.socialOutlookCalendarUrl;
-    testVars["{{socialIcsCalendarUrl}}"] = calPh.socialIcsCalendarUrl;
+    const { vars, subjectVars } = await buildSampleVars(type, toName, toEmail);
 
     let personalised = template.htmlBody;
-    for (const [key, val] of Object.entries(testVars)) {
+    for (const [key, val] of Object.entries(vars)) {
       personalised = personalised.replaceAll(key, val);
     }
 
-    const subjectVars: Record<string, string> = {
-      "{{orderReference}}": "HRAS26-TEST-001",
-      "{{recipientName}}": toName || "Test User",
-      "{{firstName}}": toName?.split(" ")[0] || "Test",
-    };
     let subject = template.subject;
     for (const [key, val] of Object.entries(subjectVars)) {
       subject = subject.replaceAll(key, val);
@@ -352,6 +368,42 @@ router.post("/email-templates/:type/test-send", adminAuth, async (req, res): Pro
   }
 
   res.json({ success: true, message: `Test email sent to ${toEmail}` });
+});
+
+// Live preview — renders the supplied draft HTML/subject through the same
+// branded layout + sample-variable substitution that test-sends use, so the
+// admin sees exactly what recipients will see.
+router.post("/email-templates/:type/preview", adminAuth, async (req, res): Promise<void> => {
+  const type = req.params.type as "welcome" | "confirmation" | "invoice_reminder";
+  if (!["welcome", "confirmation", "invoice_reminder"].includes(type)) {
+    res.status(400).json({ error: "Invalid template type" });
+    return;
+  }
+
+  const { subject = "", htmlBody = "", toName } = req.body || {};
+
+  const settings = await getEventSettings();
+  const { wrapInBrandedLayout: wrap } = await import("../lib/email");
+  const { vars, subjectVars } = await buildSampleVars(type, toName, "preview@example.com");
+
+  // For welcome previews, also substitute the welcome-specific manage link
+  // sample so the section is visible to admins.
+  if (type === "welcome") {
+    vars["{{managementLink}}"] = vars["{{managementLink}}"] || `<div style="background:#fff8f7;border:2px solid #E74F3E;border-radius:6px;padding:20px;margin:24px 0;"><p style="margin:0;text-align:center;color:#E74F3E;font-weight:700;">[SAMPLE — Manage Attendees button appears here in real emails]</p></div>`;
+  }
+
+  let personalised = String(htmlBody);
+  for (const [key, val] of Object.entries(vars)) {
+    personalised = personalised.replaceAll(key, val);
+  }
+
+  let renderedSubject = String(subject);
+  for (const [key, val] of Object.entries(subjectVars)) {
+    renderedSubject = renderedSubject.replaceAll(key, val);
+  }
+
+  const html = wrap(personalised, settings);
+  res.json({ subject: renderedSubject, html });
 });
 
 // ─── Email Logs ───────────────────────────────────────────────────────────────
