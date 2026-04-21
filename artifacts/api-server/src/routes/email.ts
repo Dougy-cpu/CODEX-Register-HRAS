@@ -50,7 +50,33 @@ router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> =
     return isNaN(d.getTime()) ? null : d;
   }
 
+  // Validate timezone identifier (IANA) if supplied.
+  if (eventTimezone !== undefined && eventTimezone !== null && String(eventTimezone).trim() !== "") {
+    try {
+      new Intl.DateTimeFormat("en-GB", { timeZone: String(eventTimezone).trim() }).format(new Date());
+    } catch {
+      res.status(400).json({ error: `Invalid timezone identifier: ${eventTimezone}` });
+      return;
+    }
+  }
+
   const existing = await db.select().from(eventSettingsTable);
+
+  // Validate start < end for event and social once we know the merged values.
+  const current = existing[0];
+  const mergedEventStart = eventStartAt !== undefined ? parseTs(eventStartAt) : current?.eventStartAt ?? null;
+  const mergedEventEnd = eventEndAt !== undefined ? parseTs(eventEndAt) : current?.eventEndAt ?? null;
+  if (mergedEventStart && mergedEventEnd && mergedEventEnd.getTime() <= mergedEventStart.getTime()) {
+    res.status(400).json({ error: "eventEndAt must be after eventStartAt" });
+    return;
+  }
+  const mergedSocialStart = socialStartAt !== undefined ? parseTs(socialStartAt) : current?.socialStartAt ?? null;
+  const mergedSocialEnd = socialEndAt !== undefined ? parseTs(socialEndAt) : current?.socialEndAt ?? null;
+  if (mergedSocialStart && mergedSocialEnd && mergedSocialEnd.getTime() <= mergedSocialStart.getTime()) {
+    res.status(400).json({ error: "socialEndAt must be after socialStartAt" });
+    return;
+  }
+
 
   let updated;
   if (existing.length > 0) {
