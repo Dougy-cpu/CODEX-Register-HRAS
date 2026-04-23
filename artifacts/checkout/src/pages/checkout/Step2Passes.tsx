@@ -289,9 +289,9 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
       hauFetched.current = true;
       fetch("/api/hear-about-us-options")
         .then(res => res.ok ? res.json() : null)
-        .then(data => {
-          if (data?.options?.length) {
-            setHearOptions(data.options.map((o: { label: string }) => o.label));
+        .then((data: { label: string }[] | null) => {
+          if (Array.isArray(data) && data.length > 0) {
+            setHearOptions(data.map(o => o.label));
           }
         })
         .catch(() => {});
