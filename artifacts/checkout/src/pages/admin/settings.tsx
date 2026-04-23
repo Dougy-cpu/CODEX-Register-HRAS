@@ -3,7 +3,7 @@ import AdminLayout from "@/components/layout/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, Lock, Unlock, Settings2, Loader2, Globe, ShieldCheck, CalendarDays } from "lucide-react";
+import { Check, Lock, Unlock, Settings2, Loader2, Globe, ShieldCheck, CalendarDays, ChevronUp, ChevronDown, Trash2, Plus, ListChecks } from "lucide-react";
 
 interface EventSettings {
   eventName: string;
@@ -164,6 +164,29 @@ export default function AdminSettings() {
   const [refSaved, setRefSaved] = useState(false);
   const [refError, setRefError] = useState("");
 
+  // ── Hear-about-us option management ──────────────────────────────────────
+  type HauOption = { id: number; label: string; position: number; responseCount: number };
+  const [hauOptions, setHauOptions] = useState<HauOption[]>([]);
+  const [hauTotalAnswered, setHauTotalAnswered] = useState(0);
+  const [hauTotalBookings, setHauTotalBookings] = useState(0);
+  const [hauNewLabel, setHauNewLabel] = useState("");
+  const [hauAdding, setHauAdding] = useState(false);
+  const [hauLoading, setHauLoading] = useState(true);
+
+  const loadHauOptions = useCallback(async () => {
+    setHauLoading(true);
+    try {
+      const res = await adminFetch("/api/admin/hear-about-us-options");
+      if (res.ok) {
+        const data = await res.json();
+        setHauOptions(data.options ?? []);
+        setHauTotalAnswered(data.totalAnswered ?? 0);
+        setHauTotalBookings(data.totalBookings ?? 0);
+      }
+    } catch { /* ignore */ }
+    setHauLoading(false);
+  }, []);
+
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestLockRef = useRef<{ locked: boolean; message: string | null }>({
     locked: false,
@@ -209,7 +232,60 @@ export default function AdminSettings() {
         }
       })
       .finally(() => setLoading(false));
-  }, []);
+    loadHauOptions();
+  }, [loadHauOptions]);
+
+  const hauAddOption = async () => {
+    const label = hauNewLabel.trim();
+    if (!label) return;
+    setHauAdding(true);
+    const optimistic: HauOption = { id: Date.now(), label, position: hauOptions.length, responseCount: 0 };
+    setHauOptions(prev => [...prev, optimistic]);
+    setHauNewLabel("");
+    try {
+      const res = await adminFetch("/api/admin/hear-about-us-options", {
+        method: "POST",
+        body: JSON.stringify({ label }),
+      });
+      if (res.ok) {
+        await loadHauOptions();
+      } else {
+        setHauOptions(prev => prev.filter(o => o.id !== optimistic.id));
+        setHauNewLabel(label);
+      }
+    } catch {
+      setHauOptions(prev => prev.filter(o => o.id !== optimistic.id));
+      setHauNewLabel(label);
+    }
+    setHauAdding(false);
+  };
+
+  const hauDeleteOption = async (id: number) => {
+    const prev = hauOptions;
+    setHauOptions(opt => opt.filter(o => o.id !== id));
+    try {
+      const res = await adminFetch(`/api/admin/hear-about-us-options/${id}`, { method: "DELETE" });
+      if (!res.ok) setHauOptions(prev);
+    } catch {
+      setHauOptions(prev);
+    }
+  };
+
+  const hauMoveOption = async (id: number, direction: "up" | "down") => {
+    const idx = hauOptions.findIndex(o => o.id === id);
+    if (idx === -1) return;
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= hauOptions.length) return;
+    const next = [...hauOptions];
+    [next[idx], next[swapIdx]] = [next[swapIdx], next[idx]];
+    setHauOptions(next);
+    try {
+      await adminFetch(`/api/admin/hear-about-us-options/${id}/move`, {
+        method: "PUT",
+        body: JSON.stringify({ direction }),
+      });
+    } catch { /* revert would be ideal but this is a rare path */ }
+  };
 
   const persistLock = useCallback(async (locked: boolean, message: string | null) => {
     setLockSaving(true);
@@ -753,6 +829,124 @@ export default function AdminSettings() {
               <div className="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-800">
                 <strong>Stripe live mode:</strong> Ensure <code className="bg-blue-100 px-1 py-0.5 rounded">STRIPE_SECRET_KEY</code> begins with <code className="bg-blue-100 px-1 py-0.5 rounded">sk_live_</code> (not <code className="bg-blue-100 px-1 py-0.5 rounded">sk_test_</code>) before publishing. The app uses whichever key is present — no code changes are needed to switch from test to live mode.
               </div>
+            </div>
+          </div>
+
+          {/* ── Registration Form — Hear About Us Options ── */}
+          <div className="bg-white border border-border">
+            <div className="px-6 py-4 border-b border-border flex items-center gap-3">
+              <ListChecks className="w-5 h-5 text-primary" />
+              <h2 className="font-bold text-base">Registration Form — "How did you hear about us?"</h2>
+            </div>
+            <div className="p-6 space-y-6">
+              <p className="text-sm text-muted-foreground">
+                Manage the options shown in the "How did you hear about the event?" dropdown on the booking form. Changes take effect immediately for new registrations.
+              </p>
+
+              {hauLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Loading options…
+                </div>
+              ) : (
+                <>
+                  {/* Option list */}
+                  <div className="border border-border rounded overflow-hidden divide-y divide-border">
+                    {hauOptions.map((opt, idx) => (
+                      <div key={opt.id} className="flex items-center gap-3 px-4 py-2.5 bg-white hover:bg-muted/20 transition-colors">
+                        <div className="flex flex-col gap-0.5">
+                          <button
+                            type="button"
+                            onClick={() => hauMoveOption(opt.id, "up")}
+                            disabled={idx === 0}
+                            className="p-0.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                          >
+                            <ChevronUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => hauMoveOption(opt.id, "down")}
+                            disabled={idx === hauOptions.length - 1}
+                            className="p-0.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                          >
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <span className="flex-1 text-sm">{opt.label}</span>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${opt.responseCount > 0 ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+                          {opt.responseCount > 0 ? opt.responseCount : "—"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => hauDeleteOption(opt.id)}
+                          className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
+                          title="Delete option"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                    {hauOptions.length === 0 && (
+                      <div className="px-4 py-6 text-sm text-muted-foreground text-center">No options yet — add one below.</div>
+                    )}
+                  </div>
+
+                  {/* Add new option */}
+                  <div className="flex gap-2">
+                    <Input
+                      value={hauNewLabel}
+                      onChange={e => setHauNewLabel(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && hauAddOption()}
+                      placeholder="New option label…"
+                      className="h-9 flex-1"
+                      disabled={hauAdding}
+                    />
+                    <Button
+                      type="button"
+                      onClick={hauAddOption}
+                      disabled={hauAdding || !hauNewLabel.trim()}
+                      size="sm"
+                      className="h-9 px-4"
+                    >
+                      {hauAdding ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Plus className="w-4 h-4 mr-1.5" />Add</>}
+                    </Button>
+                  </div>
+
+                  {/* Analytics summary */}
+                  {hauTotalBookings > 0 && (
+                    <div className="border border-border rounded p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Response Breakdown</p>
+                        <p className="text-xs text-muted-foreground">
+                          {hauTotalAnswered} of {hauTotalBookings} booking{hauTotalBookings !== 1 ? "s" : ""} answered
+                        </p>
+                      </div>
+                      {hauTotalAnswered > 0 ? (
+                        <div className="space-y-2">
+                          {hauOptions
+                            .filter(o => o.responseCount > 0)
+                            .sort((a, b) => b.responseCount - a.responseCount)
+                            .map(opt => {
+                              const pct = Math.round((opt.responseCount / hauTotalAnswered) * 100);
+                              return (
+                                <div key={opt.id} className="space-y-0.5">
+                                  <div className="flex justify-between text-xs">
+                                    <span className="text-foreground">{opt.label}</span>
+                                    <span className="text-muted-foreground font-semibold">{opt.responseCount} ({pct}%)</span>
+                                  </div>
+                                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                                    <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${pct}%` }} />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">No responses recorded yet.</p>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
 

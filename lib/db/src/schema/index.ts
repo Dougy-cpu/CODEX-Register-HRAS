@@ -9,3 +9,4 @@ export * from "./pass-inventory";
 export * from "./event-settings";
 export * from "./pass-config";
 export * from "./activity-log";
+export * from "./hear-about-us";

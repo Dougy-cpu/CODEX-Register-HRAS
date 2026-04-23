@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUpdateBooking, useCalculatePricing, useListDiscountTiers, customFetch, type PricingRequestPassType, type DiscountTier } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -37,6 +37,18 @@ interface PassConfig {
   benefits: string[];
   extraBenefits: string[];
 }
+
+const FALLBACK_HEAR_OPTIONS = [
+  "LinkedIn",
+  "Google / Search engine",
+  "Email newsletter",
+  "Word of mouth / Colleague",
+  "Previous attendee",
+  "Industry publication or press",
+  "Podcast",
+  "Social media",
+  "Other",
+];
 
 function getActiveTier(tiers: DiscountTier[], passType: string, qty: number): DiscountTier | null {
   const relevant = tiers
@@ -256,6 +268,8 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
   const leadEmail = booking.attendees?.find((a) => a.isLead)?.workEmail ?? null;
 
   const [hearAboutUs, setHearAboutUs] = useState<string>((booking as unknown as Record<string, unknown>).hearAboutUs as string ?? "");
+  const [hearOptions, setHearOptions] = useState<string[]>(FALLBACK_HEAR_OPTIONS);
+  const hauFetched = useRef(false);
 
   const calculatePricingMutation = useCalculatePricing();
   const queryClient = useQueryClient();
@@ -271,6 +285,17 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
       .then(res => res.ok ? res.json() : {})
       .then(data => setPassConfig(data))
       .catch(() => {});
+    if (!hauFetched.current) {
+      hauFetched.current = true;
+      fetch("/api/hear-about-us-options")
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data?.options?.length) {
+            setHearOptions(data.options.map((o: { label: string }) => o.label));
+          }
+        })
+        .catch(() => {});
+    }
   }, []);
 
   useEffect(() => {
@@ -693,24 +718,27 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
           </p>
 
           {/* How did you hear about us */}
-          <div className="pt-4 space-y-1.5">
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">How did you hear about the event?</p>
-            <select
-              value={hearAboutUs}
-              onChange={e => setHearAboutUs(e.target.value)}
-              className="w-full h-10 border border-input bg-white rounded-none px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="">Select an option</option>
-              <option value="LinkedIn">LinkedIn</option>
-              <option value="Google / Search engine">Google / Search engine</option>
-              <option value="Email newsletter">Email newsletter</option>
-              <option value="Word of mouth / Colleague">Word of mouth / Colleague</option>
-              <option value="Previous attendee">I attended previously</option>
-              <option value="Industry publication or press">Industry publication or press</option>
-              <option value="Podcast">Podcast</option>
-              <option value="Social media">Social media</option>
-              <option value="Other">Other</option>
-            </select>
+          <div className="pt-4">
+            <style>{`
+              @keyframes hau-glow {
+                0%, 100% { box-shadow: 0 0 0 0 rgba(231,79,62,0); border-color: rgba(231,79,62,0.25); }
+                50% { box-shadow: 0 0 0 3px rgba(231,79,62,0.12); border-color: rgba(231,79,62,0.7); }
+              }
+              .hau-card { animation: hau-glow 3.6s ease-in-out infinite; }
+            `}</style>
+            <div className="hau-card border rounded-none px-4 py-3 space-y-2 transition-colors">
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">How did you hear about the event?</p>
+              <select
+                value={hearAboutUs}
+                onChange={e => setHearAboutUs(e.target.value)}
+                className="w-full h-10 border border-input bg-white rounded-none px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Select an option…</option>
+                {hearOptions.map(opt => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Promo code input */}
