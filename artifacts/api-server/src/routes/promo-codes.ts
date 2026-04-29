@@ -89,15 +89,13 @@ router.post("/promo-codes/validate", async (req, res): Promise<void> => {
       baseSubtotal
     );
   } else if (promo.discountType === "complimentary") {
+    // For comp codes we surface remainingSeats but allow apply-with-shortfall
+    // so the UI can prompt the user to reduce or remove the code. Pricing
+    // refuses to zero the order until quantity <= remainingSeats.
     if (promo.maxUses !== null) {
       remainingSeats = Math.max(0, promo.maxUses - promo.usedCount);
-      if (remainingSeats < qty) {
-        res.status(400).json({
-          error: remainingSeats === 0
-            ? "This complimentary code has been fully redeemed — no tickets remain"
-            : `Only ${remainingSeats} complimentary ticket${remainingSeats === 1 ? "" : "s"} remain on this code — please reduce your quantity to ${remainingSeats}`,
-          remainingSeats,
-        });
+      if (remainingSeats === 0) {
+        res.status(400).json({ error: "This complimentary code has been fully redeemed — no tickets remain" });
         return;
       }
     }

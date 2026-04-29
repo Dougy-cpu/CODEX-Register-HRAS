@@ -473,14 +473,29 @@ export interface ValidatePromoCodeBody {
   leadEmail?: string | null;
 }
 
+export type PromoCodeValidationResultDiscountType =
+  (typeof PromoCodeValidationResultDiscountType)[keyof typeof PromoCodeValidationResultDiscountType];
+
+export const PromoCodeValidationResultDiscountType = {
+  percentage: "percentage",
+  fixed: "fixed",
+  per_ticket: "per_ticket",
+  complimentary: "complimentary",
+} as const;
+
 export interface PromoCodeValidationResult {
   valid: boolean;
   code: string;
-  discountType: string;
+  discountType: PromoCodeValidationResultDiscountType;
   discountValue: number;
   discountAmount: number;
   /** @nullable */
   message?: string | null;
+  /**
+   * For complimentary codes only — the number of free tickets still available on this code (null if the code is uncapped or not complimentary).
+   * @nullable
+   */
+  remainingSeats?: number | null;
 }
 
 export type DiscountTierPassType =

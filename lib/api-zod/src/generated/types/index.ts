@@ -53,6 +53,7 @@ export * from "./promoCode";
 export * from "./promoCodeApplicablePassTypesItem";
 export * from "./promoCodeDiscountType";
 export * from "./promoCodeValidationResult";
+export * from "./promoCodeValidationResultDiscountType";
 export * from "./registrationList";
 export * from "./registrationSummary";
 export * from "./stripeSessionResponse";

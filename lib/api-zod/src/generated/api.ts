@@ -422,10 +422,21 @@ export const ValidatePromoCodeBody = zod.object({
 export const ValidatePromoCodeResponse = zod.object({
   valid: zod.boolean(),
   code: zod.string(),
-  discountType: zod.string(),
+  discountType: zod.enum([
+    "percentage",
+    "fixed",
+    "per_ticket",
+    "complimentary",
+  ]),
   discountValue: zod.number(),
   discountAmount: zod.number(),
   message: zod.string().nullish(),
+  remainingSeats: zod
+    .number()
+    .nullish()
+    .describe(
+      "For complimentary codes only — the number of free tickets still available on this code (null if the code is uncapped or not complimentary).",
+    ),
 });
 
 /**

@@ -1473,12 +1473,16 @@ components:
           type: string
         discountType:
           type: string
+          enum: [percentage, fixed, per_ticket, complimentary]
         discountValue:
           type: number
         discountAmount:
           type: number
         message:
           type: ["string", "null"]
+        remainingSeats:
+          type: ["integer", "null"]
+          description: For complimentary codes only — the number of free tickets still available on this code (null if the code is uncapped or not complimentary).
       required:
         - valid
         - code

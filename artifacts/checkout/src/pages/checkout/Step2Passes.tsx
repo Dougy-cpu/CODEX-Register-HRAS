@@ -331,7 +331,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
           leadEmail: leadEmail ?? undefined,
         }),
       });
-      const data = res as { valid?: boolean; error?: string; code?: string } | null;
+      const data = res as { valid?: boolean; error?: string; code?: string; remainingSeats?: number | null } | null;
       if (data?.valid && data?.code) return { ok: true, code: data.code };
       return { ok: false, error: typeof data?.error === "string" ? data.error : "Invalid promo code" };
     } catch (e: unknown) {
