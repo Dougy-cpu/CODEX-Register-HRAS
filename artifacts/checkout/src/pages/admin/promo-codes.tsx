@@ -62,7 +62,10 @@ const promoSchema = z.object({
 }).refine((data) => data.applySingle || data.applyBusiness, {
   message: "At least one pass type must be selected",
   path: ["applySingle"],
-});
+}).refine(
+  (data) => data.discountType === "complimentary" || data.discountValue > 0,
+  { message: "Value must be greater than 0 for this discount type", path: ["discountValue"] },
+);
 
 type PromoFormValues = z.infer<typeof promoSchema>;
 
