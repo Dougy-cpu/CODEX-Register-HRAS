@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { bookingsTable, attendeesTable, eventSettingsTable } from "@workspace/db";
-import { calculatePricing } from "../lib/pricing";
+import { calculatePricing, incrementPromoUsage } from "../lib/pricing";
 import { promoCodesTable } from "@workspace/db";
 import { isCodeUsedByEmail } from "./promo-codes";
 import { v4 as uuidv4 } from "uuid";
@@ -465,6 +465,24 @@ router.post("/bookings/:id/confirm-free", async (req, res): Promise<void> => {
         res.status(400).json({ error: "This promo code has already been used on a previous booking with this email" });
         return;
       }
+    }
+  }
+
+  // Reserve the promo seats atomically *before* marking the booking paid so
+  // we never confirm a free booking that exceeded the cap. For unconfirmed
+  // free bookings there's no charge to refund, so it's safe to fail here.
+  if (existing.promoCode) {
+    const reserved = await incrementPromoUsage(existing.promoCode, existing.quantity);
+    if (!reserved) {
+      const [promo] = await db.select().from(promoCodesTable).where(eq(promoCodesTable.code, existing.promoCode));
+      const remaining = promo && promo.maxUses !== null ? Math.max(0, promo.maxUses - promo.usedCount) : 0;
+      const msg = promo?.discountType === "complimentary"
+        ? remaining === 0
+          ? "This complimentary code has been fully redeemed — no tickets remain"
+          : `Only ${remaining} complimentary ticket${remaining === 1 ? "" : "s"} remain on this code — please reduce your quantity`
+        : "This promo code has already been used up";
+      res.status(400).json({ error: msg });
+      return;
     }
   }
 

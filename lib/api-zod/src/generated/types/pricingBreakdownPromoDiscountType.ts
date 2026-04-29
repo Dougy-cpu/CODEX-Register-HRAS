@@ -6,10 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type UpdatePromoCodeBodyDiscountType =
-  (typeof UpdatePromoCodeBodyDiscountType)[keyof typeof UpdatePromoCodeBodyDiscountType];
+/**
+ * @nullable
+ */
+export type PricingBreakdownPromoDiscountType =
+  | (typeof PricingBreakdownPromoDiscountType)[keyof typeof PricingBreakdownPromoDiscountType]
+  | null;
 
-export const UpdatePromoCodeBodyDiscountType = {
+export const PricingBreakdownPromoDiscountType = {
   percentage: "percentage",
   fixed: "fixed",
   per_ticket: "per_ticket",

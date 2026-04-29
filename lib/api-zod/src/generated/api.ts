@@ -302,6 +302,16 @@ export const GetBookingPricingResponse = zod.object({
   total: zod.number(),
   originalPrice: zod.number(),
   savedAmount: zod.number(),
+  promoDiscountType: zod
+    .union([
+      zod.literal("percentage"),
+      zod.literal("fixed"),
+      zod.literal("per_ticket"),
+      zod.literal("complimentary"),
+      zod.literal(null),
+    ])
+    .nullish(),
+  promoRemainingSeats: zod.number().nullish(),
 });
 
 /**
@@ -387,6 +397,16 @@ export const CalculatePricingResponse = zod.object({
   total: zod.number(),
   originalPrice: zod.number(),
   savedAmount: zod.number(),
+  promoDiscountType: zod
+    .union([
+      zod.literal("percentage"),
+      zod.literal("fixed"),
+      zod.literal("per_ticket"),
+      zod.literal("complimentary"),
+      zod.literal(null),
+    ])
+    .nullish(),
+  promoRemainingSeats: zod.number().nullish(),
 });
 
 /**
@@ -414,7 +434,12 @@ export const ValidatePromoCodeResponse = zod.object({
 export const ListPromoCodesResponseItem = zod.object({
   id: zod.number(),
   code: zod.string(),
-  discountType: zod.enum(["percentage", "fixed", "per_ticket"]),
+  discountType: zod.enum([
+    "percentage",
+    "fixed",
+    "per_ticket",
+    "complimentary",
+  ]),
   discountValue: zod.number(),
   maxUses: zod.number().nullish(),
   usedCount: zod.number(),
@@ -436,7 +461,12 @@ export const ListPromoCodesResponse = zod.array(ListPromoCodesResponseItem);
  */
 export const CreatePromoCodeBody = zod.object({
   code: zod.string(),
-  discountType: zod.enum(["percentage", "fixed", "per_ticket"]),
+  discountType: zod.enum([
+    "percentage",
+    "fixed",
+    "per_ticket",
+    "complimentary",
+  ]),
   discountValue: zod.number(),
   maxUses: zod.number().nullish(),
   validFrom: zod.coerce.date().nullish(),
@@ -459,7 +489,9 @@ export const UpdatePromoCodeParams = zod.object({
 
 export const UpdatePromoCodeBody = zod.object({
   code: zod.string().optional(),
-  discountType: zod.enum(["percentage", "fixed", "per_ticket"]).optional(),
+  discountType: zod
+    .enum(["percentage", "fixed", "per_ticket", "complimentary"])
+    .optional(),
   discountValue: zod.number().optional(),
   maxUses: zod.number().nullish(),
   validFrom: zod.coerce.date().nullish(),
@@ -476,7 +508,12 @@ export const UpdatePromoCodeBody = zod.object({
 export const UpdatePromoCodeResponse = zod.object({
   id: zod.number(),
   code: zod.string(),
-  discountType: zod.enum(["percentage", "fixed", "per_ticket"]),
+  discountType: zod.enum([
+    "percentage",
+    "fixed",
+    "per_ticket",
+    "complimentary",
+  ]),
   discountValue: zod.number(),
   maxUses: zod.number().nullish(),
   usedCount: zod.number(),

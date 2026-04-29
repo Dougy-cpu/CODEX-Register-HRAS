@@ -5,6 +5,7 @@
  * HR Analytics Summit Conference Registration API
  * OpenAPI spec version: 0.1.0
  */
+import type { PricingBreakdownPromoDiscountType } from "./pricingBreakdownPromoDiscountType";
 
 export interface PricingBreakdown {
   passType: string;
@@ -20,4 +21,8 @@ export interface PricingBreakdown {
   total: number;
   originalPrice: number;
   savedAmount: number;
+  /** @nullable */
+  promoDiscountType?: PricingBreakdownPromoDiscountType;
+  /** @nullable */
+  promoRemainingSeats?: number | null;
 }

@@ -46,6 +46,7 @@ export * from "./invoiceResponse";
 export * from "./listEmailLogsParams";
 export * from "./listRegistrationsParams";
 export * from "./pricingBreakdown";
+export * from "./pricingBreakdownPromoDiscountType";
 export * from "./pricingRequest";
 export * from "./pricingRequestPassType";
 export * from "./promoCode";

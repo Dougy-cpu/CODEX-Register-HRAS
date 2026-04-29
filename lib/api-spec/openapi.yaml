@@ -1297,6 +1297,11 @@ components:
           type: number
         savedAmount:
           type: number
+        promoDiscountType:
+          type: ["string", "null"]
+          enum: [percentage, fixed, per_ticket, complimentary, null]
+        promoRemainingSeats:
+          type: ["integer", "null"]
       required:
         - passType
         - quantity
@@ -1322,7 +1327,7 @@ components:
           type: string
         discountType:
           type: string
-          enum: [percentage, fixed, per_ticket]
+          enum: [percentage, fixed, per_ticket, complimentary]
         discountValue:
           type: number
         maxUses:
@@ -1373,7 +1378,7 @@ components:
           type: string
         discountType:
           type: string
-          enum: [percentage, fixed, per_ticket]
+          enum: [percentage, fixed, per_ticket, complimentary]
         discountValue:
           type: number
         maxUses:
@@ -1413,7 +1418,7 @@ components:
           type: string
         discountType:
           type: string
-          enum: [percentage, fixed, per_ticket]
+          enum: [percentage, fixed, per_ticket, complimentary]
         discountValue:
           type: number
         maxUses:

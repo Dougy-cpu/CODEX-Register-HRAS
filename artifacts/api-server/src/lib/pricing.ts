@@ -1,6 +1,42 @@
 import { db } from "@workspace/db";
 import { discountTiersTable, promoCodesTable, passConfigTable } from "@workspace/db";
-import { eq, and, lte, gte, or, isNull } from "drizzle-orm";
+import { eq, and, lte, gte, or, isNull, sql } from "drizzle-orm";
+
+/**
+ * Atomically increment a promo code's `usedCount` after a successful booking
+ * confirmation, refusing to exceed `maxUses` when set. For "complimentary"
+ * codes the counter tracks tickets issued (so we add the booking's quantity);
+ * for every other discount type the counter tracks bookings (so we add 1).
+ *
+ * Returns `true` if the counter was incremented, `false` if the increment was
+ * rejected because it would exceed the cap. (`false` is also returned if the
+ * code does not exist.)
+ *
+ * The cap check and the increment are performed in a single conditional
+ * UPDATE so concurrent confirmations cannot oversubscribe a capped code.
+ */
+export async function incrementPromoUsage(code: string, quantity: number): Promise<boolean> {
+  const normalised = code.toUpperCase();
+  const [promo] = await db
+    .select({ discountType: promoCodesTable.discountType })
+    .from(promoCodesTable)
+    .where(eq(promoCodesTable.code, normalised));
+  if (!promo) return false;
+  const inc = promo.discountType === "complimentary" ? Math.max(1, quantity) : 1;
+  const result = await db
+    .update(promoCodesTable)
+    .set({ usedCount: sql`${promoCodesTable.usedCount} + ${inc}` })
+    .where(
+      and(
+        eq(promoCodesTable.code, normalised),
+        or(
+          isNull(promoCodesTable.maxUses),
+          sql`${promoCodesTable.usedCount} + ${inc} <= ${promoCodesTable.maxUses}`
+        )
+      )
+    );
+  return (result.rowCount ?? 0) > 0;
+}
 
 export const PASS_PRICES: Record<string, { price: number; originalPrice: number; seats: number }> = {
   single: { price: 199, originalPrice: 429, seats: 1 },
@@ -41,6 +77,8 @@ export interface PricingResult {
   total: number;
   originalPrice: number;
   savedAmount: number;
+  promoDiscountType?: string | null;
+  promoRemainingSeats?: number | null;
 }
 
 export async function calculatePricing(
@@ -79,6 +117,8 @@ export async function calculatePricing(
   );
 
   let promoDiscountAmount = 0;
+  let promoDiscountType: string | null = null;
+  let promoRemainingSeats: number | null = null;
   if (promoCode) {
     const now = new Date();
     const [promo] = await db
@@ -94,6 +134,7 @@ export async function calculatePricing(
       );
 
     if (promo) {
+      promoDiscountType = promo.discountType;
       const afterGroupDiscount = baseSubtotal - groupDiscountAmount;
       if (promo.discountType === "percentage") {
         promoDiscountAmount = parseFloat(
@@ -108,6 +149,17 @@ export async function calculatePricing(
           parseFloat((parseFloat(promo.discountValue.toString()) * quantity).toFixed(2)),
           afterGroupDiscount
         );
+      } else if (promo.discountType === "complimentary") {
+        if (promo.maxUses !== null) {
+          promoRemainingSeats = Math.max(0, promo.maxUses - promo.usedCount);
+        }
+        // Comp = 100% off, but only if every requested ticket is covered by
+        // the remaining cap. If the request exceeds remaining seats, the
+        // discount does not apply — the caller (UI) will surface a prompt
+        // asking the user to reduce the quantity or remove the code.
+        if (promoRemainingSeats === null || promoRemainingSeats >= quantity) {
+          promoDiscountAmount = afterGroupDiscount;
+        }
       } else {
         promoDiscountAmount = Math.min(
           parseFloat(promo.discountValue.toString()),
@@ -140,5 +192,7 @@ export async function calculatePricing(
     total,
     originalPrice,
     savedAmount,
+    promoDiscountType,
+    promoRemainingSeats,
   };
 }

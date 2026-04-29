@@ -297,6 +297,20 @@ export interface PricingRequest {
   promoCode?: string | null;
 }
 
+/**
+ * @nullable
+ */
+export type PricingBreakdownPromoDiscountType =
+  | (typeof PricingBreakdownPromoDiscountType)[keyof typeof PricingBreakdownPromoDiscountType]
+  | null;
+
+export const PricingBreakdownPromoDiscountType = {
+  percentage: "percentage",
+  fixed: "fixed",
+  per_ticket: "per_ticket",
+  complimentary: "complimentary",
+} as const;
+
 export interface PricingBreakdown {
   passType: string;
   quantity: number;
@@ -311,6 +325,10 @@ export interface PricingBreakdown {
   total: number;
   originalPrice: number;
   savedAmount: number;
+  /** @nullable */
+  promoDiscountType?: PricingBreakdownPromoDiscountType;
+  /** @nullable */
+  promoRemainingSeats?: number | null;
 }
 
 export type PromoCodeDiscountType =
@@ -320,6 +338,7 @@ export const PromoCodeDiscountType = {
   percentage: "percentage",
   fixed: "fixed",
   per_ticket: "per_ticket",
+  complimentary: "complimentary",
 } as const;
 
 export type PromoCodeApplicablePassTypesItem =
@@ -363,6 +382,7 @@ export const CreatePromoCodeBodyDiscountType = {
   percentage: "percentage",
   fixed: "fixed",
   per_ticket: "per_ticket",
+  complimentary: "complimentary",
 } as const;
 
 export type CreatePromoCodeBodyApplicablePassTypesItem =
@@ -403,6 +423,7 @@ export const UpdatePromoCodeBodyDiscountType = {
   percentage: "percentage",
   fixed: "fixed",
   per_ticket: "per_ticket",
+  complimentary: "complimentary",
 } as const;
 
 export type UpdatePromoCodeBodyApplicablePassTypesItem =

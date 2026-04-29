@@ -49,8 +49,8 @@ function CopyLinkButton({ code }: { code: string }) {
 
 const promoSchema = z.object({
   code: z.string().min(1, "Code is required").toUpperCase(),
-  discountType: z.enum(["percentage", "fixed", "per_ticket"]),
-  discountValue: z.coerce.number().min(0.01, "Value must be greater than 0"),
+  discountType: z.enum(["percentage", "fixed", "per_ticket", "complimentary"]),
+  discountValue: z.coerce.number().min(0, "Value must be 0 or greater"),
   maxUses: z.coerce.number().int().positive().optional().nullable(),
   isActive: z.boolean().default(true),
   applySingle: z.boolean().default(true),
@@ -182,6 +182,7 @@ function PromoFormDialog({ open, onOpenChange, initial, onSubmit, submitting, tr
                         <SelectItem value="percentage">Percentage (%)</SelectItem>
                         <SelectItem value="fixed">Fixed Amount (£)</SelectItem>
                         <SelectItem value="per_ticket">Per Ticket (£ per ticket)</SelectItem>
+                        <SelectItem value="complimentary">Complimentary (free ticket)</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -497,7 +498,9 @@ export default function AdminPromoCodes() {
                         ? `${promo.discountValue}%`
                         : promo.discountType === "per_ticket"
                           ? `£${promo.discountValue}/ticket`
-                          : `£${promo.discountValue}`}
+                          : promo.discountType === "complimentary"
+                            ? <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Free ticket</Badge>
+                            : `£${promo.discountValue}`}
                     </TableCell>
                     <TableCell>{passTypeBadges(promo.applicablePassTypes)}</TableCell>
                     <TableCell className="max-w-[200px]">
@@ -517,7 +520,11 @@ export default function AdminPromoCodes() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {promo.usedCount} {promo.maxUses ? `/ ${promo.maxUses}` : "used"}
+                      {promo.discountType === "complimentary"
+                        ? promo.maxUses
+                          ? `${promo.usedCount} / ${promo.maxUses} tickets`
+                          : `${promo.usedCount} tickets`
+                        : `${promo.usedCount} ${promo.maxUses ? `/ ${promo.maxUses}` : "used"}`}
                     </TableCell>
                     <TableCell>
                       <Switch

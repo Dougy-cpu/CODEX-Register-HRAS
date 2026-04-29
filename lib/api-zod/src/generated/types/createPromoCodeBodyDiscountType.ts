@@ -13,4 +13,5 @@ export const CreatePromoCodeBodyDiscountType = {
   percentage: "percentage",
   fixed: "fixed",
   per_ticket: "per_ticket",
+  complimentary: "complimentary",
 } as const;

@@ -1,9 +1,10 @@
 import { Router, type IRouter } from "express";
 import Stripe from "stripe";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { bookingsTable, attendeesTable, promoCodesTable } from "@workspace/db";
 import { isCodeUsedByEmail } from "./promo-codes";
+import { incrementPromoUsage } from "../lib/pricing";
 import {
   sendBookingEmails,
   sendOrganiserNotification,
@@ -226,9 +227,15 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
         .where(eq(bookingsTable.id, bookingId));
 
       if (existing.promoCode) {
-        await db.update(promoCodesTable)
-          .set({ usedCount: sql`${promoCodesTable.usedCount} + 1` })
-          .where(eq(promoCodesTable.code, existing.promoCode));
+        const reserved = await incrementPromoUsage(existing.promoCode, existing.quantity);
+        if (!reserved) {
+          // The customer has already paid — confirm the booking and just log
+          // that the cap was technically exceeded so the organiser can review.
+          logger.warn(
+            { bookingId, promoCode: existing.promoCode, quantity: existing.quantity },
+            "Promo cap exceeded after successful card payment — booking confirmed but usage not incremented",
+          );
+        }
       }
 
       try {
@@ -562,9 +569,13 @@ router.post("/stripe/confirm-card-payment", async (req, res): Promise<void> => {
     }).where(eq(bookingsTable.id, id));
 
     if (existing.promoCode) {
-      await db.update(promoCodesTable)
-        .set({ usedCount: sql`${promoCodesTable.usedCount} + 1` })
-        .where(eq(promoCodesTable.code, existing.promoCode));
+      const reserved = await incrementPromoUsage(existing.promoCode, existing.quantity);
+      if (!reserved) {
+        logger.warn(
+          { bookingId: id, promoCode: existing.promoCode, quantity: existing.quantity },
+          "Promo cap exceeded after successful card payment — booking confirmed but usage not incremented",
+        );
+      }
     }
 
     try { await sendBookingEmails(id); } catch (err) { logger.error({ err, bookingId: id }, "Failed to send booking emails after confirm-card-payment"); }
@@ -781,9 +792,13 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
     }).where(eq(bookingsTable.id, id));
 
     if (booking.promoCode) {
-      await db.update(promoCodesTable)
-        .set({ usedCount: sql`${promoCodesTable.usedCount} + 1` })
-        .where(eq(promoCodesTable.code, booking.promoCode));
+      const reserved = await incrementPromoUsage(booking.promoCode, booking.quantity);
+      if (!reserved) {
+        logger.warn(
+          { bookingId: id, promoCode: booking.promoCode, quantity: booking.quantity },
+          "Promo cap exceeded after Stripe invoice issued — booking confirmed but usage not incremented",
+        );
+      }
     }
 
     try { await sendBookingEmails(id); } catch (err) { logger.error({ err }, "Failed to send booking emails after Stripe invoice"); }

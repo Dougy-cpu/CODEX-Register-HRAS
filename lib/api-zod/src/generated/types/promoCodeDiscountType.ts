@@ -13,4 +13,5 @@ export const PromoCodeDiscountType = {
   percentage: "percentage",
   fixed: "fixed",
   per_ticket: "per_ticket",
+  complimentary: "complimentary",
 } as const;

@@ -307,6 +307,19 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
 
   const currentPricing = calculatePricingMutation.data;
 
+  // Complimentary codes are capped by ticket count, not booking count. When
+  // the requested quantity exceeds the seats remaining on the comp code, the
+  // server returns the code as applied but does not zero out the price — the
+  // user must either reduce their quantity or remove the code before they
+  // can continue.
+  const compRemaining = currentPricing?.promoDiscountType === "complimentary"
+    ? currentPricing.promoRemainingSeats ?? null
+    : null;
+  const compShortfall = compRemaining !== null && compRemaining < quantity;
+  const handleReduceToCompCap = () => {
+    if (compRemaining !== null && compRemaining > 0) setQuantity(compRemaining);
+  };
+
   const validatePromo = async (codeToValidate: string): Promise<{ ok: boolean; code?: string; error?: string }> => {
     try {
       const res = await customFetch(`/api/promo-codes/validate`, {
@@ -744,25 +757,57 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
           {/* Promo code input */}
           <div className="pt-4 space-y-2">
             {appliedPromoCode ? (
-              <div className="flex items-center gap-2 bg-green-50 border border-green-200 px-3 py-2 text-sm font-semibold text-green-800">
-                <Tag className="w-4 h-4 shrink-0" />
-                <span className="flex-1">
-                  Code <span className="font-mono">{appliedPromoCode}</span> applied
-                  {appliedViaLink && (
-                    <span className="ml-2 inline-block text-[10px] uppercase tracking-wider font-bold bg-green-200 text-green-900 px-1.5 py-0.5 rounded-sm">
-                      Applied via link
-                    </span>
-                  )}
-                </span>
-                <button
-                  type="button"
-                  onClick={handleRemovePromo}
-                  className="ml-auto text-green-600 hover:text-green-800 transition-colors"
-                  aria-label="Remove promo code"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+              <>
+                <div className="flex items-center gap-2 bg-green-50 border border-green-200 px-3 py-2 text-sm font-semibold text-green-800">
+                  <Tag className="w-4 h-4 shrink-0" />
+                  <span className="flex-1">
+                    Code <span className="font-mono">{appliedPromoCode}</span> applied
+                    {appliedViaLink && (
+                      <span className="ml-2 inline-block text-[10px] uppercase tracking-wider font-bold bg-green-200 text-green-900 px-1.5 py-0.5 rounded-sm">
+                        Applied via link
+                      </span>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleRemovePromo}
+                    className="ml-auto text-green-600 hover:text-green-800 transition-colors"
+                    aria-label="Remove promo code"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                {compShortfall && compRemaining !== null && (
+                  <div className="bg-amber-50 border border-amber-300 px-3 py-2.5 text-sm text-amber-900 space-y-2">
+                    <p className="font-semibold">
+                      Only {compRemaining} complimentary ticket{compRemaining === 1 ? "" : "s"} {compRemaining === 1 ? "remains" : "remain"} on this code, but you've selected {quantity}.
+                    </p>
+                    <p className="text-xs">Reduce your quantity to use the code, or remove the code to keep all {quantity} tickets at the standard price.</p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {compRemaining > 0 && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-8 border-amber-400 bg-white hover:bg-amber-100"
+                          onClick={handleReduceToCompCap}
+                        >
+                          Reduce to {compRemaining} ticket{compRemaining === 1 ? "" : "s"}
+                        </Button>
+                      )}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 border-amber-400 bg-white hover:bg-amber-100"
+                        onClick={handleRemovePromo}
+                      >
+                        Keep my quantity (remove code)
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="space-y-1.5">
                 <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Promo Code</p>
@@ -879,7 +924,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
           size="lg"
           className="px-10 h-14 text-lg bg-primary hover:bg-primary/90 text-white border-none"
           onClick={handleContinue}
-          disabled={calculatePricingMutation.isPending || !booking.id}
+          disabled={calculatePricingMutation.isPending || !booking.id || compShortfall}
         >
           Continue to Attendees
         </Button>

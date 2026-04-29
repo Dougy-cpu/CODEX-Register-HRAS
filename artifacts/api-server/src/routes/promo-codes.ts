@@ -35,7 +35,11 @@ router.post("/promo-codes/validate", async (req, res): Promise<void> => {
   }
 
   if (promo.maxUses !== null && promo.usedCount >= promo.maxUses) {
-    res.status(400).json({ error: "This promo code has already been used up" });
+    if (promo.discountType === "complimentary") {
+      res.status(400).json({ error: "This complimentary code has been fully redeemed — no tickets remain" });
+    } else {
+      res.status(400).json({ error: "This promo code has already been used up" });
+    }
     return;
   }
 
@@ -71,6 +75,7 @@ router.post("/promo-codes/validate", async (req, res): Promise<void> => {
 
   const baseSubtotal = passInfo.price * qty;
   let discountAmount: number;
+  let remainingSeats: number | null = null;
 
   if (promo.discountType === "percentage") {
     discountAmount = parseFloat(((baseSubtotal * parseFloat(promo.discountValue.toString())) / 100).toFixed(2));
@@ -83,6 +88,20 @@ router.post("/promo-codes/validate", async (req, res): Promise<void> => {
       parseFloat((parseFloat(promo.discountValue.toString()) * qty).toFixed(2)),
       baseSubtotal
     );
+  } else if (promo.discountType === "complimentary") {
+    if (promo.maxUses !== null) {
+      remainingSeats = Math.max(0, promo.maxUses - promo.usedCount);
+      if (remainingSeats < qty) {
+        res.status(400).json({
+          error: remainingSeats === 0
+            ? "This complimentary code has been fully redeemed — no tickets remain"
+            : `Only ${remainingSeats} complimentary ticket${remainingSeats === 1 ? "" : "s"} remain on this code — please reduce your quantity to ${remainingSeats}`,
+          remainingSeats,
+        });
+        return;
+      }
+    }
+    discountAmount = baseSubtotal;
   } else {
     discountAmount = Math.min(parseFloat(promo.discountValue.toString()), baseSubtotal);
   }
@@ -94,6 +113,7 @@ router.post("/promo-codes/validate", async (req, res): Promise<void> => {
     discountValue: parseFloat(promo.discountValue.toString()),
     discountAmount,
     message: promo.description || null,
+    remainingSeats,
   });
 });
 
