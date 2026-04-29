@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Check, Lock, Unlock, Settings2, Loader2, Globe, ShieldCheck, CalendarDays, ChevronUp, ChevronDown, Trash2, Plus, ListChecks } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 
 interface EventSettings {
   eventName: string;
@@ -121,6 +123,7 @@ async function saveLockSettings(locked: boolean, message: string | null): Promis
 }
 
 export default function AdminSettings() {
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -261,14 +264,55 @@ export default function AdminSettings() {
   };
 
   const hauDeleteOption = async (id: number) => {
-    const prev = hauOptions;
+    const removedIdx = hauOptions.findIndex(o => o.id === id);
+    if (removedIdx === -1) return;
+    const removed = hauOptions[removedIdx];
+
     setHauOptions(opt => opt.filter(o => o.id !== id));
+
+    const restoreOption = () => {
+      setHauOptions(curr => {
+        const next = [...curr];
+        next.splice(Math.min(removedIdx, next.length), 0, removed);
+        return next;
+      });
+    };
+
     try {
       const res = await adminFetch(`/api/admin/hear-about-us-options/${id}`, { method: "DELETE" });
-      if (!res.ok) setHauOptions(prev);
+      if (!res.ok) {
+        restoreOption();
+        toast({ title: "Could not remove option", description: "The option was restored. Please try again.", variant: "destructive" });
+        return;
+      }
     } catch {
-      setHauOptions(prev);
+      restoreOption();
+      toast({ title: "Could not remove option", description: "Network error — the option was restored.", variant: "destructive" });
+      return;
     }
+
+    toast({
+      title: "Option removed",
+      description: `"${removed.label}" has been deleted.`,
+      action: (
+        <ToastAction
+          altText="Undo"
+          onClick={async () => {
+            try {
+              const res = await adminFetch("/api/admin/hear-about-us-options", {
+                method: "POST",
+                body: JSON.stringify({ label: removed.label }),
+              });
+              if (res.ok) {
+                await loadHauOptions();
+              }
+            } catch { /* ignore — user can re-add manually */ }
+          }}
+        >
+          Undo
+        </ToastAction>
+      ),
+    });
   };
 
   const hauMoveOption = async (id: number, direction: "up" | "down") => {
