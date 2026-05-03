@@ -45,7 +45,30 @@ interface EventSettings {
   socialEndAt: string | null;
   socialVenue: string | null;
   socialDescription: string | null;
+  invoiceHelpContent: string | null;
 }
+
+// Built-in default copy for the "How invoicing works" help block. Mirrors the
+// server-side DEFAULT_INVOICE_HELP_CONTENT constant in api-server/src/lib/email.ts —
+// shown as the placeholder when an admin hasn't overridden the copy.
+const DEFAULT_INVOICE_HELP_CONTENT = `When will I receive the invoice?
+We email a VAT invoice to the billing address you provide as soon as your registration is confirmed — usually within a few minutes.
+
+What are the payment terms?
+Invoices are due within 14 days, or before the event date if sooner. Your seats are reserved as soon as the invoice is issued.
+
+How can I pay?
+- Card or bank transfer using the secure "Pay Online" link on the invoice.
+- BACS / wire transfer to the bank account printed at the bottom of the invoice (please quote your booking reference).
+
+Where do I send remittance advice?
+Email remittance to accounts@hranalyticssummit.com so we can match your payment quickly.
+
+Need a PO number on the invoice?
+You can add or update a PO number — and edit any billing field — at any time before payment using the secure self-service link in your confirmation email. We'll re-issue the invoice automatically.
+
+Questions?
+Email accounts@hranalyticssummit.com and we'll come back to you within one working day.`;
 
 // Compute a timezone's UTC offset (in minutes) for a given UTC instant.
 // Uses Intl.DateTimeFormat to render the moment in the target tz then diff.
@@ -187,7 +210,12 @@ export default function AdminSettings() {
     socialEndAt: null,
     socialVenue: null,
     socialDescription: null,
+    invoiceHelpContent: null,
   });
+
+  const [helpSaving, setHelpSaving] = useState(false);
+  const [helpSaved, setHelpSaved] = useState(false);
+  const [helpError, setHelpError] = useState("");
 
   const [calSaving, setCalSaving] = useState(false);
   const [calSaved, setCalSaved] = useState(false);
@@ -263,6 +291,8 @@ export default function AdminSettings() {
             socialEndAt: data.socialEndAt ?? null,
             socialVenue: data.socialVenue ?? null,
             socialDescription: data.socialDescription ?? null,
+            invoiceHelpContent:
+              (data as { invoiceHelpContent?: string | null }).invoiceHelpContent ?? null,
           });
         }
       })
@@ -471,6 +501,30 @@ export default function AdminSettings() {
       }
     } finally {
       setCalSaving(false);
+    }
+  };
+
+  const handleSaveInvoiceHelp = async () => {
+    setHelpSaving(true);
+    setHelpError("");
+    setHelpSaved(false);
+    try {
+      const res = await adminFetch("/api/admin/event-settings", {
+        method: "PUT",
+        body: JSON.stringify({
+          // Empty string => server reverts to built-in default copy.
+          invoiceHelpContent: (form.invoiceHelpContent ?? "").trim(),
+        }),
+      });
+      if (res.ok) {
+        setHelpSaved(true);
+        setTimeout(() => setHelpSaved(false), 2500);
+      } else {
+        const body = await res.json().catch(() => ({}));
+        setHelpError(body.error || "Failed to save");
+      }
+    } finally {
+      setHelpSaving(false);
     }
   };
 
@@ -955,6 +1009,52 @@ export default function AdminSettings() {
               </div>
 
               {lockError && <p className="text-sm text-destructive">{lockError}</p>}
+            </div>
+          </div>
+
+          {/* ── Invoice Help Content ── */}
+          <div className="bg-white border border-border">
+            <div className="px-6 py-4 border-b border-border flex items-center gap-3">
+              <Settings2 className="w-5 h-5 text-primary" />
+              <h2 className="font-bold text-base">Invoice Help Content</h2>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Plain-text copy shown in the expandable <strong>"How invoicing works"</strong> block
+                on the checkout payment step (when "Pay by Invoice" is selected) and embedded in
+                invoice confirmation emails. Use blank lines to separate paragraphs; lines starting
+                with <code className="text-xs bg-muted px-1 py-0.5 rounded">- </code> become
+                bullets; the first line of a multi-line block is rendered as a bold heading. Leave
+                empty to revert to the built-in default.
+              </p>
+              <Textarea
+                rows={16}
+                value={form.invoiceHelpContent ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, invoiceHelpContent: e.target.value }))}
+                placeholder={DEFAULT_INVOICE_HELP_CONTENT}
+                className="text-sm font-mono leading-relaxed"
+              />
+              {helpError && <p className="text-sm text-destructive">{helpError}</p>}
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  onClick={handleSaveInvoiceHelp}
+                  disabled={helpSaving}
+                  className={`h-10 px-6 ${helpSaved ? "bg-green-600 hover:bg-green-700" : "bg-primary hover:bg-primary/90"} text-white`}
+                >
+                  {helpSaved ? (
+                    <span className="flex items-center gap-1.5">
+                      <Check className="w-4 h-4" /> Saved
+                    </span>
+                  ) : helpSaving ? (
+                    <span className="flex items-center gap-1.5">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Saving…
+                    </span>
+                  ) : (
+                    "Save Invoice Help Content"
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
 

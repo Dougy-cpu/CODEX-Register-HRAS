@@ -105,7 +105,60 @@ const defaultSettings: Omit<EventSettings, "id" | "updatedAt"> = {
   socialEndAt: null,
   socialVenue: null,
   socialDescription: null,
+  invoiceHelpContent: null,
 };
+
+/**
+ * Built-in fallback copy for the "How invoicing works" help block. Used
+ * whenever an admin has not set `event_settings.invoice_help_content`. Edit
+ * via Admin → Settings → Pay-by-Invoice Help.
+ */
+export const DEFAULT_INVOICE_HELP_CONTENT = `When will I receive the invoice?
+We email a VAT invoice to the billing address you provide as soon as your registration is confirmed — usually within a few minutes.
+
+What are the payment terms?
+Invoices are due within 14 days, or before the event date if sooner. Your seats are reserved as soon as the invoice is issued.
+
+How can I pay?
+- Card or bank transfer using the secure "Pay Online" link on the invoice.
+- BACS / wire transfer to the bank account printed at the bottom of the invoice (please quote your booking reference).
+
+Where do I send remittance advice?
+Email remittance to accounts@hranalyticssummit.com so we can match your payment quickly.
+
+Need a PO number on the invoice?
+You can add or update a PO number — and edit any billing field — at any time before payment using the secure self-service link in your confirmation email. We'll re-issue the invoice automatically.
+
+Questions?
+Email accounts@hranalyticssummit.com and we'll come back to you within one working day.`;
+
+/**
+ * Render plain-text invoice help into safe HTML for emails. Paragraphs are
+ * separated by blank lines; consecutive lines starting with "- " render as a
+ * <ul>. All other text is HTML-escaped.
+ */
+export function renderInvoiceHelpHtml(text: string): string {
+  const blocks = text.replace(/\r\n/g, "\n").split(/\n{2,}/);
+  return blocks
+    .map((block) => {
+      const lines = block.split("\n").filter((l) => l.trim().length > 0);
+      if (lines.length === 0) return "";
+      const allBullets = lines.every((l) => /^\s*-\s+/.test(l));
+      if (allBullets) {
+        const items = lines
+          .map((l) => `<li style="margin:4px 0;">${escHtml(l.replace(/^\s*-\s+/, ""))}</li>`)
+          .join("");
+        return `<ul style="margin:8px 0 8px 20px;padding:0;">${items}</ul>`;
+      }
+      // First line of a multi-line block is treated as a bold heading.
+      if (lines.length > 1) {
+        const [heading, ...rest] = lines;
+        return `<p style="margin:12px 0 4px;font-weight:600;color:#221D1B;">${escHtml(heading)}</p><p style="margin:0 0 8px;color:#444;">${escHtml(rest.join(" "))}</p>`;
+      }
+      return `<p style="margin:8px 0;color:#444;">${escHtml(lines[0])}</p>`;
+    })
+    .join("");
+}
 
 export async function getEventSettings(): Promise<EventSettings> {
   const [settings] = await db.select().from(eventSettingsTable);
@@ -373,6 +426,17 @@ async function buildConfirmationEmailHtml(
     ? `<p style="margin-top:16px;"><a href="${booking.stripeInvoicePaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;">Download Invoice / Pay Online →</a></p>`
     : "";
 
+  // "How invoicing works" help block — only rendered for invoice bookings.
+  // Pulls admin-editable copy from event_settings (falls back to built-in
+  // default) and renders a collapsed-style info card directly in the email.
+  const invoiceHelpHtml =
+    booking.paymentMethod === "invoice"
+      ? `<div style="margin:20px 0;padding:16px 20px;background:#FCFBFA;border:1px solid #DEDDDC;border-radius:6px;">
+      <p style="margin:0 0 6px;font-size:15px;font-weight:700;color:#221D1B;">How invoicing works</p>
+      ${renderInvoiceHelpHtml(settings.invoiceHelpContent || DEFAULT_INVOICE_HELP_CONTENT)}
+    </div>`
+      : "";
+
   const orderRef = booking.orderReference || `#${booking.id}`;
 
   // Standalone promo summary block — surfaced in the email body whenever a
@@ -417,6 +481,7 @@ async function buildConfirmationEmailHtml(
         "{{promoSummary}}": promoSummaryHtml,
         "{{promoCode}}": escHtml(booking.promoCode || ""),
         "{{promoDiscount}}": promoDiscount > 0 ? formatCurrency(promoDiscount) : "",
+        "{{invoiceHelp}}": invoiceHelpHtml,
       };
       const calPh = getCalendarPlaceholders(settings);
       vars["{{eventCalendarLinks}}"] = calPh.eventCalendarLinks;
@@ -469,6 +534,16 @@ async function buildConfirmationEmailHtml(
           body = body.replace(/<\/body>/i, `${insert}</body>`);
         } else {
           body += insert;
+        }
+      }
+      // If the DB template predates the new {{invoiceHelp}} placeholder,
+      // append the help block so invoice customers always see the guidance
+      // (timeline, payment methods, remittance, contact email).
+      if (invoiceHelpHtml && !body.includes("{{invoiceHelp}}")) {
+        if (/<\/body>/i.test(body)) {
+          body = body.replace(/<\/body>/i, `${invoiceHelpHtml}</body>`);
+        } else {
+          body += invoiceHelpHtml;
         }
       }
       // If the DB template predates the new promo placeholders, append the
@@ -530,6 +605,7 @@ async function buildConfirmationEmailHtml(
     <p>A PDF VAT receipt is attached to this email for your records.</p>
     ${invoicePaymentButtonHtml}
     ${billingEditLinkHtml}
+    ${invoiceHelpHtml}
     <p>We look forward to seeing you at the ${settings.eventName || "HR Analytics Summit"}!</p>
   `;
 

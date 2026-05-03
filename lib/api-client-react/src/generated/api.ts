@@ -49,6 +49,7 @@ import type {
   PricingRequest,
   PromoCode,
   PromoCodeValidationResult,
+  PublicEventSettings,
   RegistrationList,
   StripeSessionResponse,
   SuccessResponse,
@@ -2749,6 +2750,74 @@ export function useExportRegistrations<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getExportRegistrationsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns the public-facing copy required by the checkout, currently the
+"How invoicing works" help content shown on Step 4 (Pay by Invoice).
+No authentication required.
+
+ * @summary Public subset of event settings
+ */
+export const getGetPublicEventSettingsUrl = () => {
+  return `/api/event-settings/public`;
+};
+
+export const getPublicEventSettings = async (
+  options?: RequestInit,
+): Promise<PublicEventSettings> => {
+  return customFetch<PublicEventSettings>(getGetPublicEventSettingsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPublicEventSettingsQueryKey = () => {
+  return [`/api/event-settings/public`] as const;
+};
+
+export const getGetPublicEventSettingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPublicEventSettings>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof getPublicEventSettings>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetPublicEventSettingsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getPublicEventSettings>>> = ({ signal }) =>
+    getPublicEventSettings({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPublicEventSettings>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPublicEventSettingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPublicEventSettings>>
+>;
+export type GetPublicEventSettingsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Public subset of event settings
+ */
+
+export function useGetPublicEventSettings<
+  TData = Awaited<ReturnType<typeof getPublicEventSettings>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof getPublicEventSettings>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPublicEventSettingsQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

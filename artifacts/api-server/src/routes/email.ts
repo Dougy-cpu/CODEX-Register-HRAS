@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { emailTemplatesTable, emailLogsTable, eventSettingsTable } from "@workspace/db";
-import { getEventSettings } from "../lib/email";
+import { getEventSettings, DEFAULT_INVOICE_HELP_CONTENT } from "../lib/email";
 import { adminAuth } from "../middleware/admin-auth";
 import { logAdminAction } from "../lib/audit";
 
@@ -29,6 +29,16 @@ router.get("/admin/event-settings", adminAuth, async (_req, res): Promise<void> 
   res.json({
     ...settings,
     updatedAt: settings.updatedAt.toISOString(),
+  });
+});
+
+// Public, unauthenticated subset of event-settings — only the fields needed
+// by the public checkout (currently the "How invoicing works" help block).
+// Falls back to the built-in default copy when admins haven't customised it.
+router.get("/event-settings/public", async (_req, res): Promise<void> => {
+  const settings = await getEventSettings();
+  res.json({
+    invoiceHelpContent: settings.invoiceHelpContent || DEFAULT_INVOICE_HELP_CONTENT,
   });
 });
 
@@ -61,6 +71,7 @@ router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> =
     socialEndAt,
     socialVenue,
     socialDescription,
+    invoiceHelpContent,
   } = req.body;
 
   function parseTs(v: unknown): Date | null | undefined {
@@ -159,6 +170,9 @@ router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> =
         ...(socialEndAt !== undefined && { socialEndAt: parseTs(socialEndAt) }),
         ...(socialVenue !== undefined && { socialVenue: socialVenue || null }),
         ...(socialDescription !== undefined && { socialDescription: socialDescription || null }),
+        ...(invoiceHelpContent !== undefined && {
+          invoiceHelpContent: invoiceHelpContent || null,
+        }),
       })
       .where(eq(eventSettingsTable.id, existing[0].id))
       .returning();
@@ -189,6 +203,7 @@ router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> =
         socialEndAt: parseTs(socialEndAt) ?? null,
         socialVenue: socialVenue || null,
         socialDescription: socialDescription || null,
+        invoiceHelpContent: invoiceHelpContent || null,
       })
       .returning();
   }

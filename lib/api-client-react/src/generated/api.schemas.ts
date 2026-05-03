@@ -826,7 +826,17 @@ export interface EventSettings {
   socialEndAt?: string | null;
   socialVenue?: string | null;
   socialDescription?: string | null;
+  /** Admin-editable "How invoicing works" copy shown on Step 4 (Pay by Invoice) and embedded into invoice confirmation emails. Null means use the built-in default. */
+  invoiceHelpContent?: string | null;
   updatedAt: string;
+}
+
+/**
+ * Public subset of event settings exposed to the checkout UI.
+ */
+export interface PublicEventSettings {
+  /** Plain-text "How invoicing works" copy. Always populated (default fallback applied server-side). */
+  invoiceHelpContent: string;
 }
 
 /**
@@ -863,6 +873,7 @@ export interface EventSettingsUpdate {
   socialEndAt?: string | null;
   socialVenue?: string | null;
   socialDescription?: string | null;
+  invoiceHelpContent?: string | null;
 }
 
 export type AdminStatsPassCounts = {

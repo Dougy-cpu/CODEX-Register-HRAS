@@ -21,8 +21,97 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Check } from "lucide-react";
+import { Check, Link2, Link2Off, ChevronDown, ChevronRight, HelpCircle } from "lucide-react";
 import type { BookingWithAttendees } from "@/types/booking";
+
+// Fields on the billing form that can be auto-linked to the lead attendee.
+// Editing any of them unlinks just that field; clicking the "Use lead
+// attendee" button re-links it and copies the value back from the lead.
+const LINKABLE_FIELDS = ["billingName", "billingCompany", "billingEmail", "billingPhone"] as const;
+type LinkableField = (typeof LINKABLE_FIELDS)[number];
+
+// Renders the form label plus a small "Same as lead attendee" badge (when
+// linked) or a "Use lead attendee" relink button (when unlinked but a lead
+// value exists). When there's no lead value to copy from, only the plain
+// label is rendered.
+function LinkedFieldLabel({
+  label,
+  field,
+  linked,
+  canLink,
+  onRelink,
+}: {
+  label: string;
+  field: LinkableField;
+  linked: boolean;
+  canLink: boolean;
+  onRelink: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 mb-1.5">
+      <FormLabel className="!mb-0">{label}</FormLabel>
+      {canLink && linked && (
+        <span
+          className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full"
+          title="This field is linked to your lead attendee. Editing it unlinks just this field."
+          data-testid={`linked-${field}`}
+        >
+          <Link2 className="w-3 h-3" /> Same as lead attendee
+        </span>
+      )}
+      {canLink && !linked && (
+        <button
+          type="button"
+          onClick={onRelink}
+          className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground hover:text-primary"
+          data-testid={`relink-${field}`}
+        >
+          <Link2Off className="w-3 h-3" /> Use lead attendee
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Renders admin-editable plain-text help copy in the checkout. Mirrors the
+// server-side renderer in api-server/src/lib/email.ts: blank-line-separated
+// paragraphs, lines starting with "- " become bullet lists, and the first
+// line of a multi-line block becomes a bold heading.
+function InvoiceHelpRendered({ text }: { text: string }) {
+  const blocks = text.replace(/\r\n/g, "\n").split(/\n{2,}/);
+  return (
+    <>
+      {blocks.map((block, idx) => {
+        const lines = block.split("\n").filter((l) => l.trim().length > 0);
+        if (lines.length === 0) return null;
+        const allBullets = lines.every((l) => /^\s*-\s+/.test(l));
+        if (allBullets) {
+          return (
+            <ul key={idx} className="list-disc pl-5 space-y-1 text-muted-foreground">
+              {lines.map((l, j) => (
+                <li key={j}>{l.replace(/^\s*-\s+/, "")}</li>
+              ))}
+            </ul>
+          );
+        }
+        if (lines.length > 1) {
+          const [heading, ...rest] = lines;
+          return (
+            <div key={idx}>
+              <p className="font-semibold text-foreground">{heading}</p>
+              <p className="text-muted-foreground">{rest.join(" ")}</p>
+            </div>
+          );
+        }
+        return (
+          <p key={idx} className="text-muted-foreground">
+            {lines[0]}
+          </p>
+        );
+      })}
+    </>
+  );
+}
 
 const invoiceSchema = z.object({
   billingName: z.string().min(1, "Billing name is required"),
@@ -53,6 +142,28 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [isFreeConfirming, setIsFreeConfirming] = useState(false);
+  const [invoiceHelpContent, setInvoiceHelpContent] = useState<string>("");
+  const [helpExpanded, setHelpExpanded] = useState(false);
+
+  // Fetch the admin-editable "How invoicing works" copy. Falls back silently;
+  // if the request fails we just hide the help block (it's an enhancement,
+  // never blocking the checkout). Re-runs only when the user opens Step 4.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/event-settings/public")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { invoiceHelpContent?: string } | null) => {
+        if (!cancelled && data?.invoiceHelpContent) {
+          setInvoiceHelpContent(data.invoiceHelpContent);
+        }
+      })
+      .catch(() => {
+        /* silently ignore — help block is non-critical */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   // Set to true just before intentional navigation (Stripe redirect / invoice success)
   // so the beforeunload handler does NOT fire a false incomplete-ping.
   const isSubmittingPaymentRef = useRef(false);
@@ -105,6 +216,65 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
     booking.attendees?.find((a) => a.isLead && !a.isTbc) ??
     booking.attendees?.find((a) => !a.isTbc);
 
+  // Resolve the lead's value for each linkable billing field. Returns "" when
+  // the lead has no usable value, so callers can decide whether linking even
+  // makes sense (we never link to an empty source).
+  const getLeadValue = (field: LinkableField): string => {
+    if (!billingLead) return "";
+    switch (field) {
+      case "billingName":
+        return `${billingLead.firstName ?? ""} ${billingLead.lastName ?? ""}`.trim();
+      case "billingCompany":
+        return billingLead.company ?? "";
+      case "billingEmail":
+        return billingLead.workEmail ?? "";
+      case "billingPhone":
+        return billingLead.phone ?? "";
+    }
+  };
+
+  // Initial linked state: a field is linked if it currently matches the lead's
+  // value (case-insensitive), or if both the booking and the lead are empty
+  // (nothing to link to). We treat "matching" as the source of truth so a
+  // returning customer who didn't override the prefill still sees the badge.
+  const initialLinkedRef = useRef<Record<LinkableField, boolean>>(
+    Object.fromEntries(
+      LINKABLE_FIELDS.map((f) => {
+        const leadVal = getLeadValue(f).toLowerCase();
+        const savedRaw =
+          f === "billingName"
+            ? booking.billingName
+            : f === "billingCompany"
+              ? booking.billingCompany
+              : f === "billingEmail"
+                ? booking.billingEmail
+                : booking.billingPhone;
+        const savedVal = (savedRaw ?? "").toLowerCase();
+        const linked = leadVal !== "" && (savedVal === "" || savedVal === leadVal);
+        return [f, linked];
+      }),
+    ) as Record<LinkableField, boolean>,
+  );
+
+  const [linkedFields, setLinkedFields] = useState<Record<LinkableField, boolean>>(
+    initialLinkedRef.current,
+  );
+
+  // Re-link a field: copy the lead's value back into the form and mark linked.
+  // Only callable when there's a non-empty lead value to copy from.
+  const relinkField = (field: LinkableField) => {
+    const leadVal = getLeadValue(field);
+    if (!leadVal) return;
+    form.setValue(field, leadVal, { shouldDirty: true, shouldValidate: true });
+    setLinkedFields((prev) => ({ ...prev, [field]: true }));
+  };
+
+  // Mark a field as unlinked. Called from the input's onChange so any user
+  // edit visibly breaks the link without waiting for a value comparison.
+  const unlinkField = (field: LinkableField) => {
+    setLinkedFields((prev) => (prev[field] ? { ...prev, [field]: false } : prev));
+  };
+
   const form = useForm<z.infer<typeof invoiceSchema>>({
     resolver: zodResolver(invoiceSchema),
     defaultValues: {
@@ -119,7 +289,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
       billingRegion: booking.billingRegion || "",
       billingPostcode: booking.billingPostcode || "",
       billingCountry: booking.billingCountry || "United Kingdom",
-      billingPhone: booking.billingPhone || "",
+      billingPhone: booking.billingPhone || billingLead?.phone || "",
       billingVatNumber: booking.billingVatNumber || "",
       poNumber: booking.poNumber || "",
     },
@@ -346,15 +516,37 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
             <h2 className="text-2xl font-bold mb-6">Billing Details</h2>
             <Form {...form}>
               <form className="space-y-6" id="invoice-form" onSubmit={form.handleSubmit(onSubmit)}>
+                {billingLead && (
+                  <p className="text-xs text-muted-foreground -mt-2">
+                    Pre-filled from your lead attendee{" "}
+                    <span className="font-semibold">
+                      {billingLead.firstName} {billingLead.lastName}
+                    </span>
+                    . Edit any field to override; use the "Use lead attendee" link to relink.
+                  </p>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField
                     control={form.control}
                     name="billingName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Billing Contact Name *</FormLabel>
+                        <LinkedFieldLabel
+                          label="Billing Contact Name *"
+                          field="billingName"
+                          linked={linkedFields.billingName}
+                          canLink={!!getLeadValue("billingName")}
+                          onRelink={() => relinkField("billingName")}
+                        />
                         <FormControl>
-                          <Input {...field} className="h-12 bg-white" />
+                          <Input
+                            {...field}
+                            onChange={(e) => {
+                              field.onChange(e);
+                              unlinkField("billingName");
+                            }}
+                            className="h-12 bg-white"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -365,9 +557,22 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                     name="billingCompany"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Company Name *</FormLabel>
+                        <LinkedFieldLabel
+                          label="Company Name *"
+                          field="billingCompany"
+                          linked={linkedFields.billingCompany}
+                          canLink={!!getLeadValue("billingCompany")}
+                          onRelink={() => relinkField("billingCompany")}
+                        />
                         <FormControl>
-                          <Input {...field} className="h-12 bg-white" />
+                          <Input
+                            {...field}
+                            onChange={(e) => {
+                              field.onChange(e);
+                              unlinkField("billingCompany");
+                            }}
+                            className="h-12 bg-white"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -379,9 +584,23 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                   name="billingEmail"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Invoice Email Address *</FormLabel>
+                      <LinkedFieldLabel
+                        label="Invoice Email Address *"
+                        field="billingEmail"
+                        linked={linkedFields.billingEmail}
+                        canLink={!!getLeadValue("billingEmail")}
+                        onRelink={() => relinkField("billingEmail")}
+                      />
                       <FormControl>
-                        <Input type="email" {...field} className="h-12 bg-white" />
+                        <Input
+                          type="email"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            unlinkField("billingEmail");
+                          }}
+                          className="h-12 bg-white"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -392,9 +611,23 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                   name="billingPhone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Purchaser Contact Number *</FormLabel>
+                      <LinkedFieldLabel
+                        label="Purchaser Contact Number *"
+                        field="billingPhone"
+                        linked={linkedFields.billingPhone}
+                        canLink={!!getLeadValue("billingPhone")}
+                        onRelink={() => relinkField("billingPhone")}
+                      />
                       <FormControl>
-                        <Input type="tel" {...field} className="h-12 bg-white" />
+                        <Input
+                          type="tel"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            unlinkField("billingPhone");
+                          }}
+                          className="h-12 bg-white"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -540,6 +773,32 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                 </p>
               </form>
             </Form>
+
+            {invoiceHelpContent && (
+              <div className="mt-6 border border-border rounded-sm overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setHelpExpanded((v) => !v)}
+                  aria-expanded={helpExpanded}
+                  className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-muted/40 hover:bg-muted/60 text-left transition-colors"
+                >
+                  <span className="flex items-center gap-2 font-semibold text-sm">
+                    <HelpCircle className="w-4 h-4 text-primary" />
+                    How invoicing works
+                  </span>
+                  {helpExpanded ? (
+                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  )}
+                </button>
+                {helpExpanded && (
+                  <div className="px-4 py-4 bg-white text-sm space-y-3 leading-relaxed">
+                    <InvoiceHelpRendered text={invoiceHelpContent} />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

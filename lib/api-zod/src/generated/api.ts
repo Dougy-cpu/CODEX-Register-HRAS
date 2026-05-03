@@ -895,6 +895,23 @@ export const ExportRegistrationsQueryParams = zod.object({
 });
 
 /**
+ * Returns the public-facing copy required by the checkout, currently the
+"How invoicing works" help content shown on Step 4 (Pay by Invoice).
+No authentication required.
+
+ * @summary Public subset of event settings
+ */
+export const GetPublicEventSettingsResponse = zod
+  .object({
+    invoiceHelpContent: zod
+      .string()
+      .describe(
+        'Plain-text \"How invoicing works\" copy. Always populated (default fallback applied server-side).',
+      ),
+  })
+  .describe("Public subset of event settings exposed to the checkout UI.");
+
+/**
  * @summary Get event/organisation settings (admin)
  */
 export const GetAdminEventSettingsResponse = zod
@@ -938,6 +955,12 @@ export const GetAdminEventSettingsResponse = zod
     socialEndAt: zod.coerce.date().nullish(),
     socialVenue: zod.string().nullish(),
     socialDescription: zod.string().nullish(),
+    invoiceHelpContent: zod
+      .string()
+      .nullish()
+      .describe(
+        'Admin-editable \"How invoicing works\" copy shown on Step 4 (Pay by Invoice) and embedded into invoice confirmation emails. Null means use the built-in default.',
+      ),
     updatedAt: zod.coerce.date(),
   })
   .describe("Configurable per-event branding, scheduling and contact details.");
@@ -979,6 +1002,7 @@ export const UpdateAdminEventSettingsBody = zod
     socialEndAt: zod.coerce.date().nullish(),
     socialVenue: zod.string().nullish(),
     socialDescription: zod.string().nullish(),
+    invoiceHelpContent: zod.string().nullish(),
   })
   .describe(
     "Partial-update payload. Any field omitted is left unchanged. Datetime\nfields accept ISO-8601 strings, `null`, or empty strings (treated as\nnull).\n",
@@ -1025,6 +1049,12 @@ export const UpdateAdminEventSettingsResponse = zod
     socialEndAt: zod.coerce.date().nullish(),
     socialVenue: zod.string().nullish(),
     socialDescription: zod.string().nullish(),
+    invoiceHelpContent: zod
+      .string()
+      .nullish()
+      .describe(
+        'Admin-editable \"How invoicing works\" copy shown on Step 4 (Pay by Invoice) and embedded into invoice confirmation emails. Null means use the built-in default.',
+      ),
     updatedAt: zod.coerce.date(),
   })
   .describe("Configurable per-event branding, scheduling and contact details.");

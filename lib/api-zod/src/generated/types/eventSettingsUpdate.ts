@@ -40,4 +40,5 @@ export interface EventSettingsUpdate {
   socialEndAt?: Date | null;
   socialVenue?: string | null;
   socialDescription?: string | null;
+  invoiceHelpContent?: string | null;
 }

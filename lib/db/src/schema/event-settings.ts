@@ -36,6 +36,11 @@ export const eventSettingsTable = pgTable("event_settings", {
   socialEndAt: timestamp("social_end_at", { withTimezone: true }),
   socialVenue: text("social_venue"),
   socialDescription: text("social_description"),
+  // Admin-editable "How invoicing works" help copy. Surfaced on Step 4 of the
+  // checkout (Pay by Invoice) and linked from the invoice confirmation email.
+  // Plain text — paragraphs separated by blank lines, lines starting with "- "
+  // render as a bullet list. Null falls back to a built-in default copy.
+  invoiceHelpContent: text("invoice_help_content"),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow()

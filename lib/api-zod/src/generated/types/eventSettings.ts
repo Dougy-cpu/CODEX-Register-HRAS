@@ -42,5 +42,7 @@ export interface EventSettings {
   socialEndAt?: Date | null;
   socialVenue?: string | null;
   socialDescription?: string | null;
+  /** Admin-editable "How invoicing works" copy shown on Step 4 (Pay by Invoice) and embedded into invoice confirmation emails. Null means use the built-in default. */
+  invoiceHelpContent?: string | null;
   updatedAt: Date;
 }

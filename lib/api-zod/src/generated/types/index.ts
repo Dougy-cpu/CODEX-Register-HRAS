@@ -63,6 +63,7 @@ export * from "./promoCodeApplicablePassTypesItem";
 export * from "./promoCodeDiscountType";
 export * from "./promoCodeValidationResult";
 export * from "./promoCodeValidationResultDiscountType";
+export * from "./publicEventSettings";
 export * from "./registrationList";
 export * from "./registrationSummary";
 export * from "./registrationSummaryInvoiceBadgeStatus";

@@ -947,6 +947,23 @@ paths:
               schema:
                 type: string
 
+  /event-settings/public:
+    get:
+      operationId: getPublicEventSettings
+      tags: [public]
+      summary: Public subset of event settings
+      description: |
+        Returns the public-facing copy required by the checkout, currently the
+        "How invoicing works" help content shown on Step 4 (Pay by Invoice).
+        No authentication required.
+      responses:
+        "200":
+          description: Public event settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicEventSettings"
+
   /admin/event-settings:
     get:
       operationId: getAdminEventSettings
@@ -2106,6 +2123,10 @@ components:
         socialDescription:
           type: string
           nullable: true
+        invoiceHelpContent:
+          type: string
+          nullable: true
+          description: Admin-editable "How invoicing works" copy shown on Step 4 (Pay by Invoice) and embedded into invoice confirmation emails. Null means use the built-in default.
         updatedAt:
           type: string
           format: date-time
@@ -2126,6 +2147,16 @@ components:
         - eventTimezone
         - socialEnabled
         - updatedAt
+
+    PublicEventSettings:
+      type: object
+      description: Public subset of event settings exposed to the checkout UI.
+      properties:
+        invoiceHelpContent:
+          type: string
+          description: Plain-text "How invoicing works" copy. Always populated (default fallback applied server-side).
+      required:
+        - invoiceHelpContent
 
     EventSettingsUpdate:
       type: object
@@ -2161,6 +2192,7 @@ components:
         socialEndAt: { type: string, format: date-time, nullable: true }
         socialVenue: { type: string, nullable: true }
         socialDescription: { type: string, nullable: true }
+        invoiceHelpContent: { type: string, nullable: true }
 
     AdminStats:
       type: object
