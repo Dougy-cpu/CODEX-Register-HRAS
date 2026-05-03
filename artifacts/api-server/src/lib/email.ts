@@ -307,6 +307,16 @@ async function buildConfirmationEmailHtml(
     : null;
   const managementLinkHtml = manageUrl ? buildManageLinkSection(manageUrl) : "";
 
+  const billingEditUrl = booking.managementToken && booking.paymentMethod === "invoice"
+    ? `${process.env.APP_BASE_URL || "https://register.hranalyticssummit.com"}/manage/${booking.managementToken}/billing`
+    : "";
+  const billingEditLinkHtml = billingEditUrl
+    ? `<p style="margin:14px 0 0;font-size:14px;"><a href="${billingEditUrl}" style="color:#E74F3E;font-weight:600;text-decoration:underline;">${booking.poNumber ? "Update PO number or billing details →" : "Add a PO number / update billing details →"}</a></p>`
+    : "";
+  const poNumberHtml = booking.poNumber
+    ? `<p style="margin:6px 0 0;font-size:14px;"><strong>PO Number:</strong> <span style="font-family:monospace;">${booking.poNumber}</span></p>`
+    : "";
+
   const invoicePaymentButtonHtml = booking.stripeInvoicePaymentUrl
     ? `<p style="margin-top:16px;"><a href="${booking.stripeInvoicePaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;">Download Invoice / Pay Online →</a></p>`
     : "";
@@ -334,6 +344,10 @@ async function buildConfirmationEmailHtml(
         "{{eventVenuePostcode}}": settings.eventVenuePostcode || "EC2M 3TQ",
         "{{managementLink}}": managementLinkHtml,
         "{{invoicePaymentButton}}": invoicePaymentButtonHtml,
+        "{{poNumber}}": booking.poNumber || "",
+        "{{poNumberSection}}": poNumberHtml,
+        "{{billingEditLink}}": billingEditLinkHtml,
+        "{{billingEditUrl}}": billingEditUrl,
       };
       const calPh = getCalendarPlaceholders(settings);
       vars["{{eventCalendarLinks}}"] = calPh.eventCalendarLinks;
@@ -347,6 +361,32 @@ async function buildConfirmationEmailHtml(
       vars["{{socialIcsCalendarUrl}}"] = calPh.socialIcsCalendarUrl;
 
       let body = dbTemplate.htmlBody;
+      // If the DB template predates the new PO/billing-edit placeholders,
+      // append a default block so invoice customers always see the link.
+      if (
+        billingEditLinkHtml &&
+        !body.includes("{{billingEditLink}}") &&
+        !body.includes("{{billingEditUrl}}") &&
+        !body.includes(billingEditUrl)
+      ) {
+        const fallbackBlock =
+          `\n<div style="margin:18px 0;padding:14px 18px;background:#fdf3f1;border:1px solid #f3c8c1;border-radius:6px;">` +
+          `<p style="margin:0;font-size:14px;font-weight:600;color:#333;">Need a PO number on your invoice?</p>` +
+          `<p style="margin:6px 0 0;font-size:13px;color:#555;">Add or update your PO number and billing details from the secure self-service link below — we'll re-issue the invoice automatically.</p>` +
+          billingEditLinkHtml +
+          `</div>`;
+        const extraPo = (poNumberHtml && !body.includes("{{poNumber}}") && !body.includes("{{poNumberSection}}"))
+          ? poNumberHtml
+          : "";
+        const insert = extraPo + fallbackBlock;
+        // Detect </body> presence first — `.replace()` always returns a truthy
+        // string even on no match, so `||` cannot be used as a fallback signal.
+        if (/<\/body>/i.test(body)) {
+          body = body.replace(/<\/body>/i, `${insert}</body>`);
+        } else {
+          body += insert;
+        }
+      }
       for (const [placeholder, value] of Object.entries(vars)) {
         body = body.replaceAll(placeholder, value);
       }
@@ -386,7 +426,9 @@ async function buildConfirmationEmailHtml(
     <p style="margin:0 0 16px;color:#444;line-height:1.6;">You have a secure self-service link to manage all your attendee information. You can fill in placeholder seats, update existing details, add dietary requirements — all without logging in. Need to share registration with colleagues? Forward them the link to enter their own details.</p>
     ${managementLinkHtml}
     <p>A PDF VAT receipt is attached to this email for your records.</p>
+    ${poNumberHtml}
     ${invoicePaymentButtonHtml}
+    ${billingEditLinkHtml}
     <p>We look forward to seeing you at the ${settings.eventName || "HR Analytics Summit"}!</p>
   `;
 
@@ -486,6 +528,70 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
   for (const attendee of additionalAttendees) {
     await sendWelcomeEmail(bookingId, attendee.firstName, attendee.workEmail);
   }
+}
+
+/**
+ * Send a "your invoice has been re-issued" email to the billing email
+ * (falling back to the lead's work email) with the freshly-generated Stripe
+ * invoice PDF attached. Used after self-serve or admin billing/PO edits.
+ */
+export async function sendReissuedInvoiceEmail(bookingId: number): Promise<void> {
+  const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
+  if (!booking) {
+    logger.warn({ bookingId }, "Booking not found for re-issued invoice email");
+    return;
+  }
+  const settings = await getEventSettings();
+  const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
+  const lead = attendees.find((a) => a.isLead) || attendees[0];
+  if (!lead) return;
+
+  const recipient = booking.billingEmail || lead.workEmail;
+  const orderRef = booking.orderReference || `#${bookingId}`;
+
+  // Build the standard confirmation body but prepend a re-issue notice banner
+  const { html: bodyHtml, subject: baseSubject } =
+    await buildConfirmationEmailHtml(booking, attendees, lead, settings);
+
+  const reissueBanner = `
+    <div style="background:#fff8f7;border:2px solid #E74F3E;border-radius:6px;padding:18px 22px;margin:0 0 20px;">
+      <p style="margin:0 0 6px;font-size:15px;font-weight:700;color:#E74F3E;">Your invoice has been re-issued</p>
+      <p style="margin:0;font-size:14px;color:#333;line-height:1.5;">
+        We've updated your billing details${booking.poNumber ? ` (including PO Number <strong style="font-family:monospace;">${booking.poNumber}</strong>)` : ""} and issued a fresh invoice. The previous invoice has been voided. The latest invoice PDF is attached and a payment link is below.
+      </p>
+    </div>`;
+  // Inject the banner just after the opening branded layout container if
+  // present. `.replace()` always returns a truthy string, so we explicitly
+  // check whether the marker exists before deciding where to put the banner.
+  const containerRe = /(<div class="container"[^>]*>)/i;
+  const html = containerRe.test(bodyHtml)
+    ? bodyHtml.replace(containerRe, `$1${reissueBanner}`)
+    : reissueBanner + bodyHtml;
+
+  let pdfBuffer: Buffer | null = null;
+  const pdfFilename = `invoice-${booking.orderReference || bookingId}.pdf`;
+  if (booking.stripeInvoicePdfUrl) {
+    try { pdfBuffer = await downloadHttpsPdf(booking.stripeInvoicePdfUrl); }
+    catch (err) { logger.warn({ err, bookingId }, "Failed to download re-issued invoice PDF"); }
+  }
+  if (!pdfBuffer) {
+    try { pdfBuffer = await generatePdfReceipt(booking, attendees); }
+    catch (err) { logger.warn({ err }, "Failed to generate fallback PDF for re-issued invoice"); }
+  }
+  const attachments: Array<{ filename: string; content: Buffer; contentType: string }> = [];
+  if (pdfBuffer) attachments.push({ filename: pdfFilename, content: pdfBuffer, contentType: "application/pdf" });
+
+  const sent = await sendMail({
+    to: recipient,
+    subject: `Updated Invoice — ${settings.eventName || "HR Analytics Summit"} (${orderRef})`,
+    html,
+    attachments,
+    fromName: settings.fromName,
+    fromEmail: settings.fromEmail,
+  });
+  void baseSubject;
+  await logEmail(bookingId, recipient, "invoice", sent ? "sent" : "failed",
+    sent ? undefined : "SMTP not configured or send failed");
 }
 
 export async function resendConfirmationAndReceipt(bookingId: number): Promise<void> {
@@ -661,6 +767,7 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
       })()}</td></tr>
       ${booking.billingPhone ? `<tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Contact Phone</td><td style="border-bottom:1px solid #f0f0f0">${booking.billingPhone}</td></tr>` : ""}
       ${booking.billingVatNumber ? `<tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">VAT Number</td><td style="border-bottom:1px solid #f0f0f0">${booking.billingVatNumber}</td></tr>` : ""}
+      ${booking.poNumber ? `<tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">PO Number</td><td style="border-bottom:1px solid #f0f0f0;font-family:monospace"><strong>${booking.poNumber}</strong></td></tr>` : ""}
     </table>
     ` : ""}
 

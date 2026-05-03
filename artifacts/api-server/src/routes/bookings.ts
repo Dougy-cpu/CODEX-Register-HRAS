@@ -7,8 +7,10 @@ import { promoCodesTable } from "@workspace/db";
 import { isCodeUsedByEmail } from "./promo-codes";
 import { v4 as uuidv4 } from "uuid";
 import { deriveAdminToken, getAdminPassword } from "../middleware/admin-auth";
-import { sendIncompleteFormNotification, sendBookingEmails, sendOrganiserNotification } from "../lib/email";
+import { sendIncompleteFormNotification, sendBookingEmails, sendOrganiserNotification, sendReissuedInvoiceEmail, getEventSettings } from "../lib/email";
 import { logger } from "../lib/logger";
+import { reissueBookingInvoice, getStripeInvoiceStatus } from "../lib/invoice";
+import { getStripe } from "./stripe";
 
 function isAdminRequest(req: import("express").Request): boolean {
   const token = req.headers["x-admin-token"] as string | undefined;
@@ -342,6 +344,7 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
     billingCountry,
     billingPhone,
     billingVatNumber,
+    poNumber,
     // status is admin/webhook-only — excluded from public PATCH body
     status,
   } = req.body;
@@ -380,6 +383,7 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
   if (billingCountry !== undefined) updateData.billingCountry = billingCountry;
   if (billingPhone !== undefined) updateData.billingPhone = billingPhone || null;
   if (billingVatNumber !== undefined) updateData.billingVatNumber = billingVatNumber || null;
+  if (poNumber !== undefined) updateData.poNumber = (poNumber ?? "").toString().trim() || null;
   if (hearAboutUs !== undefined) updateData.hearAboutUs = hearAboutUs || null;
 
   // Only admin requests may mutate status
@@ -396,7 +400,199 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
     .where(eq(bookingsTable.id, id))
     .returning();
 
-  res.json(formatBooking(updated));
+  // If admin edited billing/PO on an invoice booking that already has a Stripe
+  // invoice, re-issue it so the customer gets an updated PDF/email.
+  let reissueResult: { reissued?: boolean; alreadyPaid?: boolean; error?: string } = {};
+  const billingTouched =
+    billingName !== undefined || billingCompany !== undefined || billingEmail !== undefined ||
+    billingAddressLine1 !== undefined || billingAddressLine2 !== undefined ||
+    billingTown !== undefined || billingRegion !== undefined || billingPostcode !== undefined ||
+    billingCountry !== undefined || billingPhone !== undefined || billingVatNumber !== undefined ||
+    poNumber !== undefined;
+
+  if (admin && billingTouched && updated.paymentMethod === "invoice" && updated.stripeInvoiceId) {
+    const stripe = getStripe();
+    if (stripe) {
+      try {
+        const result = await reissueBookingInvoice(stripe, id);
+        reissueResult = result.alreadyPaid ? { alreadyPaid: true } : { reissued: true };
+        if (!result.alreadyPaid) {
+          try { await sendReissuedInvoiceEmail(id); } catch (err) { logger.error({ err }, "Failed to send re-issued invoice email"); }
+        }
+      } catch (err: any) {
+        reissueResult = { error: err?.message || "Re-issue failed" };
+        logger.error({ err, bookingId: id }, "Failed to re-issue invoice after admin edit");
+      }
+    }
+  }
+
+  const [refreshed] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, id));
+  res.json({ ...formatBooking(refreshed), reissue: reissueResult });
+});
+
+// ----- Self-serve billing/PO management (token-authed) -----
+
+router.get("/bookings/by-management-token/:token/billing", async (req, res): Promise<void> => {
+  const { token } = req.params;
+  const [booking] = await db
+    .select()
+    .from(bookingsTable)
+    .where(eq(bookingsTable.managementToken, token));
+  if (!booking) {
+    res.status(404).json({ error: "Booking not found" });
+    return;
+  }
+
+  let alreadyPaid = booking.status === "paid";
+  if (!alreadyPaid && booking.stripeInvoiceId) {
+    const stripe = getStripe();
+    if (stripe) {
+      const { paid } = await getStripeInvoiceStatus(stripe, booking.stripeInvoiceId);
+      if (paid) {
+        alreadyPaid = true;
+        await db.update(bookingsTable).set({ status: "paid" }).where(eq(bookingsTable.id, booking.id));
+      }
+    }
+  }
+
+  const settings = await getEventSettings();
+  const locked = !!settings?.attendeeChangesLocked;
+  const lockedMessage = settings?.attendeeChangesLockedMessage ?? null;
+
+  res.json({
+    id: booking.id,
+    orderReference: booking.orderReference,
+    paymentMethod: booking.paymentMethod,
+    status: alreadyPaid ? "paid" : booking.status,
+    alreadyPaid,
+    locked,
+    lockedMessage,
+    billingName: booking.billingName,
+    billingCompany: booking.billingCompany,
+    billingEmail: booking.billingEmail,
+    billingAddressLine1: booking.billingAddressLine1,
+    billingAddressLine2: booking.billingAddressLine2,
+    billingTown: booking.billingTown,
+    billingRegion: booking.billingRegion,
+    billingPostcode: booking.billingPostcode,
+    billingCountry: booking.billingCountry,
+    billingPhone: booking.billingPhone,
+    billingVatNumber: booking.billingVatNumber,
+    poNumber: booking.poNumber,
+    stripeInvoicePaymentUrl: booking.stripeInvoicePaymentUrl,
+    stripeInvoicePdfUrl: booking.stripeInvoicePdfUrl,
+  });
+});
+
+router.post("/bookings/by-management-token/:token/billing", async (req, res): Promise<void> => {
+  const { token } = req.params;
+  const [booking] = await db
+    .select()
+    .from(bookingsTable)
+    .where(eq(bookingsTable.managementToken, token));
+  if (!booking) {
+    res.status(404).json({ error: "Booking not found" });
+    return;
+  }
+  if (booking.paymentMethod !== "invoice") {
+    res.status(400).json({ error: "Billing details can only be edited for invoice bookings" });
+    return;
+  }
+
+  // Lock check — once admin freezes attendee/booking edits, billing edits are locked too
+  const settings = await getEventSettings();
+  if (settings?.attendeeChangesLocked) {
+    res.status(423).json({
+      error: settings.attendeeChangesLockedMessage || "Booking edits are currently locked. Please contact us.",
+      locked: true,
+    });
+    return;
+  }
+
+  // Pre-flight paid check BEFORE any DB writes — catches Stripe-side payments
+  // that have not yet been webhooked into our DB.
+  if (booking.status === "paid") {
+    res.status(409).json({ error: "Invoice has already been paid", alreadyPaid: true });
+    return;
+  }
+  if (booking.stripeInvoiceId) {
+    const stripe = getStripe();
+    if (stripe) {
+      const { paid } = await getStripeInvoiceStatus(stripe, booking.stripeInvoiceId);
+      if (paid) {
+        await db.update(bookingsTable).set({ status: "paid" }).where(eq(bookingsTable.id, booking.id));
+        res.status(409).json({ error: "Invoice has already been paid", alreadyPaid: true });
+        return;
+      }
+    }
+  }
+
+  const {
+    poNumber,
+    billingName,
+    billingCompany,
+    billingEmail,
+    billingAddressLine1,
+    billingAddressLine2,
+    billingTown,
+    billingRegion,
+    billingPostcode,
+    billingCountry,
+    billingPhone,
+    billingVatNumber,
+  } = req.body ?? {};
+
+  const updates: Partial<typeof bookingsTable.$inferInsert> = {};
+  if (poNumber !== undefined) updates.poNumber = (poNumber ?? "").toString().trim() || null;
+  if (billingName !== undefined) updates.billingName = billingName || null;
+  if (billingCompany !== undefined) updates.billingCompany = billingCompany || null;
+  if (billingEmail !== undefined) updates.billingEmail = billingEmail || null;
+  if (billingAddressLine1 !== undefined) updates.billingAddressLine1 = billingAddressLine1 || null;
+  if (billingAddressLine2 !== undefined) updates.billingAddressLine2 = billingAddressLine2 || null;
+  if (billingTown !== undefined) updates.billingTown = billingTown || null;
+  if (billingRegion !== undefined) updates.billingRegion = billingRegion || null;
+  if (billingPostcode !== undefined) updates.billingPostcode = billingPostcode || null;
+  if (billingCountry !== undefined) updates.billingCountry = billingCountry || null;
+  if (billingPhone !== undefined) updates.billingPhone = billingPhone || null;
+  if (billingVatNumber !== undefined) updates.billingVatNumber = billingVatNumber || null;
+
+  if (Object.keys(updates).length > 0) {
+    await db.update(bookingsTable).set(updates).where(eq(bookingsTable.id, booking.id));
+  }
+
+  // Re-issue the Stripe invoice (if any) so the PO + new billing details show.
+  let reissue: { alreadyPaid?: boolean; reissued?: boolean; error?: string } = {};
+  if (booking.stripeInvoiceId) {
+    const stripe = getStripe();
+    if (!stripe) {
+      reissue = { error: "Stripe is not configured" };
+    } else {
+      try {
+        const result = await reissueBookingInvoice(stripe, booking.id);
+        if (result.alreadyPaid) {
+          reissue = { alreadyPaid: true };
+        } else {
+          reissue = { reissued: true };
+          try { await sendReissuedInvoiceEmail(booking.id); } catch (err) {
+            logger.error({ err }, "Failed to send re-issued invoice email");
+          }
+        }
+      } catch (err: any) {
+        reissue = { error: err?.message || "Failed to re-issue invoice" };
+        logger.error({ err, bookingId: booking.id }, "Failed to re-issue invoice on self-serve billing edit");
+      }
+    }
+  }
+
+  const [refreshed] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, booking.id));
+  res.json({
+    ok: true,
+    reissue,
+    poNumber: refreshed.poNumber,
+    status: refreshed.status,
+    stripeInvoicePaymentUrl: refreshed.stripeInvoicePaymentUrl,
+    stripeInvoicePdfUrl: refreshed.stripeInvoicePdfUrl,
+  });
 });
 
 // Fire-and-forget endpoint called by the frontend via sendBeacon or setTimeout when the

@@ -15,6 +15,7 @@ import {
 } from "../lib/email";
 import { syncBookingToSheets } from "../lib/google-sheets";
 import { logger } from "../lib/logger";
+import { reissueBookingInvoice } from "../lib/invoice";
 
 const DECLINE_CODE_LABELS: Record<string, string> = {
   authentication_required: "Strong customer authentication required — please retry your payment",
@@ -46,7 +47,6 @@ const DISPUTE_REASON_LABELS: Record<string, string> = {
   unrecognized: "Unrecognised transaction",
 };
 
-let cachedVatRateId: string | null = null;
 
 const router: IRouter = Router();
 
@@ -61,7 +61,7 @@ async function isPromoOncePerCustomerViolation(bookingId: number, promoCode: str
   return await isCodeUsedByEmail(promoCode, email, bookingId);
 }
 
-function getStripe() {
+export function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) return null;
   return new Stripe(key);
@@ -591,31 +591,6 @@ router.post("/stripe/confirm-card-payment", async (req, res): Promise<void> => {
   }
 });
 
-async function getOrCreateVatRate(stripe: Stripe): Promise<string | null> {
-  if (cachedVatRateId) return cachedVatRateId;
-  try {
-    const list = await stripe.taxRates.list({ limit: 20, active: true });
-    const existing = list.data.find(
-      (r) => r.percentage === 20 && r.country === "GB" && r.inclusive === false
-    );
-    if (existing) {
-      cachedVatRateId = existing.id;
-      return existing.id;
-    }
-    const created = await stripe.taxRates.create({
-      display_name: "VAT",
-      percentage: 20,
-      country: "GB",
-      inclusive: false,
-      description: "UK VAT 20%",
-    });
-    cachedVatRateId = created.id;
-    return created.id;
-  } catch (err) {
-    logger.error({ err }, "Failed to get/create Stripe VAT tax rate");
-    return null;
-  }
-}
 
 
 router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
@@ -670,125 +645,28 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
     return;
   }
 
-  const passLabels: Record<string, string> = {
-    single: "Single Pass — HR Analytics Summit 2026",
-    team: "Team Pass (3 Seats) — HR Analytics Summit 2026",
-    business: "Business Pass — HR Analytics Summit 2026",
-  };
-
   const orderRef = booking.orderReference || `HRAS26-${6541 + id}`;
 
-  const subtotalAfterDiscounts = parseFloat(booking.subtotalAmount?.toString() || "0");
-  const groupDiscount = parseFloat(booking.groupDiscountAmount?.toString() || "0");
-  const promoDiscount = parseFloat(booking.promoDiscountAmount?.toString() || "0");
-  const baseAmount = subtotalAfterDiscounts + groupDiscount + promoDiscount;
-
-  const contactEmail = booking.billingEmail || lead.workEmail;
-  const contactName = booking.billingName || `${lead.firstName} ${lead.lastName}`;
-  const contactCompany = booking.billingCompany || lead.company;
-
   try {
-    const customerList = await stripe.customers.list({ email: contactEmail, limit: 1 });
-    let customer: Stripe.Customer;
-    if (customerList.data.length > 0) {
-      customer = customerList.data[0];
-    } else {
-      customer = await stripe.customers.create({
-        email: contactEmail,
-        name: contactName,
-        metadata: { company: contactCompany || "" },
-        address: booking.billingAddressLine1 ? {
-          line1: booking.billingAddressLine1,
-          line2: booking.billingAddressLine2 || undefined,
-          city: booking.billingTown || undefined,
-          state: booking.billingRegion || undefined,
-          postal_code: booking.billingPostcode || undefined,
-          country: booking.billingCountry === "United Kingdom" ? "GB" : (booking.billingCountry || "GB"),
-        } : undefined,
+    // Delegate the customer-sync + invoice-create + finalize + send to the
+    // shared helper so the create and re-issue flows can never drift apart.
+    const result = await reissueBookingInvoice(stripe, id);
+    if (result.alreadyPaid) {
+      const [refreshed] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, id));
+      res.json({
+        invoiceId: refreshed.stripeInvoiceId || `manual-${refreshed.orderReference}`,
+        invoiceUrl: refreshed.stripeInvoicePdfUrl || null,
+        paymentUrl: refreshed.stripeInvoicePaymentUrl || null,
+        invoiceReference: refreshed.orderReference || "",
+        alreadyProcessed: true,
       });
-    }
-
-    const vatRateId = await getOrCreateVatRate(stripe);
-    if (!vatRateId) {
-      res.status(500).json({ error: "Could not establish UK VAT 20% tax rate in Stripe. Invoice not created." });
       return;
     }
-    const vatParams = { tax_rates: [vatRateId] };
-
-    const invoiceObj = await stripe.invoices.create({
-      customer: customer.id,
-      collection_method: "send_invoice",
-      days_until_due: 14,
-      description: `HR Analytics Summit 2026 — ${orderRef}`,
-      footer: [
-        "Issued by: Dynamic Business Leaders Limited",
-        "Company No. 12252258  |  VAT No. 336124621",
-        "Registered Address: 45 Lemsford Village, Welwyn Garden City, Hertfordshire AL8 7TR",
-        "Contact: douglas@dynamicbusinessleaders.co.uk  |  Tel: 07763618052",
-        "Goods: Conference",
-        "",
-        "Bank: Tide (ClearBank)  |  Sort Code: 04-06-05  |  Account: 16963209",
-        "IBAN (GBP): GB65CLRB04060516963209  |  SWIFT: CLRBGB22",
-        "IBAN (EUR): GB45TCCL00997990500906  |  BIC: TCCLGB31",
-      ].join("\n"),
-      custom_fields: [
-        { name: "Booking Reference", value: orderRef },
-        { name: "Company Number", value: "12252258" },
-        { name: "VAT Number", value: "336124621" },
-        { name: "Contact", value: "douglas@dynamicbusinessleaders.co.uk" },
-      ],
-      metadata: { bookingId: String(id), orderRef },
-      auto_advance: false,
-    });
-
-    await stripe.invoiceItems.create({
-      customer: customer.id,
-      invoice: invoiceObj.id,
-      description: `${passLabels[booking.passType] || booking.passType} × ${booking.quantity}`,
-      amount: Math.round(baseAmount * 100),
-      currency: "gbp",
-      ...vatParams,
-    });
-
-    if (groupDiscount > 0) {
-      await stripe.invoiceItems.create({
-        customer: customer.id,
-        invoice: invoiceObj.id,
-        description: "Group Discount",
-        amount: -Math.round(groupDiscount * 100),
-        currency: "gbp",
-        ...vatParams,
-      });
-    }
-
-    if (promoDiscount > 0) {
-      await stripe.invoiceItems.create({
-        customer: customer.id,
-        invoice: invoiceObj.id,
-        description: `Promo Code: ${booking.promoCode}`,
-        amount: -Math.round(promoDiscount * 100),
-        currency: "gbp",
-        ...vatParams,
-      });
-    }
-
-    const finalized = await stripe.invoices.finalizeInvoice(invoiceObj.id);
-    const sent = await stripe.invoices.sendInvoice(finalized.id);
-
-    const invoiceId = sent.id;
-    const invoicePdfUrl = sent.invoice_pdf || null;
-    const invoicePaymentUrl = sent.hosted_invoice_url || null;
-    const invoiceDueDate = sent.due_date ? new Date(sent.due_date * 1000) : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
 
     await db.update(bookingsTable).set({
-      status: "invoiced",
       currentStep: 5,
       orderReference: orderRef,
       paymentMethod: "invoice",
-      stripeInvoiceId: invoiceId,
-      stripeInvoicePdfUrl: invoicePdfUrl,
-      stripeInvoicePaymentUrl: invoicePaymentUrl,
-      invoiceDueDate,
     }).where(eq(bookingsTable.id, id));
 
     if (booking.promoCode) {
@@ -805,12 +683,20 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
     try { await sendOrganiserNotification(id); } catch (err) { logger.error({ err }, "Failed to send organiser notification"); }
     try { await syncBookingToSheets(id); } catch (err) { logger.error({ err }, "Failed to sync to Google Sheets"); }
 
-    res.json({ invoiceId, invoiceUrl: invoicePdfUrl, paymentUrl: invoicePaymentUrl, invoiceReference: orderRef });
+    res.json({
+      invoiceId: result.invoiceId,
+      invoiceUrl: result.pdfUrl,
+      paymentUrl: result.paymentUrl,
+      invoiceReference: orderRef,
+    });
+    return;
   } catch (err: any) {
     const msg = err?.raw?.message || err?.message || "Stripe error";
     logger.error({ err, bookingId: id }, "Failed to create Stripe invoice");
     res.status(502).json({ error: `Failed to create invoice: ${msg}` });
+    return;
   }
+
 });
 
 export default router;

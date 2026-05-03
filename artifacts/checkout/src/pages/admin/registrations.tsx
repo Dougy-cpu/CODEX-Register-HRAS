@@ -59,6 +59,75 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
   const [saveState, setSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
+  const [editingBilling, setEditingBilling] = useState(false);
+  const [billingForm, setBillingForm] = useState({
+    poNumber: "",
+    billingName: "",
+    billingCompany: "",
+    billingEmail: "",
+    billingAddressLine1: "",
+    billingAddressLine2: "",
+    billingTown: "",
+    billingRegion: "",
+    billingPostcode: "",
+    billingCountry: "",
+    billingPhone: "",
+    billingVatNumber: "",
+  });
+  const [billingSaveState, setBillingSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
+  const [billingSaveError, setBillingSaveError] = useState<string | null>(null);
+  const [billingReissueInfo, setBillingReissueInfo] = useState<string | null>(null);
+
+  const startEditBilling = () => {
+    if (!data) return;
+    setBillingForm({
+      poNumber: data.poNumber ?? "",
+      billingName: data.billingName ?? "",
+      billingCompany: data.billingCompany ?? "",
+      billingEmail: data.billingEmail ?? "",
+      billingAddressLine1: data.billingAddressLine1 ?? "",
+      billingAddressLine2: data.billingAddressLine2 ?? "",
+      billingTown: data.billingTown ?? "",
+      billingRegion: data.billingRegion ?? "",
+      billingPostcode: data.billingPostcode ?? "",
+      billingCountry: data.billingCountry ?? "",
+      billingPhone: data.billingPhone ?? "",
+      billingVatNumber: data.billingVatNumber ?? "",
+    });
+    setBillingSaveState("idle");
+    setBillingSaveError(null);
+    setBillingReissueInfo(null);
+    setEditingBilling(true);
+  };
+
+  const handleSaveBilling = async () => {
+    setBillingSaveState("saving");
+    setBillingSaveError(null);
+    setBillingReissueInfo(null);
+    try {
+      const token = localStorage.getItem("admin_token") || "";
+      const res = await fetch(`/api/bookings/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-admin-token": token },
+        body: JSON.stringify(billingForm),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error || "Save failed");
+      }
+      const body = await res.json().catch(() => ({}));
+      const r = body?.reissue || {};
+      if (r.alreadyPaid) setBillingReissueInfo("Invoice already paid in Stripe — details saved but invoice was not re-issued.");
+      else if (r.reissued) setBillingReissueInfo("Invoice re-issued and emailed to the customer.");
+      else if (r.error) setBillingReissueInfo(`Saved, but invoice re-issue failed: ${r.error}`);
+      setBillingSaveState("success");
+      await refetch();
+      setTimeout(() => { setEditingBilling(false); setBillingSaveState("idle"); }, 2500);
+    } catch (err: any) {
+      setBillingSaveError(err?.message || "Failed to save");
+      setBillingSaveState("error");
+    }
+  };
 
   const startEditing = (a: NonNullable<typeof data>["attendees"][number]) => {
     setEditingAttendeeId(a.id);
@@ -431,6 +500,101 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
                     </>
                   ) : data.billingAddress}
                 </span>
+              </div>
+            )}
+            <div className="flex gap-2 sm:col-span-2">
+              <span className="text-muted-foreground w-36 shrink-0">PO Number</span>
+              <span className="font-mono font-semibold">
+                {data?.poNumber || <span className="text-muted-foreground italic font-sans font-normal">Not provided</span>}
+              </span>
+            </div>
+          </div>
+
+          {/* Edit billing / PO */}
+          <div className="mt-4 pt-3 border-t border-blue-200">
+            {!editingBilling ? (
+              <button
+                onClick={startEditBilling}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary underline underline-offset-2 hover:text-primary/80"
+              >
+                <Pencil className="w-3 h-3" /> Edit PO / billing details
+                {data?.stripeInvoiceId ? <span className="text-muted-foreground font-normal italic">— will re-issue invoice</span> : null}
+              </button>
+            ) : (
+              <div className="bg-white border border-primary/30 rounded-sm p-4 space-y-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Editing billing details {data?.stripeInvoiceId ? "(saving will re-issue invoice)" : ""}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">PO Number</label>
+                    <Input value={billingForm.poNumber} maxLength={30} onChange={(e) => setBillingForm(f => ({ ...f, poNumber: e.target.value }))} className="h-8 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Billing Contact</label>
+                    <Input value={billingForm.billingName} onChange={(e) => setBillingForm(f => ({ ...f, billingName: e.target.value }))} className="h-8 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Company</label>
+                    <Input value={billingForm.billingCompany} onChange={(e) => setBillingForm(f => ({ ...f, billingCompany: e.target.value }))} className="h-8 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Invoice Email</label>
+                    <Input type="email" value={billingForm.billingEmail} onChange={(e) => setBillingForm(f => ({ ...f, billingEmail: e.target.value }))} className="h-8 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Phone</label>
+                    <Input type="tel" value={billingForm.billingPhone} onChange={(e) => setBillingForm(f => ({ ...f, billingPhone: e.target.value }))} className="h-8 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">VAT Number</label>
+                    <Input value={billingForm.billingVatNumber} onChange={(e) => setBillingForm(f => ({ ...f, billingVatNumber: e.target.value }))} className="h-8 text-sm" />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Address Line 1</label>
+                    <Input value={billingForm.billingAddressLine1} onChange={(e) => setBillingForm(f => ({ ...f, billingAddressLine1: e.target.value }))} className="h-8 text-sm" />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Address Line 2</label>
+                    <Input value={billingForm.billingAddressLine2} onChange={(e) => setBillingForm(f => ({ ...f, billingAddressLine2: e.target.value }))} className="h-8 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Town</label>
+                    <Input value={billingForm.billingTown} onChange={(e) => setBillingForm(f => ({ ...f, billingTown: e.target.value }))} className="h-8 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Region</label>
+                    <Input value={billingForm.billingRegion} onChange={(e) => setBillingForm(f => ({ ...f, billingRegion: e.target.value }))} className="h-8 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Postcode</label>
+                    <Input value={billingForm.billingPostcode} onChange={(e) => setBillingForm(f => ({ ...f, billingPostcode: e.target.value }))} className="h-8 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Country</label>
+                    <Input value={billingForm.billingCountry} onChange={(e) => setBillingForm(f => ({ ...f, billingCountry: e.target.value }))} className="h-8 text-sm" />
+                  </div>
+                </div>
+                {billingSaveError && <p className="text-xs text-red-600">{billingSaveError}</p>}
+                {billingReissueInfo && billingSaveState === "success" && (
+                  <p className="text-xs text-green-700 flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />{billingReissueInfo}</p>
+                )}
+                <div className="flex items-center gap-3 pt-1">
+                  <button
+                    onClick={handleSaveBilling}
+                    disabled={billingSaveState === "saving"}
+                    className={`inline-flex items-center gap-2 text-sm font-semibold px-4 py-1.5 rounded ${
+                      billingSaveState === "success" ? "bg-green-100 text-green-700"
+                      : billingSaveState === "saving" ? "bg-primary/60 text-white"
+                      : "bg-primary text-white hover:bg-primary/90"
+                    }`}
+                  >
+                    {billingSaveState === "saving" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    {billingSaveState === "success" && <Check className="w-3.5 h-3.5" />}
+                    {billingSaveState === "saving" ? "Saving & re-issuing…" : billingSaveState === "success" ? "Saved" : "Save & Re-issue"}
+                  </button>
+                  <button onClick={() => setEditingBilling(false)} className="text-sm text-muted-foreground hover:text-foreground">Cancel</button>
+                </div>
               </div>
             )}
           </div>

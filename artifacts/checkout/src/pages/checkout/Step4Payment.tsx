@@ -29,6 +29,7 @@ const invoiceSchema = z.object({
   billingCountry: z.string().min(1, "Country is required"),
   billingPhone: z.string().min(1, "Contact number is required"),
   billingVatNumber: z.string().optional(),
+  poNumber: z.string().optional(),
 });
 
 interface Step4PaymentProps {
@@ -107,6 +108,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
       billingCountry: booking.billingCountry || "United Kingdom",
       billingPhone: booking.billingPhone || "",
       billingVatNumber: booking.billingVatNumber || "",
+      poNumber: booking.poNumber || "",
     },
   });
 
@@ -130,6 +132,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
             billingCountry: data.billingCountry,
             billingPhone: data.billingPhone,
             billingVatNumber: data.billingVatNumber || null,
+            poNumber: data.poNumber || null,
           } : {})
         }
       });
@@ -431,19 +434,39 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                     )}
                   />
                 </div>
-                <FormField
-                  control={form.control}
-                  name="billingVatNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>VAT Number <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="e.g. GB123456789" className="h-12 bg-white" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="billingVatNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>VAT Number <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="e.g. GB123456789" className="h-12 bg-white" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="poNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>PO Number <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Add to appear on the invoice" className="h-12 bg-white" maxLength={30} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground bg-muted/40 border border-border/60 rounded-sm p-3 leading-relaxed">
+                  <strong>Need a PO number on your invoice?</strong> Enter it above to have it printed on the invoice we issue.
+                  You can also add or change the PO number — and update billing details — at any time before payment using the
+                  secure self-service link in your confirmation email; we'll re-issue the invoice with the new details automatically.
+                </p>
               </form>
             </Form>
           </div>

@@ -42,6 +42,10 @@ export interface UpdateBookingBody {
   /** @nullable */
   billingVatNumber?: string | null;
   /** @nullable */
+  billingPhone?: string | null;
+  /** @nullable */
+  poNumber?: string | null;
+  /** @nullable */
   invoiceDueDate?: Date | null;
   status?: UpdateBookingBodyStatus;
   /** @nullable */

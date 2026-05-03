@@ -59,6 +59,11 @@ export default function Confirmation({ booking }: ConfirmationProps) {
                 <div className="space-y-2">
                   <h4 className="font-bold text-accent-foreground">Invoice Requested</h4>
                   <p className="text-sm text-accent-foreground/80">An invoice has been sent to {booking.billingEmail || "your billing email"}. Please arrange payment within 14 days.</p>
+                  {booking.poNumber && (
+                    <p className="text-sm text-accent-foreground/80">
+                      <span className="font-semibold">PO Number:</span> <span className="font-mono">{booking.poNumber}</span>
+                    </p>
+                  )}
                   {booking.stripeInvoicePaymentUrl && (
                     <a
                       href={booking.stripeInvoicePaymentUrl}
@@ -68,6 +73,16 @@ export default function Confirmation({ booking }: ConfirmationProps) {
                     >
                       Pay online →
                     </a>
+                  )}
+                  {booking.managementToken && (
+                    <p className="text-xs text-accent-foreground/80 pt-1">
+                      <a
+                        href={`${import.meta.env.BASE_URL.replace(/\/$/, "")}/manage/${booking.managementToken}/billing`}
+                        className="font-semibold text-primary underline underline-offset-2 hover:text-primary/80"
+                      >
+                        {booking.poNumber ? "Update PO / billing details →" : "Add a PO number or update billing →"}
+                      </a>
+                    </p>
                   )}
                 </div>
               </div>

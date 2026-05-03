@@ -66,6 +66,8 @@ export interface Booking {
   /** @nullable */
   billingPhone?: string | null;
   /** @nullable */
+  poNumber?: string | null;
+  /** @nullable */
   managementToken?: string | null;
   /** @nullable */
   invoiceDueDate?: Date | null;

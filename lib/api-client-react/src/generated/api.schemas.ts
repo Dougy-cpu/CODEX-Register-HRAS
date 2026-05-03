@@ -113,6 +113,8 @@ export interface Booking {
   /** @nullable */
   billingPhone?: string | null;
   /** @nullable */
+  poNumber?: string | null;
+  /** @nullable */
   managementToken?: string | null;
   /** @nullable */
   invoiceDueDate?: string | null;
@@ -241,6 +243,10 @@ export interface UpdateBookingBody {
   billingCountry?: string | null;
   /** @nullable */
   billingVatNumber?: string | null;
+  /** @nullable */
+  billingPhone?: string | null;
+  /** @nullable */
+  poNumber?: string | null;
   /** @nullable */
   invoiceDueDate?: string | null;
   status?: UpdateBookingBodyStatus;
