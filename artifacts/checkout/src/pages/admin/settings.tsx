@@ -1025,7 +1025,9 @@ export default function AdminSettings() {
                 invoice confirmation emails. Use blank lines to separate paragraphs; lines starting
                 with <code className="text-xs bg-muted px-1 py-0.5 rounded">- </code> become
                 bullets; the first line of a multi-line block is rendered as a bold heading. Leave
-                empty to revert to the built-in default.
+                empty to revert to the built-in default, or click{" "}
+                <strong>Load default into editor</strong> below to start from the default and tweak
+                it.
               </p>
               <Textarea
                 rows={16}
@@ -1035,7 +1037,19 @@ export default function AdminSettings() {
                 className="text-sm font-mono leading-relaxed"
               />
               {helpError && <p className="text-sm text-destructive">{helpError}</p>}
-              <div className="flex justify-end">
+              <div className="flex justify-between items-center gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    setForm((f) => ({ ...f, invoiceHelpContent: DEFAULT_INVOICE_HELP_CONTENT }))
+                  }
+                  disabled={helpSaving}
+                  className="h-10 px-4"
+                  title="Copy the built-in default into the editor so you can tweak it"
+                >
+                  Load default into editor
+                </Button>
                 <Button
                   type="button"
                   onClick={handleSaveInvoiceHelp}
