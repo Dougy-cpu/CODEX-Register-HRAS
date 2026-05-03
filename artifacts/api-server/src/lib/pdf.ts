@@ -24,6 +24,7 @@ interface BookingForPdf {
   billingCountry?: string | null;
   billingPhone?: string | null;
   billingVatNumber?: string | null;
+  poNumber?: string | null;
   createdAt: Date;
 }
 
@@ -98,6 +99,9 @@ export function generatePdfReceipt(
     doc.text(`Receipt Number: ${booking.orderReference || `INV-${booking.id}`}`);
     doc.text(`Date: ${dateStr}`);
     doc.text(`Booking Reference: ${booking.orderReference || `#${booking.id}`}`);
+    if (booking.poNumber) {
+      doc.text(`PO Number: ${booking.poNumber}`);
+    }
 
     doc.moveDown(1);
 

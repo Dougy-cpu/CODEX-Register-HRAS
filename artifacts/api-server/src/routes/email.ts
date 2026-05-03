@@ -387,6 +387,8 @@ async function buildSampleVars(
           "{{eventVenuePostcode}}": settings.eventVenuePostcode || "EC2M 3TQ",
           "{{managementLink}}": sampleManagementLink,
           "{{invoicePaymentButton}}": "",
+          "{{poNumber}}": "PO-2026-001",
+          "{{poNumberSection}}": `<br><strong>PO Number:</strong> <span style="font-family:monospace;">PO-2026-001</span>`,
           "{{total}}": "£238.80",
           "{{promoCode}}": "SAVE20",
           "{{promoDiscount}}": "£20.00",

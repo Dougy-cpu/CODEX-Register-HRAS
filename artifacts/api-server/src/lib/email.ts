@@ -362,8 +362,11 @@ async function buildConfirmationEmailHtml(
   const billingEditLinkHtml = billingEditUrl
     ? `<p style="margin:14px 0 0;font-size:14px;"><a href="${billingEditUrl}" style="color:#E74F3E;font-weight:600;text-decoration:underline;">${booking.poNumber ? "Update PO number or billing details →" : "Add a PO number / update billing details →"}</a></p>`
     : "";
+  // Inline form: leading <br> renders as a new line both inside the info-box
+  // (where neighbouring fields use <br> separators) and in the standalone
+  // fallback body. Empty string when no PO so no blank label is ever shown.
   const poNumberHtml = booking.poNumber
-    ? `<p style="margin:6px 0 0;font-size:14px;"><strong>PO Number:</strong> <span style="font-family:monospace;">${escHtml(booking.poNumber)}</span></p>`
+    ? `<br><strong>PO Number:</strong> <span style="font-family:monospace;">${escHtml(booking.poNumber)}</span>`
     : "";
 
   const invoicePaymentButtonHtml = booking.stripeInvoicePaymentUrl

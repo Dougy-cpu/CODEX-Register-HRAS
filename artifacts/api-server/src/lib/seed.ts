@@ -24,6 +24,7 @@ const DEFAULT_CONFIRMATION_BODY = `
   <strong>Order Reference:</strong> {{orderReference}}<br>
   <strong>Pass Type:</strong> {{passLabel}}<br>
   <strong>Quantity:</strong> {{quantity}} {{quantityLabel}}
+  {{poNumberSection}}
 </div>
 
 <h3>Registered Attendees</h3>

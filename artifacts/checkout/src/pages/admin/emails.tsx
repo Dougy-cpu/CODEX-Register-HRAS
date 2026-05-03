@@ -296,6 +296,18 @@ const TEMPLATE_VARIABLES: Record<TemplateType, TemplateVariable[]> = {
         "Online payment button — only rendered for invoice bookings, empty for card payments",
     },
     {
+      tag: "{{poNumberSection}}",
+      label: "PO Number Row",
+      description:
+        "Pre-built 'PO Number' row (label + value) — automatically empty when no PO is set, so it's safe to drop into the booking summary block.",
+    },
+    {
+      tag: "{{poNumber}}",
+      label: "PO Number (raw value)",
+      description:
+        "Just the PO number itself with no label or styling — empty when no PO is set. Use this if you want to position the label yourself.",
+    },
+    {
       tag: "{{eventCalendarLinks}}",
       label: "Main Event Calendar Block",
       description:
