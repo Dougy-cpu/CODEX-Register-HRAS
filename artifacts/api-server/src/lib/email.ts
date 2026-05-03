@@ -515,6 +515,7 @@ async function buildConfirmationEmailHtml(
       <strong>Order Reference:</strong> ${escHtml(orderRef)}<br>
       <strong>Pass Type:</strong> ${escHtml(passLabel)}<br>
       <strong>Quantity:</strong> ${booking.quantity} ${quantityLabel}
+      ${poNumberHtml}
     </div>
     <h3>Registered Attendees</h3>${attendeesTableHtml}
     <h3>Price Summary</h3>${priceSummaryHtml}
@@ -527,7 +528,6 @@ async function buildConfirmationEmailHtml(
     <p style="margin:0 0 16px;color:#444;line-height:1.6;">You have a secure self-service link to manage all your attendee information. You can fill in placeholder seats, update existing details, add dietary requirements — all without logging in. Need to share registration with colleagues? Forward them the link to enter their own details.</p>
     ${managementLinkHtml}
     <p>A PDF VAT receipt is attached to this email for your records.</p>
-    ${poNumberHtml}
     ${invoicePaymentButtonHtml}
     ${billingEditLinkHtml}
     <p>We look forward to seeing you at the ${settings.eventName || "HR Analytics Summit"}!</p>
