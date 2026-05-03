@@ -119,6 +119,22 @@ function applySubjectVars(template: string, vars: Record<string, string>): strin
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? `{{${key}}}`);
 }
 
+/**
+ * Escape a value for safe inclusion as HTML text/attribute content. Used to
+ * prevent stored-XSS via attendee/billing/promo fields that flow into our
+ * branded HTML email templates. Pre-built HTML fragments (calendar blocks,
+ * management link section, attendee table HTML, etc.) must NOT be escaped.
+ */
+export function escHtml(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function createTransporter() {
   const host = process.env.SMTP_HOST;
   const user = process.env.SMTP_USER;
@@ -301,11 +317,11 @@ async function buildConfirmationEmailHtml(
     .map(
       (a) => `<tr>
       <td style="padding:8px 4px;border-bottom:1px solid #eee;">${a.isLead ? "✓ Lead" : ""}</td>
-      <td style="padding:8px 4px;border-bottom:1px solid #eee;">${a.firstName} ${a.lastName}</td>
-      <td style="padding:8px 4px;border-bottom:1px solid #eee;">${a.jobTitle}</td>
-      <td style="padding:8px 4px;border-bottom:1px solid #eee;">${a.company}</td>
-      <td style="padding:8px 4px;border-bottom:1px solid #eee;">${a.workEmail}</td>
-      <td style="padding:8px 4px;border-bottom:1px solid #eee;">${a.phone || "—"}</td>
+      <td style="padding:8px 4px;border-bottom:1px solid #eee;">${escHtml(a.firstName)} ${escHtml(a.lastName)}</td>
+      <td style="padding:8px 4px;border-bottom:1px solid #eee;">${escHtml(a.jobTitle)}</td>
+      <td style="padding:8px 4px;border-bottom:1px solid #eee;">${escHtml(a.company)}</td>
+      <td style="padding:8px 4px;border-bottom:1px solid #eee;">${escHtml(a.workEmail)}</td>
+      <td style="padding:8px 4px;border-bottom:1px solid #eee;">${a.phone ? escHtml(a.phone) : "—"}</td>
     </tr>`,
     )
     .join("");
@@ -328,7 +344,7 @@ async function buildConfirmationEmailHtml(
       ? `<div class="price-row"><span>Group Discount</span><span>-${formatCurrency(groupDiscount)}</span></div>`
       : "",
     promoDiscount > 0
-      ? `<div class="price-row"><span>Promo Code (${booking.promoCode})</span><span>-${formatCurrency(promoDiscount)}</span></div>`
+      ? `<div class="price-row"><span>Promo Code (${escHtml(booking.promoCode)})</span><span>-${formatCurrency(promoDiscount)}</span></div>`
       : "",
     `<div class="price-row"><span>VAT (20%)</span><span>${formatCurrency(vat)}</span></div>`,
     `<div class="price-total"><span>Total</span><span>${formatCurrency(total)}</span></div>`,
@@ -347,7 +363,7 @@ async function buildConfirmationEmailHtml(
     ? `<p style="margin:14px 0 0;font-size:14px;"><a href="${billingEditUrl}" style="color:#E74F3E;font-weight:600;text-decoration:underline;">${booking.poNumber ? "Update PO number or billing details →" : "Add a PO number / update billing details →"}</a></p>`
     : "";
   const poNumberHtml = booking.poNumber
-    ? `<p style="margin:6px 0 0;font-size:14px;"><strong>PO Number:</strong> <span style="font-family:monospace;">${booking.poNumber}</span></p>`
+    ? `<p style="margin:6px 0 0;font-size:14px;"><strong>PO Number:</strong> <span style="font-family:monospace;">${escHtml(booking.poNumber)}</span></p>`
     : "";
 
   const invoicePaymentButtonHtml = booking.stripeInvoicePaymentUrl
@@ -364,20 +380,23 @@ async function buildConfirmationEmailHtml(
       .where(eq(emailTemplatesTable.type, "confirmation"));
 
     if (dbTemplate) {
+      // Body vars: user-controlled values are HTML-escaped; pre-built HTML
+      // fragments (calendar links, attendees table, manage-link section,
+      // billing-edit link, etc.) MUST be inserted raw.
       const vars: Record<string, string> = {
-        "{{firstName}}": lead.firstName,
-        "{{orderReference}}": orderRef,
-        "{{passLabel}}": passLabel,
+        "{{firstName}}": escHtml(lead.firstName),
+        "{{orderReference}}": escHtml(orderRef),
+        "{{passLabel}}": escHtml(passLabel),
         "{{quantity}}": String(booking.quantity),
         "{{quantityLabel}}": quantityLabel,
         "{{attendeesTable}}": attendeesTableHtml,
         "{{priceSummary}}": priceSummaryHtml,
-        "{{eventDate}}": settings.eventDate || "Thursday, 3 September 2026",
-        "{{eventVenue}}": settings.eventVenue || "155 Bishopsgate, London",
-        "{{eventVenuePostcode}}": settings.eventVenuePostcode || "EC2M 3TQ",
+        "{{eventDate}}": escHtml(settings.eventDate || "Thursday, 3 September 2026"),
+        "{{eventVenue}}": escHtml(settings.eventVenue || "155 Bishopsgate, London"),
+        "{{eventVenuePostcode}}": escHtml(settings.eventVenuePostcode || "EC2M 3TQ"),
         "{{managementLink}}": managementLinkHtml,
         "{{invoicePaymentButton}}": invoicePaymentButtonHtml,
-        "{{poNumber}}": booking.poNumber || "",
+        "{{poNumber}}": escHtml(booking.poNumber || ""),
         "{{poNumberSection}}": poNumberHtml,
         "{{billingEditLink}}": billingEditLinkHtml,
         "{{billingEditUrl}}": billingEditUrl,
@@ -392,6 +411,20 @@ async function buildConfirmationEmailHtml(
       vars["{{socialGoogleCalendarUrl}}"] = calPh.socialGoogleCalendarUrl;
       vars["{{socialOutlookCalendarUrl}}"] = calPh.socialOutlookCalendarUrl;
       vars["{{socialIcsCalendarUrl}}"] = calPh.socialIcsCalendarUrl;
+
+      // Subject is a plain-text email header — must use raw values, not
+      // HTML-escaped ones, otherwise users see literal "&amp;" in their inbox.
+      const subjectVars: Record<string, string> = {
+        "{{firstName}}": lead.firstName,
+        "{{orderReference}}": orderRef,
+        "{{passLabel}}": passLabel,
+        "{{quantity}}": String(booking.quantity),
+        "{{quantityLabel}}": quantityLabel,
+        "{{eventDate}}": settings.eventDate || "Thursday, 3 September 2026",
+        "{{eventVenue}}": settings.eventVenue || "155 Bishopsgate, London",
+        "{{eventVenuePostcode}}": settings.eventVenuePostcode || "EC2M 3TQ",
+        "{{poNumber}}": booking.poNumber || "",
+      };
 
       let body = dbTemplate.htmlBody;
       // If the DB template predates the new PO/billing-edit placeholders,
@@ -426,7 +459,7 @@ async function buildConfirmationEmailHtml(
       }
 
       let subject = dbTemplate.subject;
-      for (const [placeholder, value] of Object.entries(vars)) {
+      for (const [placeholder, value] of Object.entries(subjectVars)) {
         subject = subject.replaceAll(placeholder, value);
       }
 
@@ -442,19 +475,19 @@ async function buildConfirmationEmailHtml(
   // Fallback: hardcoded template
   const fallbackBody = `
     <h2>Booking Confirmed!</h2>
-    <p>Dear ${lead.firstName},</p>
-    <p>Thank you for registering for the <strong>${settings.eventName || "HR Analytics Summit 2026"}</strong>. Your booking is confirmed.</p>
+    <p>Dear ${escHtml(lead.firstName)},</p>
+    <p>Thank you for registering for the <strong>${escHtml(settings.eventName || "HR Analytics Summit 2026")}</strong>. Your booking is confirmed.</p>
     <div class="info-box">
-      <strong>Order Reference:</strong> ${orderRef}<br>
-      <strong>Pass Type:</strong> ${passLabel}<br>
+      <strong>Order Reference:</strong> ${escHtml(orderRef)}<br>
+      <strong>Pass Type:</strong> ${escHtml(passLabel)}<br>
       <strong>Quantity:</strong> ${booking.quantity} ${quantityLabel}
     </div>
     <h3>Registered Attendees</h3>${attendeesTableHtml}
     <h3>Price Summary</h3>${priceSummaryHtml}
     <div class="info-box" style="margin-top:24px;">
       <strong>Event Details</strong><br>
-      <strong>Date:</strong> ${settings.eventDate}<br>
-      <strong>Venue:</strong> ${settings.eventVenue}, ${settings.eventVenuePostcode}
+      <strong>Date:</strong> ${escHtml(settings.eventDate)}<br>
+      <strong>Venue:</strong> ${escHtml(settings.eventVenue)}, ${escHtml(settings.eventVenuePostcode)}
     </div>
     <h3 style="margin-top:28px;margin-bottom:12px;color:#000;">Update Attendee Details Anytime</h3>
     <p style="margin:0 0 16px;color:#444;line-height:1.6;">You have a secure self-service link to manage all your attendee information. You can fill in placeholder seats, update existing details, add dietary requirements — all without logging in. Need to share registration with colleagues? Forward them the link to enter their own details.</p>
@@ -567,11 +600,14 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
     await logEmail(bookingId, lead.workEmail, "receipt", confirmSent ? "sent" : "failed");
   }
 
-  await sendWelcomeEmail(bookingId, lead.firstName, lead.workEmail);
-
-  // Send welcome email to every other confirmed (non-TBC) attendee
-  const additionalAttendees = attendees.filter((a) => !a.isLead && !a.isTbc);
-  for (const attendee of additionalAttendees) {
+  // Send a welcome email to every confirmed (non-TBC) attendee, including the
+  // lead. Previously the lead got a standalone `sendWelcomeEmail()` call AND
+  // the per-attendee loop excluded them, but the audit flagged that the
+  // standalone path could fire twice when both `sendBookingEmails` and a
+  // separate caller (e.g. lead-capture) raced. Unifying through one filtered
+  // loop guarantees exactly-one welcome per attendee for this booking flow.
+  const welcomeAttendees = attendees.filter((a) => !a.isTbc);
+  for (const attendee of welcomeAttendees) {
     await sendWelcomeEmail(bookingId, attendee.firstName, attendee.workEmail);
   }
 }
@@ -610,7 +646,7 @@ export async function sendReissuedInvoiceEmail(bookingId: number): Promise<void>
     <div style="background:#fff8f7;border:2px solid #E74F3E;border-radius:6px;padding:18px 22px;margin:0 0 20px;">
       <p style="margin:0 0 6px;font-size:15px;font-weight:700;color:#E74F3E;">Your invoice has been re-issued</p>
       <p style="margin:0;font-size:14px;color:#333;line-height:1.5;">
-        We've updated your billing details${booking.poNumber ? ` (including PO Number <strong style="font-family:monospace;">${booking.poNumber}</strong>)` : ""} and issued a fresh invoice. The previous invoice has been voided. The latest invoice PDF is attached and a payment link is below.
+        We've updated your billing details${booking.poNumber ? ` (including PO Number <strong style="font-family:monospace;">${escHtml(booking.poNumber)}</strong>)` : ""} and issued a fresh invoice. The previous invoice has been voided. The latest invoice PDF is attached and a payment link is below.
       </p>
     </div>`;
   // Inject the banner just after the opening branded layout container if
@@ -808,11 +844,11 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
     .map(
       (a, i) => `
     <tr style="background:${i % 2 === 0 ? "#f9f9f9" : "#fff"}">
-      <td style="padding:8px 10px;border:1px solid #e5e5e5">${a.firstName} ${a.lastName}${a.isLead ? ' <span style="font-size:11px;color:#E74F3E;font-weight:bold">(Buyer)</span>' : ""}</td>
-      <td style="padding:8px 10px;border:1px solid #e5e5e5">${a.workEmail}</td>
-      <td style="padding:8px 10px;border:1px solid #e5e5e5">${a.phone || "—"}</td>
-      <td style="padding:8px 10px;border:1px solid #e5e5e5">${a.jobTitle || "—"}</td>
-      <td style="padding:8px 10px;border:1px solid #e5e5e5">${a.company || "—"}</td>
+      <td style="padding:8px 10px;border:1px solid #e5e5e5">${escHtml(a.firstName)} ${escHtml(a.lastName)}${a.isLead ? ' <span style="font-size:11px;color:#E74F3E;font-weight:bold">(Buyer)</span>' : ""}</td>
+      <td style="padding:8px 10px;border:1px solid #e5e5e5">${escHtml(a.workEmail)}</td>
+      <td style="padding:8px 10px;border:1px solid #e5e5e5">${a.phone ? escHtml(a.phone) : "—"}</td>
+      <td style="padding:8px 10px;border:1px solid #e5e5e5">${a.jobTitle ? escHtml(a.jobTitle) : "—"}</td>
+      <td style="padding:8px 10px;border:1px solid #e5e5e5">${a.company ? escHtml(a.company) : "—"}</td>
     </tr>
   `,
     )
@@ -836,12 +872,12 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
 
     <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:0.05em;color:#888">Order Details</h3>
     <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px">
-      <tr><td style="padding:7px 0;color:#666;width:180px;border-bottom:1px solid #f0f0f0">Order Reference</td><td style="border-bottom:1px solid #f0f0f0"><strong style="font-family:monospace">${booking.orderReference || `#${bookingId}`}</strong></td></tr>
+      <tr><td style="padding:7px 0;color:#666;width:180px;border-bottom:1px solid #f0f0f0">Order Reference</td><td style="border-bottom:1px solid #f0f0f0"><strong style="font-family:monospace">${escHtml(booking.orderReference || `#${bookingId}`)}</strong></td></tr>
       <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Pass Type</td><td style="border-bottom:1px solid #f0f0f0">${passLabels[booking.passType] || booking.passType}</td></tr>
       <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Quantity</td><td style="border-bottom:1px solid #f0f0f0">${booking.quantity} ${booking.quantity === 1 ? "ticket" : "tickets"}</td></tr>
       <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Payment Method</td><td style="border-bottom:1px solid #f0f0f0">${booking.paymentMethod === "card" ? "Credit/Debit Card" : booking.paymentMethod === "invoice" ? "Invoice" : "—"}</td></tr>
-      <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Status</td><td style="border-bottom:1px solid #f0f0f0"><strong style="color:${booking.status === "paid" ? "#16a34a" : "#d97706"}">${booking.status === "paid" ? "Paid" : booking.status === "invoiced" ? "Invoiced (Awaiting Payment)" : booking.status}</strong></td></tr>
-      ${booking.promoCode ? `<tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Promo Code</td><td style="border-bottom:1px solid #f0f0f0">${booking.promoCode}</td></tr>` : ""}
+      <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Status</td><td style="border-bottom:1px solid #f0f0f0"><strong style="color:${booking.status === "paid" ? "#16a34a" : "#d97706"}">${booking.status === "paid" ? "Paid" : booking.status === "invoiced" ? "Invoiced (Awaiting Payment)" : escHtml(booking.status)}</strong></td></tr>
+      ${booking.promoCode ? `<tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Promo Code</td><td style="border-bottom:1px solid #f0f0f0">${escHtml(booking.promoCode)}</td></tr>` : ""}
     </table>
 
     <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:0.05em;color:#888">Pricing</h3>
@@ -858,9 +894,9 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
         ? `
     <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:0.05em;color:#888">Billing Details</h3>
     <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px">
-      <tr><td style="padding:7px 0;color:#666;width:180px;border-bottom:1px solid #f0f0f0">Billing Contact</td><td style="border-bottom:1px solid #f0f0f0">${booking.billingName}</td></tr>
-      <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Company</td><td style="border-bottom:1px solid #f0f0f0">${booking.billingCompany || "—"}</td></tr>
-      <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Invoice Email</td><td style="border-bottom:1px solid #f0f0f0">${booking.billingEmail || "—"}</td></tr>
+      <tr><td style="padding:7px 0;color:#666;width:180px;border-bottom:1px solid #f0f0f0">Billing Contact</td><td style="border-bottom:1px solid #f0f0f0">${escHtml(booking.billingName)}</td></tr>
+      <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Company</td><td style="border-bottom:1px solid #f0f0f0">${booking.billingCompany ? escHtml(booking.billingCompany) : "—"}</td></tr>
+      <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Invoice Email</td><td style="border-bottom:1px solid #f0f0f0">${booking.billingEmail ? escHtml(booking.billingEmail) : "—"}</td></tr>
       <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Address</td><td style="border-bottom:1px solid #f0f0f0">${(() => {
         if (booking.billingAddressLine1) {
           const cityRegion =
@@ -875,13 +911,14 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
             booking.billingCountry,
           ]
             .filter(Boolean)
+            .map((s) => escHtml(s))
             .join("<br>");
         }
-        return (booking.billingAddress || "—").replace(/\n/g, "<br>");
+        return escHtml(booking.billingAddress || "—").replace(/\n/g, "<br>");
       })()}</td></tr>
-      ${booking.billingPhone ? `<tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Contact Phone</td><td style="border-bottom:1px solid #f0f0f0">${booking.billingPhone}</td></tr>` : ""}
-      ${booking.billingVatNumber ? `<tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">VAT Number</td><td style="border-bottom:1px solid #f0f0f0">${booking.billingVatNumber}</td></tr>` : ""}
-      ${booking.poNumber ? `<tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">PO Number</td><td style="border-bottom:1px solid #f0f0f0;font-family:monospace"><strong>${booking.poNumber}</strong></td></tr>` : ""}
+      ${booking.billingPhone ? `<tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Contact Phone</td><td style="border-bottom:1px solid #f0f0f0">${escHtml(booking.billingPhone)}</td></tr>` : ""}
+      ${booking.billingVatNumber ? `<tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">VAT Number</td><td style="border-bottom:1px solid #f0f0f0">${escHtml(booking.billingVatNumber)}</td></tr>` : ""}
+      ${booking.poNumber ? `<tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">PO Number</td><td style="border-bottom:1px solid #f0f0f0;font-family:monospace"><strong>${escHtml(booking.poNumber)}</strong></td></tr>` : ""}
     </table>
     `
         : ""
@@ -904,14 +941,37 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
     </table>
   `);
 
+  // sendMail() is non-throwing: it returns false (and logs the underlying
+  // SMTP error itself) when delivery fails. Aggregate by inspecting the
+  // boolean return so we get an accurate sent/failed split per booking.
   let sentCount = 0;
+  const failedRecipients: string[] = [];
   for (const to of recipients) {
+    let ok = false;
     try {
-      await sendMail({ to, subject, html });
-      sentCount++;
+      ok = await sendMail({ to, subject, html });
     } catch (err) {
-      logger.error({ err, bookingId, to }, "Failed to send organiser notification");
+      // Defensive: sendMail should never throw, but if it ever does we log
+      // the unexpected error here rather than swallowing it silently.
+      logger.error({ err, bookingId, to }, "Organiser notification threw unexpectedly");
     }
+    if (ok) {
+      sentCount++;
+    } else {
+      failedRecipients.push(to);
+    }
+  }
+  if (failedRecipients.length > 0) {
+    logger.error(
+      {
+        bookingId,
+        sentCount,
+        failedCount: failedRecipients.length,
+        total: recipients.length,
+        failedRecipients,
+      },
+      "Organiser notifications: one or more recipients failed",
+    );
   }
   logger.info({ bookingId, sentCount, total: recipients.length }, "Organiser notifications sent");
 }
@@ -983,8 +1043,8 @@ export async function sendIncompleteFormNotification(bookingId: number): Promise
     .map(
       ([label, value], i) => `
     <tr style="background:${i % 2 === 0 ? "#1e293b" : "#263548"}">
-      <td style="padding:11px 16px;font-weight:bold;color:#94a3b8;font-size:13px;width:160px;border-bottom:1px solid #334155">${label}</td>
-      <td style="padding:11px 16px;color:#f1f5f9;font-size:13px;border-bottom:1px solid #334155">${value}</td>
+      <td style="padding:11px 16px;font-weight:bold;color:#94a3b8;font-size:13px;width:160px;border-bottom:1px solid #334155">${escHtml(label)}</td>
+      <td style="padding:11px 16px;color:#f1f5f9;font-size:13px;border-bottom:1px solid #334155">${escHtml(value)}</td>
     </tr>
   `,
     )
@@ -1055,14 +1115,34 @@ export async function sendIncompleteFormNotification(bookingId: number): Promise
 </body>
 </html>`;
 
+  // See note in sendOrganiserNotification: sendMail returns false on failure
+  // rather than throwing, so we aggregate based on the boolean return.
   let sentCount = 0;
+  const failedRecipients: string[] = [];
   for (const to of recipients) {
+    let ok = false;
     try {
-      await sendMail({ to, subject, html });
-      sentCount++;
+      ok = await sendMail({ to, subject, html });
     } catch (err) {
-      logger.error({ err, bookingId, to }, "Failed to send incomplete form notification");
+      logger.error({ err, bookingId, to }, "Incomplete form notification threw unexpectedly");
     }
+    if (ok) {
+      sentCount++;
+    } else {
+      failedRecipients.push(to);
+    }
+  }
+  if (failedRecipients.length > 0) {
+    logger.error(
+      {
+        bookingId,
+        sentCount,
+        failedCount: failedRecipients.length,
+        total: recipients.length,
+        failedRecipients,
+      },
+      "Incomplete form notifications: one or more recipients failed",
+    );
   }
   logger.info(
     { bookingId, sentCount, total: recipients.length },
@@ -1307,9 +1387,10 @@ export async function sendWelcomeEmail(
 
     const calPh = getCalendarPlaceholders(settings);
 
+    const safeFirstName = escHtml(firstName);
     const personalised = template.htmlBody
-      .replace(/\{\{firstName\}\}/g, firstName)
-      .replace(/\{\{name\}\}/g, firstName)
+      .replace(/\{\{firstName\}\}/g, safeFirstName)
+      .replace(/\{\{name\}\}/g, safeFirstName)
       .replace(/\{\{managementLink\}\}/g, manageLinkHtml)
       .replace(/\{\{eventCalendarLinks\}\}/g, calPh.eventCalendarLinks)
       .replace(/\{\{socialCalendarLinks\}\}/g, calPh.socialCalendarLinks)
@@ -1430,8 +1511,8 @@ export async function sendAttendeeChangeNotification(
                   .map(
                     ([label, value], i) => `
                   <tr style="background:${i % 2 === 0 ? "#1e293b" : "#263548"}">
-                    <td style="padding:11px 16px;font-weight:bold;color:#94a3b8;font-size:13px;width:160px;border-bottom:1px solid #334155">${label}</td>
-                    <td style="padding:11px 16px;color:#f1f5f9;font-size:13px;border-bottom:1px solid #334155">${value}</td>
+                    <td style="padding:11px 16px;font-weight:bold;color:#94a3b8;font-size:13px;width:160px;border-bottom:1px solid #334155">${escHtml(label)}</td>
+                    <td style="padding:11px 16px;color:#f1f5f9;font-size:13px;border-bottom:1px solid #334155">${escHtml(value)}</td>
                   </tr>`,
                   )
                   .join("")}
@@ -1452,17 +1533,38 @@ export async function sendAttendeeChangeNotification(
 </body>
 </html>`;
 
+    // See note in sendOrganiserNotification: sendMail returns false on
+    // failure rather than throwing, so aggregate from the boolean return.
     let sentCount = 0;
+    const failedRecipients: string[] = [];
     for (const to of recipients) {
+      let ok = false;
       try {
-        await sendMail({ to, subject, html });
-        sentCount++;
+        ok = await sendMail({ to, subject, html });
       } catch (err) {
         logger.error(
           { err, bookingId, attendeeId, to },
-          "Failed to send attendee change notification",
+          "Attendee change notification threw unexpectedly",
         );
       }
+      if (ok) {
+        sentCount++;
+      } else {
+        failedRecipients.push(to);
+      }
+    }
+    if (failedRecipients.length > 0) {
+      logger.error(
+        {
+          bookingId,
+          attendeeId,
+          sentCount,
+          failedCount: failedRecipients.length,
+          total: recipients.length,
+          failedRecipients,
+        },
+        "Attendee change notifications: one or more recipients failed",
+      );
     }
     logger.info({ bookingId, attendeeId, sentCount }, "Attendee change notifications sent");
   } catch (err) {
@@ -1485,6 +1587,7 @@ export async function sendCheckoutExpiredEmail(bookingId: number): Promise<void>
   const organisers = await getOrganiserEmails();
 
   const name = `${lead.firstName} ${lead.lastName}`;
+  const safeName = escHtml(name);
   const checkoutUrl = settings.orgWebsite || "https://www.hranalyticssummit.com";
 
   const html = wrapInBrandedLayout(
@@ -1493,7 +1596,7 @@ export async function sendCheckoutExpiredEmail(bookingId: number): Promise<void>
       <strong style="color:#856404;">⚠ Checkout session expired</strong>
     </div>
     <h2 style="margin-top:0;">Incomplete Registration — Session Expired</h2>
-    <p>Hi ${name},</p>
+    <p>Hi ${safeName},</p>
     <p>Your checkout session for <strong>HR Analytics Summit 2026</strong> expired before the payment was completed. This usually happens if the browser was left open for more than 24 hours without submitting payment.</p>
     <p><strong>Your booking details are still saved.</strong> To complete your registration, simply return to the checkout and restart the payment step — you won't need to re-enter your attendee information.</p>
     <p style="text-align:center;margin:32px 0;">
@@ -1542,11 +1645,11 @@ export async function sendRefundConfirmationEmail(
   const html = wrapInBrandedLayout(
     `
     <h2 style="margin-top:0;">Your Refund Has Been Processed</h2>
-    <p>Hi ${name},</p>
+    <p>Hi ${escHtml(name)},</p>
     <p>We have processed a refund for your registration at <strong>HR Analytics Summit 2026</strong>. The amount will appear in your account within 5–10 business days depending on your bank.</p>
     <div class="info-box">
       <table style="width:100%;font-size:15px;">
-        <tr><td style="color:#666;padding:4px 0;">Booking Reference</td><td style="text-align:right;font-family:monospace;font-weight:600;">${orderRef}</td></tr>
+        <tr><td style="color:#666;padding:4px 0;">Booking Reference</td><td style="text-align:right;font-family:monospace;font-weight:600;">${escHtml(orderRef)}</td></tr>
         <tr><td style="color:#666;padding:4px 0;">Refund Amount</td><td style="text-align:right;font-weight:700;color:#E74F3E;">£${refundAmount}</td></tr>
         <tr><td style="color:#666;padding:4px 0;">Status</td><td style="text-align:right;">Refunded &amp; Booking Cancelled</td></tr>
       </table>
@@ -1595,7 +1698,7 @@ export async function sendInvoicePaymentFailedEmail(
 
   const declineNote = declineReason
     ? `<div style="background:#f8d7da;border:1px solid #f5c2c7;padding:12px 16px;border-radius:4px;margin:16px 0;font-size:14px;color:#842029;">
-        <strong>Reason:</strong> ${declineReason}
+        <strong>Reason:</strong> ${escHtml(declineReason)}
       </div>`
     : "";
 
@@ -1605,8 +1708,8 @@ export async function sendInvoicePaymentFailedEmail(
       <strong style="color:#856404;">⚠ Invoice payment unsuccessful</strong>
     </div>
     <h2 style="margin-top:0;">Action Required: Invoice Payment Failed</h2>
-    <p>Hi ${name},</p>
-    <p>We attempted to collect payment for your HR Analytics Summit 2026 invoice but the payment was unsuccessful. Your booking reference is <strong>${orderRef}</strong>.</p>
+    <p>Hi ${escHtml(name)},</p>
+    <p>We attempted to collect payment for your HR Analytics Summit 2026 invoice but the payment was unsuccessful. Your booking reference is <strong>${escHtml(orderRef)}</strong>.</p>
     ${declineNote}
     ${attemptNote}
     <p>Please use the button below to pay your invoice. If you continue to have difficulties, contact your bank or reach out to us directly.</p>
@@ -1687,10 +1790,10 @@ export async function sendDisputeAlertEmail(
     <p>A customer has filed a chargeback with their bank. <strong>You must respond by the deadline below</strong> or the funds will be automatically returned and a dispute fee charged.</p>
     <div class="info-box">
       <table style="width:100%;font-size:15px;">
-        <tr><td style="color:#666;padding:6px 0;">Booking Reference</td><td style="text-align:right;font-family:monospace;font-weight:600;">${orderRef}</td></tr>
-        <tr><td style="color:#666;padding:6px 0;">Customer</td><td style="text-align:right;font-weight:600;">${customerName}</td></tr>
+        <tr><td style="color:#666;padding:6px 0;">Booking Reference</td><td style="text-align:right;font-family:monospace;font-weight:600;">${escHtml(orderRef)}</td></tr>
+        <tr><td style="color:#666;padding:6px 0;">Customer</td><td style="text-align:right;font-weight:600;">${escHtml(customerName)}</td></tr>
         <tr><td style="color:#666;padding:6px 0;">Disputed Amount</td><td style="text-align:right;font-weight:700;color:#842029;">£${disputeAmount}</td></tr>
-        <tr><td style="color:#666;padding:6px 0;">Dispute Reason</td><td style="text-align:right;">${disputeReason}</td></tr>
+        <tr><td style="color:#666;padding:6px 0;">Dispute Reason</td><td style="text-align:right;">${escHtml(disputeReason)}</td></tr>
         <tr><td style="color:#666;padding:6px 0;font-weight:700;">Evidence Deadline</td><td style="text-align:right;font-weight:700;color:#842029;">${deadlineStr}</td></tr>
       </table>
     </div>
@@ -1764,13 +1867,24 @@ export async function sendInvoiceReminder(bookingId: number): Promise<void> {
     ? `<p style="margin:24px 0;text-align:center;"><a href="${booking.stripeInvoicePaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:14px 32px;text-decoration:none;font-weight:bold;font-size:15px;border-radius:4px;">Pay Invoice Online →</a></p>`
     : "";
 
+  // Body-vars are HTML-escaped (these are inserted into HTML email content),
+  // except `payOnlineButton` which is a pre-built HTML fragment.
   const templateVars: Record<string, string> = {
+    "{{firstName}}": escHtml(lead.firstName || recipientName),
+    "{{recipientName}}": escHtml(recipientName),
+    "{{orderReference}}": escHtml(orderRef),
+    "{{dueDate}}": escHtml(dueDateStr),
+    "{{payOnlineButton}}": payOnlineButton,
+    "{{payOnlineUrl}}": booking.stripeInvoicePaymentUrl || "",
+  };
+  // Subject is a plain-text mail header — must use raw values.
+  const subjectVars: Record<string, string> = {
     "{{firstName}}": lead.firstName || recipientName,
     "{{recipientName}}": recipientName,
     "{{orderReference}}": orderRef,
     "{{dueDate}}": dueDateStr,
-    "{{payOnlineButton}}": payOnlineButton,
     "{{payOnlineUrl}}": booking.stripeInvoicePaymentUrl || "",
+    "{{payOnlineButton}}": "",
   };
   const templateHasPayButton = !!storedTemplate?.htmlBody.includes("{{payOnlineButton}}");
 
@@ -1781,11 +1895,11 @@ export async function sendInvoiceReminder(bookingId: number): Promise<void> {
       introHtml = introHtml.replaceAll(key, val);
     }
   } else {
-    introHtml = `<p>Dear ${recipientName},</p>
+    introHtml = `<p>Dear ${escHtml(recipientName)},</p>
     <p>${
       isOverdue
-        ? `We are writing to remind you that invoice <strong>${orderRef}</strong> for your registration to the <strong>HR Analytics Summit 2026</strong> was due on <strong>${dueDateStr}</strong> and remains unpaid.`
-        : `This is a friendly reminder that invoice <strong>${orderRef}</strong> for your registration to the <strong>HR Analytics Summit 2026</strong> is due on <strong>${dueDateStr}</strong>.`
+        ? `We are writing to remind you that invoice <strong>${escHtml(orderRef)}</strong> for your registration to the <strong>HR Analytics Summit 2026</strong> was due on <strong>${escHtml(dueDateStr)}</strong> and remains unpaid.`
+        : `This is a friendly reminder that invoice <strong>${escHtml(orderRef)}</strong> for your registration to the <strong>HR Analytics Summit 2026</strong> is due on <strong>${escHtml(dueDateStr)}</strong>.`
     }</p>
     <p>Please arrange payment at your earliest convenience using the details below. A copy of the invoice PDF is attached to this email for your reference.</p>`;
   }
@@ -1795,7 +1909,7 @@ export async function sendInvoiceReminder(bookingId: number): Promise<void> {
     (isOverdue
       ? `Overdue Invoice — {{orderReference}} — HR Analytics Summit 2026`
       : `Invoice Reminder — {{orderReference}} — HR Analytics Summit 2026`);
-  for (const [key, val] of Object.entries(templateVars)) {
+  for (const [key, val] of Object.entries(subjectVars)) {
     rawSubject = rawSubject.replaceAll(key, val);
   }
   const subject = isOverdue
@@ -1813,17 +1927,17 @@ export async function sendInvoiceReminder(bookingId: number): Promise<void> {
     <div class="info-box" style="margin-bottom:24px;">
       <strong>Order Details</strong><br><br>
       <table style="width:100%;border-collapse:collapse;font-size:14px;">
-        <tr><td style="padding:6px 0;color:#666;width:180px;border-bottom:1px solid #f0f0f0">Reference</td><td style="border-bottom:1px solid #f0f0f0;font-family:monospace;font-weight:600;">${orderRef}</td></tr>
+        <tr><td style="padding:6px 0;color:#666;width:180px;border-bottom:1px solid #f0f0f0">Reference</td><td style="border-bottom:1px solid #f0f0f0;font-family:monospace;font-weight:600;">${escHtml(orderRef)}</td></tr>
         <tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">Event</td><td style="border-bottom:1px solid #f0f0f0">HR Analytics Summit 2026, 3 September 2026</td></tr>
         <tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">Venue</td><td style="border-bottom:1px solid #f0f0f0">155 Bishopsgate, London EC2M 3TQ</td></tr>
-        <tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">Pass Type</td><td style="border-bottom:1px solid #f0f0f0">${passLabel}</td></tr>
+        <tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">Pass Type</td><td style="border-bottom:1px solid #f0f0f0">${escHtml(passLabel)}</td></tr>
         <tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">Quantity</td><td style="border-bottom:1px solid #f0f0f0">${booking.quantity}</td></tr>
         <tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">Net Amount</td><td style="border-bottom:1px solid #f0f0f0">£${baseAmount.toFixed(2)}</td></tr>
         ${groupDiscount > 0 ? `<tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">Group Discount</td><td style="border-bottom:1px solid #f0f0f0;color:#E74F3E">-£${groupDiscount.toFixed(2)}</td></tr>` : ""}
         ${promoDiscount > 0 ? `<tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">Promo Discount</td><td style="border-bottom:1px solid #f0f0f0;color:#E74F3E">-£${promoDiscount.toFixed(2)}</td></tr>` : ""}
         <tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">VAT (20%)</td><td style="border-bottom:1px solid #f0f0f0">£${vatAmount}</td></tr>
         <tr><td style="padding:6px 0;font-weight:700;border-bottom:1px solid #f0f0f0">Total Due</td><td style="border-bottom:1px solid #f0f0f0"><strong style="font-size:16px;">£${totalAmount}</strong></td></tr>
-        <tr><td style="padding:6px 0;color:${isOverdue ? "#E74F3E" : "#888"};border-bottom:1px solid #f0f0f0">Invoice Due</td><td style="border-bottom:1px solid #f0f0f0;color:${isOverdue ? "#E74F3E" : "inherit"};font-weight:${isOverdue ? "700" : "400"};">${dueDateStr}${isOverdue ? " — OVERDUE" : ""}</td></tr>
+        <tr><td style="padding:6px 0;color:${isOverdue ? "#E74F3E" : "#888"};border-bottom:1px solid #f0f0f0">Invoice Due</td><td style="border-bottom:1px solid #f0f0f0;color:${isOverdue ? "#E74F3E" : "inherit"};font-weight:${isOverdue ? "700" : "400"};">${escHtml(dueDateStr)}${isOverdue ? " — OVERDUE" : ""}</td></tr>
       </table>
     </div>
 
@@ -1838,7 +1952,7 @@ export async function sendInvoiceReminder(bookingId: number): Promise<void> {
         <tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">Account Number</td><td style="border-bottom:1px solid #f0f0f0;font-family:monospace;font-weight:600;">16963209</td></tr>
         <tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">IBAN (GBP)</td><td style="border-bottom:1px solid #f0f0f0;font-family:monospace;">GB65CLRB04060516963209</td></tr>
         <tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">SWIFT/BIC</td><td style="border-bottom:1px solid #f0f0f0;font-family:monospace;">CLRBGB22</td></tr>
-        <tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">Reference</td><td style="border-bottom:1px solid #f0f0f0;font-family:monospace;font-weight:600;">${orderRef}</td></tr>
+        <tr><td style="padding:6px 0;color:#666;border-bottom:1px solid #f0f0f0">Reference</td><td style="border-bottom:1px solid #f0f0f0;font-family:monospace;font-weight:600;">${escHtml(orderRef)}</td></tr>
       </table>
     </div>
 

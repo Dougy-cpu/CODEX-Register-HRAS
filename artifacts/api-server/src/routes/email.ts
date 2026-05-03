@@ -200,48 +200,62 @@ router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> =
 
 // ─── Generic Template Routes ──────────────────────────────────────────────────
 
-router.get("/email-templates/:type", async (req, res): Promise<void> => {
+// Read-only template fetch. Locked behind admin auth and made side-effect
+// free: previously this endpoint would silently INSERT a default template
+// row on first read, which let any unauth caller seed DB rows simply by
+// hitting the endpoint with a valid `type`. Now we either return the
+// persisted row or, if absent, the in-memory default — the row is only
+// created when an admin explicitly saves via PUT.
+const TEMPLATE_DEFAULTS: Record<string, { subject: string; htmlBody: string }> = {
+  welcome: {
+    subject: "Welcome to HR Analytics Summit 2026!",
+    htmlBody:
+      "<h2>Welcome, {{firstName}}!</h2><p>We're thrilled to have you join us at the HR Analytics Summit 2026. Your booking is confirmed and we can't wait to see you there.</p><p>If you have any questions in the meantime, don't hesitate to reach out.</p><p>See you on 3 September!</p>",
+  },
+  confirmation: {
+    subject: "Booking Confirmed — HR Analytics Summit 2026",
+    htmlBody:
+      "<h2>Booking Confirmed, {{firstName}}!</h2><p>Thank you for registering. Your order reference is <strong>{{orderReference}}</strong>.</p><p>You have booked <strong>{{quantity}}</strong> {{passType}} pass(es). A full VAT receipt is attached to this email.</p><p>We look forward to seeing you at the HR Analytics Summit!</p>",
+  },
+  invoice_reminder: {
+    subject: "Invoice Reminder — {{orderReference}} — HR Analytics Summit 2026",
+    htmlBody:
+      '<p>Dear {{recipientName}},</p><p>This is a friendly reminder that invoice <strong>{{orderReference}}</strong> for your registration to the <strong>HR Analytics Summit 2026</strong> is due on <strong>{{dueDate}}</strong>.</p><p>Please arrange payment at your earliest convenience using the bank transfer details below. A copy of the invoice PDF is attached for your reference.</p>{{payOnlineButton}}<p>If you have already arranged payment, please disregard this email. For any queries, please contact <a href="mailto:douglas@dynamicbusinessleaders.co.uk">douglas@dynamicbusinessleaders.co.uk</a>.</p>',
+  },
+};
+
+router.get("/email-templates/:type", adminAuth, async (req, res): Promise<void> => {
   const type = req.params.type as "welcome" | "confirmation" | "invoice_reminder";
   if (!["welcome", "confirmation", "invoice_reminder"].includes(type)) {
     res.status(400).json({ error: "Invalid template type" });
     return;
   }
 
-  let [template] = await db
+  const [template] = await db
     .select()
     .from(emailTemplatesTable)
     .where(eq(emailTemplatesTable.type, type));
 
-  if (!template) {
-    const defaults: Record<string, { subject: string; htmlBody: string }> = {
-      welcome: {
-        subject: "Welcome to HR Analytics Summit 2026!",
-        htmlBody:
-          "<h2>Welcome, {{firstName}}!</h2><p>We're thrilled to have you join us at the HR Analytics Summit 2026. Your booking is confirmed and we can't wait to see you there.</p><p>If you have any questions in the meantime, don't hesitate to reach out.</p><p>See you on 3 September!</p>",
-      },
-      confirmation: {
-        subject: "Booking Confirmed — HR Analytics Summit 2026",
-        htmlBody:
-          "<h2>Booking Confirmed, {{firstName}}!</h2><p>Thank you for registering. Your order reference is <strong>{{orderReference}}</strong>.</p><p>You have booked <strong>{{quantity}}</strong> {{passType}} pass(es). A full VAT receipt is attached to this email.</p><p>We look forward to seeing you at the HR Analytics Summit!</p>",
-      },
-      invoice_reminder: {
-        subject: "Invoice Reminder — {{orderReference}} — HR Analytics Summit 2026",
-        htmlBody:
-          '<p>Dear {{recipientName}},</p><p>This is a friendly reminder that invoice <strong>{{orderReference}}</strong> for your registration to the <strong>HR Analytics Summit 2026</strong> is due on <strong>{{dueDate}}</strong>.</p><p>Please arrange payment at your earliest convenience using the bank transfer details below. A copy of the invoice PDF is attached for your reference.</p>{{payOnlineButton}}<p>If you have already arranged payment, please disregard this email. For any queries, please contact <a href="mailto:douglas@dynamicbusinessleaders.co.uk">douglas@dynamicbusinessleaders.co.uk</a>.</p>',
-      },
-    };
-    const def = defaults[type];
-    if (!def) {
-      res.status(404).json({ error: `${type} email template not found` });
-      return;
-    }
-    [template] = await db
-      .insert(emailTemplatesTable)
-      .values({ type, subject: def.subject, htmlBody: def.htmlBody })
-      .returning();
+  if (template) {
+    res.json(formatTemplate(template));
+    return;
   }
 
-  res.json(formatTemplate(template));
+  const def = TEMPLATE_DEFAULTS[type];
+  if (!def) {
+    res.status(404).json({ error: `${type} email template not found` });
+    return;
+  }
+  // Synthetic record using in-memory defaults — not persisted. The admin UI
+  // edits this and saves via PUT, which performs the actual insert.
+  res.json({
+    id: null,
+    type,
+    subject: def.subject,
+    htmlBody: def.htmlBody,
+    updatedAt: new Date().toISOString(),
+    isDefault: true,
+  });
 });
 
 router.put("/email-templates/:type", adminAuth, async (req, res): Promise<void> => {
