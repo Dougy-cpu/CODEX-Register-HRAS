@@ -10,6 +10,6 @@
  * Public subset of event settings exposed to the checkout UI.
  */
 export interface PublicEventSettings {
-  /** Plain-text "How invoicing works" copy. Always populated (default fallback applied server-side). */
+  /** Plain-text how-invoicing-works copy. Always populated (default fallback applied server-side). */
   invoiceHelpContent: string;
 }

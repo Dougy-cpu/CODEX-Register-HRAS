@@ -2758,7 +2758,7 @@ export function useExportRegistrations<
 
 /**
  * Returns the public-facing copy required by the checkout, currently the
-"How invoicing works" help content shown on Step 4 (Pay by Invoice).
+How-invoicing-works help content shown on Step 4 (Pay by Invoice).
 No authentication required.
 
  * @summary Public subset of event settings

@@ -954,7 +954,7 @@ paths:
       summary: Public subset of event settings
       description: |
         Returns the public-facing copy required by the checkout, currently the
-        "How invoicing works" help content shown on Step 4 (Pay by Invoice).
+        How-invoicing-works help content shown on Step 4 (Pay by Invoice).
         No authentication required.
       responses:
         "200":
@@ -2126,7 +2126,7 @@ components:
         invoiceHelpContent:
           type: string
           nullable: true
-          description: Admin-editable "How invoicing works" copy shown on Step 4 (Pay by Invoice) and embedded into invoice confirmation emails. Null means use the built-in default.
+          description: Admin-editable how-invoicing-works copy shown on Step 4 (Pay by Invoice) and embedded into invoice confirmation emails. Null means use the built-in default.
         updatedAt:
           type: string
           format: date-time
@@ -2154,7 +2154,7 @@ components:
       properties:
         invoiceHelpContent:
           type: string
-          description: Plain-text "How invoicing works" copy. Always populated (default fallback applied server-side).
+          description: Plain-text how-invoicing-works copy. Always populated (default fallback applied server-side).
       required:
         - invoiceHelpContent
 
