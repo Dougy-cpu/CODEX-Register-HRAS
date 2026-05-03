@@ -177,11 +177,12 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
         });
         queryClient.invalidateQueries({ queryKey: ["booking"] });
       }
-    } catch (e: any) {
+    } catch (e) {
       console.error(e);
       isSubmittingPaymentRef.current = false;
+      const err = e as { data?: { error?: string }; message?: string };
       const message =
-        e?.data?.error || e?.message || "Something went wrong. Please try again or contact us.";
+        err?.data?.error || err?.message || "Something went wrong. Please try again or contact us.";
       setPaymentError(message);
       setIsProcessing(false);
     }
@@ -193,9 +194,10 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
     try {
       await customFetch(`/api/bookings/${booking.id}/confirm-free`, { method: "POST" });
       queryClient.invalidateQueries({ queryKey: ["booking"] });
-    } catch (e: any) {
+    } catch (e) {
+      const err = e as { data?: { error?: string }; message?: string };
       const message =
-        e?.data?.error || e?.message || "Something went wrong. Please try again or contact us.";
+        err?.data?.error || err?.message || "Something went wrong. Please try again or contact us.";
       setPaymentError(message);
       setIsFreeConfirming(false);
     }

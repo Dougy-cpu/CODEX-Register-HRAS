@@ -63,7 +63,7 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
     company: leadAttendee?.company || "",
     workEmail: leadAttendee?.workEmail || "",
     phone: leadAttendee?.phone || "",
-    dietaryAccessibility: (leadAttendee as any)?.dietaryAccessibility || "",
+    dietaryAccessibility: leadAttendee?.dietaryAccessibility || "",
     gdprConsent: leadAttendee?.gdprConsent || false,
     id: leadAttendee?.id,
   };
@@ -87,9 +87,7 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
             : existing?.company || leadAttendee?.company || "",
           workEmail: existing?.isTbc ? "" : existing?.workEmail || "",
           phone: existing?.isTbc ? "" : existing?.phone || "",
-          dietaryAccessibility: existing?.isTbc
-            ? ""
-            : (existing as any)?.dietaryAccessibility || "",
+          dietaryAccessibility: existing?.isTbc ? "" : existing?.dietaryAccessibility || "",
           gdprConsent: existing?.isTbc ? false : existing?.gdprConsent || false,
           id: existing?.id,
         });

@@ -1,5 +1,12 @@
 import { useState } from "react";
 import { useListDiscountTiers, useUpdateDiscountTiers } from "@workspace/api-client-react";
+
+type TierDraft = {
+  id?: number;
+  minQuantity: number | string;
+  discountPercent: number | string;
+  label?: string | null;
+};
 import AdminLayout from "@/components/layout/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +26,7 @@ export default function AdminDiscountTiers() {
 
   const updateTiers = useUpdateDiscountTiers();
 
-  const [localTiers, setLocalTiers] = useState<Record<string, any[]>>({});
+  const [localTiers, setLocalTiers] = useState<Record<string, TierDraft[]>>({});
 
   // Sync server data to local state when it arrives
   if (tiers && Object.keys(localTiers).length === 0) {
@@ -61,7 +68,7 @@ export default function AdminDiscountTiers() {
     });
   };
 
-  const updateTier = (passType: string, index: number, field: string, value: any) => {
+  const updateTier = (passType: string, index: number, field: keyof TierDraft, value: string) => {
     const current = [...(localTiers[passType] || [])];
     current[index] = { ...current[index], [field]: value };
     setLocalTiers({

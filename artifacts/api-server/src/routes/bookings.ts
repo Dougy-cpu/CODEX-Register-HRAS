@@ -475,8 +475,9 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
             logger.error({ err }, "Failed to send re-issued invoice email");
           }
         }
-      } catch (err: any) {
-        reissueResult = { error: err?.message || "Re-issue failed" };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Re-issue failed";
+        reissueResult = { error: message };
         logger.error({ err, bookingId: id }, "Failed to re-issue invoice after admin edit");
       }
     }
@@ -643,8 +644,9 @@ router.post("/bookings/by-management-token/:token/billing", async (req, res): Pr
             logger.error({ err }, "Failed to send re-issued invoice email");
           }
         }
-      } catch (err: any) {
-        reissue = { error: err?.message || "Failed to re-issue invoice" };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to re-issue invoice";
+        reissue = { error: message };
         logger.error(
           { err, bookingId: booking.id },
           "Failed to re-issue invoice on self-serve billing edit",

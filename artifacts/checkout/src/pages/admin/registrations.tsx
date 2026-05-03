@@ -189,8 +189,9 @@ function ExpandedRegistrationDetail({
         setEditingBilling(false);
         setBillingSaveState("idle");
       }, 2500);
-    } catch (err: any) {
-      setBillingSaveError(err?.message || "Failed to save");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to save";
+      setBillingSaveError(message);
       setBillingSaveState("error");
     }
   };
@@ -255,8 +256,9 @@ function ExpandedRegistrationDetail({
         setEditingAttendeeId(null);
         setSaveState("idle");
       }, 1200);
-    } catch (err: any) {
-      setSaveError(err?.message || "Failed to save. Please try again.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to save. Please try again.";
+      setSaveError(message);
       setSaveState("error");
     }
   };
@@ -283,8 +285,9 @@ function ExpandedRegistrationDetail({
       }
       setReminderState("success");
       setTimeout(() => setReminderState("idle"), 3500);
-    } catch (err: any) {
-      setReminderError(err?.message || "Failed to send reminder");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to send reminder";
+      setReminderError(message);
       setReminderState("error");
       setTimeout(() => {
         setReminderState("idle");

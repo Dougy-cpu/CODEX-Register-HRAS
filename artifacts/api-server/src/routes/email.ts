@@ -524,8 +524,9 @@ router.post(
       const { sendInvoiceReminder } = await import("../lib/email");
       await sendInvoiceReminder(bookingId);
       res.json({ success: true, message: "Invoice reminder sent successfully" });
-    } catch (err: any) {
-      res.status(500).json({ error: err?.message || "Failed to send invoice reminder" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to send invoice reminder";
+      res.status(500).json({ error: message });
     }
   },
 );

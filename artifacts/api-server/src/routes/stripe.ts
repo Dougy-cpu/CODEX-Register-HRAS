@@ -160,8 +160,9 @@ router.post("/stripe/create-checkout-session", async (req, res): Promise<void> =
       },
       customer_email: booking.billingEmail || undefined,
     });
-  } catch (err: any) {
-    const stripeMessage = err?.raw?.message || err?.message || "Stripe error";
+  } catch (err) {
+    const e = err as { raw?: { message?: string }; message?: string };
+    const stripeMessage = e?.raw?.message || e?.message || "Stripe error";
     logger.error({ err, bookingId }, "Stripe checkout session creation failed");
     res.status(502).json({ error: `Payment provider error: ${stripeMessage}` });
     return;
@@ -700,8 +701,9 @@ router.post("/stripe/confirm-card-payment", async (req, res): Promise<void> => {
       "confirm-card-payment: booking confirmed and emails sent",
     );
     res.json({ alreadyProcessed: false, orderReference: orderRef });
-  } catch (err: any) {
-    const msg = err?.raw?.message || err?.message || "Stripe error";
+  } catch (err) {
+    const e = err as { raw?: { message?: string }; message?: string };
+    const msg = e?.raw?.message || e?.message || "Stripe error";
     logger.error({ err, bookingId: id }, "confirm-card-payment: failed to retrieve session");
     res.status(502).json({ error: `Failed to verify payment: ${msg}` });
   }
@@ -822,8 +824,9 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
       invoiceReference: orderRef,
     });
     return;
-  } catch (err: any) {
-    const msg = err?.raw?.message || err?.message || "Stripe error";
+  } catch (err) {
+    const e = err as { raw?: { message?: string }; message?: string };
+    const msg = e?.raw?.message || e?.message || "Stripe error";
     logger.error({ err, bookingId: id }, "Failed to create Stripe invoice");
     res.status(502).json({ error: `Failed to create invoice: ${msg}` });
     return;
