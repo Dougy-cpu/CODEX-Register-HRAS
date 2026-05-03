@@ -14,7 +14,14 @@ import {
   activityLogTable,
   emailLogsTable,
 } from "@workspace/db";
-import { adminAuth, deriveAdminToken, getAdminPassword } from "../middleware/admin-auth";
+import {
+  adminAuth,
+  issueAdminToken,
+  getAdminPassword,
+  timingSafeStringEqual,
+} from "../middleware/admin-auth";
+import { logAdminAction } from "../lib/audit";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -73,6 +80,7 @@ function formatTier(t: typeof discountTiersTable.$inferSelect) {
 router.post("/admin/login", async (req, res): Promise<void> => {
   const { password } = req.body;
   const adminPassword = getAdminPassword();
+  const ip = req.ip || req.socket.remoteAddress || "unknown";
 
   if (!adminPassword) {
     res
@@ -81,13 +89,26 @@ router.post("/admin/login", async (req, res): Promise<void> => {
     return;
   }
 
-  if (!password || password !== adminPassword) {
+  const supplied = typeof password === "string" ? password : "";
+  if (!supplied || !timingSafeStringEqual(supplied, adminPassword)) {
+    logger.warn({ ip }, "Admin login failed");
+    await logAdminAction({
+      type: "admin_login_failure",
+      actor: ip,
+      summary: "Failed admin login attempt",
+    });
     res.status(401).json({ error: "Invalid credentials" });
     return;
   }
 
-  const token = deriveAdminToken(adminPassword);
-  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  const { token, expiresAt } = issueAdminToken(adminPassword);
+  logger.info({ ip, expiresAt: expiresAt.toISOString() }, "Admin login succeeded");
+  await logAdminAction({
+    type: "admin_login_success",
+    actor: ip,
+    summary: "Admin logged in",
+    meta: { expiresAt: expiresAt.toISOString() },
+  });
 
   res.json({ token, expiresAt: expiresAt.toISOString() });
 });
@@ -435,6 +456,15 @@ router.patch("/admin/registrations/:id/status", adminAuth, async (req, res): Pro
     .where(eq(bookingsTable.id, id))
     .returning();
 
+  await logAdminAction({
+    type: "admin_booking_status_changed",
+    bookingId: id,
+    summary: `Booking ${existing.orderReference || `#${id}`}: ${existing.status} → ${finalStatus}`,
+    before: { status: existing.status },
+    after: { status: finalStatus },
+    meta: { stripeAction, requestedStatus: status },
+  });
+
   res.json({ ...formatBooking(updated), stripeAction });
 });
 
@@ -452,7 +482,14 @@ router.delete("/admin/registrations", adminAuth, async (req, res): Promise<void>
     return;
   }
 
+  const refMap = new Map<number, string>();
   for (const bookingId of numericIds) {
+    const [b] = await db
+      .select({ orderReference: bookingsTable.orderReference })
+      .from(bookingsTable)
+      .where(eq(bookingsTable.id, bookingId));
+    if (b?.orderReference) refMap.set(bookingId, b.orderReference);
+
     await db.delete(activityLogTable).where(eq(activityLogTable.bookingId, bookingId));
     const attendees = await db
       .select({ id: attendeesTable.id })
@@ -464,6 +501,15 @@ router.delete("/admin/registrations", adminAuth, async (req, res): Promise<void>
     await db.delete(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
     await db.delete(bookingsTable).where(eq(bookingsTable.id, bookingId));
   }
+
+  await logAdminAction({
+    type: "admin_booking_deleted",
+    summary: `Deleted ${numericIds.length} booking(s)`,
+    meta: {
+      bookingIds: numericIds,
+      orderReferences: numericIds.map((id) => refMap.get(id) ?? null),
+    },
+  });
 
   res.json({ deleted: numericIds.length });
 });
@@ -522,6 +568,20 @@ router.post("/admin/promo-codes", adminAuth, async (req, res): Promise<void> => 
     })
     .returning();
 
+  await logAdminAction({
+    type: "admin_promo_created",
+    summary: `Created promo code ${promo.code}`,
+    after: {
+      code: promo.code,
+      discountType: promo.discountType,
+      discountValue: promo.discountValue,
+      maxUses: promo.maxUses,
+      isActive: promo.isActive,
+      applicablePassTypes: promo.applicablePassTypes,
+    },
+    meta: { promoId: promo.id },
+  });
+
   res.status(201).json(formatPromoCode(promo));
 });
 
@@ -576,6 +636,28 @@ router.patch("/admin/promo-codes/:id", adminAuth, async (req, res): Promise<void
     .where(eq(promoCodesTable.id, id))
     .returning();
 
+  await logAdminAction({
+    type: "admin_promo_updated",
+    summary: `Updated promo code ${updated.code}`,
+    before: {
+      code: existing.code,
+      discountType: existing.discountType,
+      discountValue: existing.discountValue,
+      maxUses: existing.maxUses,
+      isActive: existing.isActive,
+      applicablePassTypes: existing.applicablePassTypes,
+    },
+    after: {
+      code: updated.code,
+      discountType: updated.discountType,
+      discountValue: updated.discountValue,
+      maxUses: updated.maxUses,
+      isActive: updated.isActive,
+      applicablePassTypes: updated.applicablePassTypes,
+    },
+    meta: { promoId: id },
+  });
+
   res.json(formatPromoCode(updated));
 });
 
@@ -590,6 +672,12 @@ router.delete("/admin/promo-codes/:id", adminAuth, async (req, res): Promise<voi
   }
 
   await db.delete(promoCodesTable).where(eq(promoCodesTable.id, id));
+  await logAdminAction({
+    type: "admin_promo_deleted",
+    summary: `Deleted promo code ${existing.code}`,
+    before: { code: existing.code, discountType: existing.discountType, isActive: existing.isActive },
+    meta: { promoId: id },
+  });
   res.sendStatus(204);
 });
 
@@ -600,6 +688,11 @@ router.put("/admin/discount-tiers", adminAuth, async (req, res): Promise<void> =
     res.status(400).json({ error: "passType and tiers array are required" });
     return;
   }
+
+  const existing = await db
+    .select()
+    .from(discountTiersTable)
+    .where(eq(discountTiersTable.passType, passType));
 
   await db.delete(discountTiersTable).where(eq(discountTiersTable.passType, passType));
 
@@ -614,6 +707,14 @@ router.put("/admin/discount-tiers", adminAuth, async (req, res): Promise<void> =
       })),
     )
     .returning();
+
+  await logAdminAction({
+    type: "admin_discount_tiers_updated",
+    summary: `Replaced ${existing.length} discount tier(s) for ${passType} with ${inserted.length}`,
+    before: { tiers: existing.map(formatTier) },
+    after: { tiers: inserted.map(formatTier) },
+    meta: { passType },
+  });
 
   res.json(inserted.map(formatTier));
 });
@@ -635,6 +736,11 @@ router.put("/admin/passes/inventory/:passType", adminAuth, async (req, res): Pro
     res.status(400).json({ error: "remaining must be a non-negative integer or null" });
     return;
   }
+  const [prev] = await db
+    .select()
+    .from(passInventoryTable)
+    .where(eq(passInventoryTable.passType, passType));
+
   await db
     .insert(passInventoryTable)
     .values({ passType, remaining: val, updatedAt: new Date() })
@@ -646,6 +752,15 @@ router.put("/admin/passes/inventory/:passType", adminAuth, async (req, res): Pro
     .select()
     .from(passInventoryTable)
     .where(eq(passInventoryTable.passType, passType));
+
+  await logAdminAction({
+    type: "admin_pass_inventory_updated",
+    summary: `Set ${passType} pass inventory to ${val ?? "unlimited"}`,
+    before: { remaining: prev?.remaining ?? null },
+    after: { remaining: val },
+    meta: { passType },
+  });
+
   res.json(row);
 });
 
@@ -678,6 +793,17 @@ router.post("/admin/notification-emails", adminAuth, async (req, res): Promise<v
         notifyIncomplete: notifyIncomplete !== false,
       })
       .returning();
+    await logAdminAction({
+      type: "admin_notification_email_added",
+      summary: `Added notification email ${inserted.email}`,
+      after: {
+        email: inserted.email,
+        label: inserted.label,
+        notifyComplete: inserted.notifyComplete,
+        notifyIncomplete: inserted.notifyIncomplete,
+      },
+      meta: { notificationEmailId: inserted.id },
+    });
     res.status(201).json({ ...inserted, createdAt: inserted.createdAt.toISOString() });
   } catch {
     res.status(409).json({ error: "This email address is already in the list" });
@@ -694,6 +820,10 @@ router.patch("/admin/notification-emails/:id", adminAuth, async (req, res): Prom
     res.status(400).json({ error: "Nothing to update" });
     return;
   }
+  const [prev] = await db
+    .select()
+    .from(notificationEmailsTable)
+    .where(eq(notificationEmailsTable.id, id));
   const [updated] = await db
     .update(notificationEmailsTable)
     .set(updates)
@@ -703,12 +833,31 @@ router.patch("/admin/notification-emails/:id", adminAuth, async (req, res): Prom
     res.status(404).json({ error: "Not found" });
     return;
   }
+  await logAdminAction({
+    type: "admin_notification_email_updated",
+    summary: `Updated notification preferences for ${updated.email}`,
+    before: prev
+      ? { notifyComplete: prev.notifyComplete, notifyIncomplete: prev.notifyIncomplete }
+      : undefined,
+    after: { notifyComplete: updated.notifyComplete, notifyIncomplete: updated.notifyIncomplete },
+    meta: { notificationEmailId: id },
+  });
   res.json({ ...updated, createdAt: updated.createdAt.toISOString() });
 });
 
 router.delete("/admin/notification-emails/:id", adminAuth, async (req, res): Promise<void> => {
   const id = parseInt(req.params["id"] as string, 10);
+  const [prev] = await db
+    .select()
+    .from(notificationEmailsTable)
+    .where(eq(notificationEmailsTable.id, id));
   await db.delete(notificationEmailsTable).where(eq(notificationEmailsTable.id, id));
+  await logAdminAction({
+    type: "admin_notification_email_deleted",
+    summary: prev ? `Removed notification email ${prev.email}` : `Removed notification email #${id}`,
+    before: prev ? { email: prev.email, label: prev.label } : undefined,
+    meta: { notificationEmailId: id },
+  });
   res.status(204).end();
 });
 
@@ -752,6 +901,11 @@ router.put("/admin/passes/config/:passType", adminAuth, async (req, res): Promis
   if (extraBenefits !== undefined)
     updates.extraBenefits = Array.isArray(extraBenefits) ? extraBenefits : [];
 
+  const [prev] = await db
+    .select()
+    .from(passConfigTable)
+    .where(eq(passConfigTable.passType, passType));
+
   const [row] = await db
     .insert(passConfigTable)
     .values({
@@ -767,6 +921,24 @@ router.put("/admin/passes/config/:passType", adminAuth, async (req, res): Promis
       set: updates,
     })
     .returning();
+
+  await logAdminAction({
+    type: "admin_pass_config_updated",
+    summary: `Updated ${passType} pass config`,
+    before: prev
+      ? {
+          currentPrice: prev.currentPrice,
+          originalPrice: prev.originalPrice,
+          pricingPeriodName: prev.pricingPeriodName,
+        }
+      : undefined,
+    after: {
+      currentPrice: row.currentPrice,
+      originalPrice: row.originalPrice,
+      pricingPeriodName: row.pricingPeriodName,
+    },
+    meta: { passType },
+  });
 
   res.json(row);
 });
@@ -866,6 +1038,7 @@ router.get("/admin/activity", adminAuth, async (req, res): Promise<void> => {
     booking?: ReturnType<typeof formatBooking> | null;
     attendee?: ReturnType<typeof formatAttendee> | null;
     data?: Record<string, unknown>;
+    actor?: string;
   }> = [];
 
   for (const b of recentBookings) {
@@ -908,6 +1081,7 @@ router.get("/admin/activity", adminAuth, async (req, res): Promise<void> => {
       booking: row.booking ? formatBooking(row.booking) : null,
       attendee: row.attendee ? formatAttendee(row.attendee) : null,
       data: (row.log.data as Record<string, unknown>) ?? undefined,
+      actor: row.log.actor ?? undefined,
     });
   }
 

@@ -84,14 +84,17 @@ Set these in the Replit Secrets panel:
 | `FREEAGENT_CLIENT_ID`     | FreeAgent OAuth (legacy, unused)         | —                   |
 | `FREEAGENT_CLIENT_SECRET` | FreeAgent OAuth (legacy, unused)         | —                   |
 | `FREEAGENT_REFRESH_TOKEN` | FreeAgent OAuth (legacy, unused)         | —                   |
-| `ADMIN_PASSWORD`          | Admin panel access (default: "admin123") | Admin panel         |
+| `ADMIN_PASSWORD`          | Admin panel password (REQUIRED, must not be a common weak value) | Admin panel         |
+| `ADMIN_TOKEN_SECRET`      | 32+ char random secret used to sign admin session tokens (optional — ephemeral key generated at startup if absent, meaning sessions don't survive restarts) | Admin panel |
 
 ## Admin Panel
 
 - URL: `/admin`
-- Default password: `admin123` (set `ADMIN_PASSWORD` env var to override)
-- Auth: JWT token stored in localStorage as `admin_token`, passed as `x-admin-token` header
-- Features: registrations list (with Stripe invoice links, due date, overdue badges, Send Reminder button), promo code management, discount tier config, email logs & template editor
+- Password: set via `ADMIN_PASSWORD` (a small set of weak values like `admin`, `admin123`, `password`, `123456`, `secret` are blocked at startup and the panel returns 503 until a stronger password is set)
+- Auth: signed token of the form `<sigHex>.<expMs>` stored in localStorage as `admin_token`, passed as `x-admin-token` header. Signature is HMAC-SHA256 keyed by a server-side secret (NOT the password) — a stolen token cannot be used to brute-force `ADMIN_PASSWORD` offline. Token TTL: 30 days, expiry enforced server-side.
+- Login endpoint: `POST /api/admin/login` is rate-limited to 5 attempts per 15 minutes per IP (always on); successful and failed attempts are written to the audit log with the source IP.
+- Audit log: every admin mutation (login success/failure, booking status/edit/delete, promo CRUD, discount tiers, pass inventory/config, notification email CRUD, event settings, email template edit/test/resend, invoice reminder, hear-about-us add/delete/move, attendee admin add/edit) is recorded in `activity_log` with `actor`, `summary`, `before`/`after` diff, and `meta`. Visible in `/admin/activity` under the "Admin Audit" filter.
+- Features: registrations list (with Stripe invoice links, due date, overdue badges, Send Reminder button), promo code management, discount tier config, email logs & template editor, activity feed with admin audit trail
 
 ## Invoice Payment Flow
 

@@ -4,6 +4,7 @@ import { db } from "@workspace/db";
 import { emailTemplatesTable, emailLogsTable, eventSettingsTable } from "@workspace/db";
 import { getEventSettings } from "../lib/email";
 import { adminAuth } from "../middleware/admin-auth";
+import { logAdminAction } from "../lib/audit";
 
 const router: IRouter = Router();
 
@@ -192,6 +193,16 @@ router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> =
       .returning();
   }
 
+  await logAdminAction({
+    type: "admin_event_settings_updated",
+    summary: "Updated event settings",
+    meta: {
+      changedFields: Object.keys(req.body || {}).filter((k) =>
+        (req.body as Record<string, unknown>)[k] !== undefined,
+      ),
+    },
+  });
+
   res.json({
     ...updated,
     updatedAt: updated.updatedAt.toISOString(),
@@ -290,6 +301,16 @@ router.put("/email-templates/:type", adminAuth, async (req, res): Promise<void> 
       .values({ type, subject, htmlBody })
       .returning();
   }
+
+  await logAdminAction({
+    type: "admin_email_template_updated",
+    summary: `Updated ${type} email template`,
+    before: existing[0]
+      ? { subject: existing[0].subject, htmlLength: existing[0].htmlBody.length }
+      : undefined,
+    after: { subject, htmlLength: String(htmlBody).length },
+    meta: { templateType: type },
+  });
 
   res.json(formatTemplate(updated));
 });
@@ -433,6 +454,12 @@ router.post("/email-templates/:type/test-send", adminAuth, async (req, res): Pro
     fromEmail: settings.fromEmail,
   });
 
+  await logAdminAction({
+    type: "admin_email_template_test_sent",
+    summary: `Sent test ${type} email to ${toEmail}`,
+    meta: { templateType: type, toEmail },
+  });
+
   res.json({ success: true, message: `Test email sent to ${toEmail}` });
 });
 
@@ -505,6 +532,12 @@ router.post("/admin/email-logs/:bookingId/resend", adminAuth, async (req, res): 
   const { resendConfirmationAndReceipt } = await import("../lib/email");
   await resendConfirmationAndReceipt(bookingId);
 
+  await logAdminAction({
+    type: "admin_email_resent",
+    bookingId,
+    summary: `Resent confirmation + receipt for booking #${bookingId}`,
+  });
+
   res.json({ success: true, message: "Confirmation and PDF receipt resent successfully" });
 });
 
@@ -523,6 +556,11 @@ router.post(
     try {
       const { sendInvoiceReminder } = await import("../lib/email");
       await sendInvoiceReminder(bookingId);
+      await logAdminAction({
+        type: "admin_invoice_reminder_sent",
+        bookingId,
+        summary: `Sent invoice reminder for booking #${bookingId}`,
+      });
       res.json({ success: true, message: "Invoice reminder sent successfully" });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to send invoice reminder";

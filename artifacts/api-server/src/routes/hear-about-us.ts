@@ -3,6 +3,7 @@ import { eq, asc, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { hearAboutUsOptionsTable, bookingsTable } from "@workspace/db";
 import { adminAuth } from "../middleware/admin-auth";
+import { logAdminAction } from "../lib/audit";
 
 const router: IRouter = Router();
 
@@ -101,23 +102,44 @@ router.post("/admin/hear-about-us-options", adminAuth, async (req, res): Promise
     .values({ label: label.trim(), position: (maxRow?.max ?? -1) + 1 })
     .returning();
 
+  await logAdminAction({
+    type: "admin_hear_about_us_added",
+    summary: `Added "How did you hear about us" option: ${created.label}`,
+    after: { label: created.label, position: created.position },
+    meta: { optionId: created.id },
+  });
+
   res.status(201).json(created);
 });
 
 // Admin — delete option
 router.delete("/admin/hear-about-us-options/:id", adminAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const idRaw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(idRaw, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid id" });
     return;
   }
+  const [prev] = await db
+    .select()
+    .from(hearAboutUsOptionsTable)
+    .where(eq(hearAboutUsOptionsTable.id, id));
   await db.delete(hearAboutUsOptionsTable).where(eq(hearAboutUsOptionsTable.id, id));
+  await logAdminAction({
+    type: "admin_hear_about_us_deleted",
+    summary: prev
+      ? `Removed "How did you hear about us" option: ${prev.label}`
+      : `Removed option #${id}`,
+    before: prev ? { label: prev.label } : undefined,
+    meta: { optionId: id },
+  });
   res.json({ success: true });
 });
 
 // Admin — move option up or down (swap positions with neighbour)
 router.put("/admin/hear-about-us-options/:id/move", adminAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const idRaw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(idRaw, 10);
   const { direction } = req.body as { direction: "up" | "down" };
   if (isNaN(id) || !["up", "down"].includes(direction)) {
     res.status(400).json({ error: "Invalid id or direction" });
@@ -157,6 +179,12 @@ router.put("/admin/hear-about-us-options/:id/move", adminAuth, async (req, res):
     .select()
     .from(hearAboutUsOptionsTable)
     .orderBy(asc(hearAboutUsOptionsTable.position));
+
+  await logAdminAction({
+    type: "admin_hear_about_us_moved",
+    summary: `Moved option "${current.label}" ${direction}`,
+    meta: { optionId: id, direction, swappedWithId: neighbour.id },
+  });
 
   res.json({ success: true, options: updated });
 });

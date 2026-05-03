@@ -15,6 +15,15 @@ import {
   Clock,
   TrendingUp,
   Hourglass,
+  ShieldCheck,
+  ShieldAlert,
+  Shield,
+  Tag,
+  Percent,
+  Ticket,
+  Bell,
+  Settings,
+  Send,
 } from "lucide-react";
 
 function adminFetch(path: string, init?: RequestInit) {
@@ -56,6 +65,7 @@ type FeedItem = {
     phone: string | null;
   };
   data?: Record<string, unknown>;
+  actor?: string;
 };
 
 type Stats = {
@@ -124,7 +134,153 @@ const EVENT_TYPE_CONFIG: Record<
     color: "text-yellow-700",
     bg: "bg-yellow-50 border-yellow-200",
   },
+  admin_login_success: {
+    label: "Admin Login",
+    icon: ShieldCheck,
+    color: "text-slate-700",
+    bg: "bg-slate-50 border-slate-200",
+  },
+  admin_login_failure: {
+    label: "Failed Admin Login",
+    icon: ShieldAlert,
+    color: "text-red-700",
+    bg: "bg-red-50 border-red-200",
+  },
+  admin_booking_status_changed: {
+    label: "Booking Status Changed",
+    icon: Shield,
+    color: "text-indigo-700",
+    bg: "bg-indigo-50 border-indigo-200",
+  },
+  admin_booking_updated: {
+    label: "Booking Edited",
+    icon: Shield,
+    color: "text-indigo-700",
+    bg: "bg-indigo-50 border-indigo-200",
+  },
+  admin_attendee_added: {
+    label: "Attendee Added (Admin)",
+    icon: UserCheck,
+    color: "text-emerald-700",
+    bg: "bg-emerald-50 border-emerald-200",
+  },
+  admin_attendee_updated: {
+    label: "Attendee Edited (Admin)",
+    icon: UserCheck,
+    color: "text-indigo-700",
+    bg: "bg-indigo-50 border-indigo-200",
+  },
+  admin_booking_deleted: {
+    label: "Booking Deleted",
+    icon: Shield,
+    color: "text-red-700",
+    bg: "bg-red-50 border-red-200",
+  },
+  admin_promo_created: {
+    label: "Promo Code Created",
+    icon: Tag,
+    color: "text-emerald-700",
+    bg: "bg-emerald-50 border-emerald-200",
+  },
+  admin_promo_updated: {
+    label: "Promo Code Updated",
+    icon: Tag,
+    color: "text-indigo-700",
+    bg: "bg-indigo-50 border-indigo-200",
+  },
+  admin_promo_deleted: {
+    label: "Promo Code Deleted",
+    icon: Tag,
+    color: "text-red-700",
+    bg: "bg-red-50 border-red-200",
+  },
+  admin_discount_tiers_updated: {
+    label: "Discount Tiers Updated",
+    icon: Percent,
+    color: "text-indigo-700",
+    bg: "bg-indigo-50 border-indigo-200",
+  },
+  admin_pass_inventory_updated: {
+    label: "Pass Inventory Updated",
+    icon: Ticket,
+    color: "text-indigo-700",
+    bg: "bg-indigo-50 border-indigo-200",
+  },
+  admin_pass_config_updated: {
+    label: "Pass Config Updated",
+    icon: Ticket,
+    color: "text-indigo-700",
+    bg: "bg-indigo-50 border-indigo-200",
+  },
+  admin_notification_email_added: {
+    label: "Notification Email Added",
+    icon: Bell,
+    color: "text-emerald-700",
+    bg: "bg-emerald-50 border-emerald-200",
+  },
+  admin_notification_email_updated: {
+    label: "Notification Email Updated",
+    icon: Bell,
+    color: "text-indigo-700",
+    bg: "bg-indigo-50 border-indigo-200",
+  },
+  admin_notification_email_deleted: {
+    label: "Notification Email Deleted",
+    icon: Bell,
+    color: "text-red-700",
+    bg: "bg-red-50 border-red-200",
+  },
+  admin_event_settings_updated: {
+    label: "Event Settings Updated",
+    icon: Settings,
+    color: "text-indigo-700",
+    bg: "bg-indigo-50 border-indigo-200",
+  },
+  admin_email_template_updated: {
+    label: "Email Template Updated",
+    icon: Mail,
+    color: "text-indigo-700",
+    bg: "bg-indigo-50 border-indigo-200",
+  },
+  admin_email_template_test_sent: {
+    label: "Test Email Sent",
+    icon: Send,
+    color: "text-slate-700",
+    bg: "bg-slate-50 border-slate-200",
+  },
+  admin_email_resent: {
+    label: "Confirmation Resent",
+    icon: Send,
+    color: "text-slate-700",
+    bg: "bg-slate-50 border-slate-200",
+  },
+  admin_invoice_reminder_sent: {
+    label: "Invoice Reminder Sent",
+    icon: Send,
+    color: "text-slate-700",
+    bg: "bg-slate-50 border-slate-200",
+  },
+  admin_hear_about_us_added: {
+    label: "Channel Option Added",
+    icon: Settings,
+    color: "text-emerald-700",
+    bg: "bg-emerald-50 border-emerald-200",
+  },
+  admin_hear_about_us_deleted: {
+    label: "Channel Option Removed",
+    icon: Settings,
+    color: "text-red-700",
+    bg: "bg-red-50 border-red-200",
+  },
+  admin_hear_about_us_moved: {
+    label: "Channel Option Reordered",
+    icon: Settings,
+    color: "text-indigo-700",
+    bg: "bg-indigo-50 border-indigo-200",
+  },
 };
+
+const ADMIN_EVENT_TYPES = Object.keys(EVENT_TYPE_CONFIG).filter((k) => k.startsWith("admin_"));
 
 function timeAgo(ts: string) {
   const diff = Date.now() - new Date(ts).getTime();
@@ -265,6 +421,29 @@ function FeedCard({ item }: { item: FeedItem }) {
           </div>
         )}
 
+        {item.type.startsWith("admin_") && (
+          <div className="mt-1 space-y-1">
+            {item.data?.summary != null && (
+              <div className="text-sm text-slate-700">{String(item.data.summary)}</div>
+            )}
+            {item.actor && (
+              <div className="text-xs text-slate-500">
+                Actor: <span className="font-mono">{item.actor}</span>
+              </div>
+            )}
+            {item.data?.changes != null && typeof item.data.changes === "object" && (
+              <details className="mt-1">
+                <summary className="text-xs text-slate-500 cursor-pointer hover:text-slate-700">
+                  View changes
+                </summary>
+                <pre className="mt-1 text-xs bg-white border border-slate-200 rounded p-2 overflow-x-auto">
+                  {JSON.stringify(item.data.changes, null, 2)}
+                </pre>
+              </details>
+            )}
+          </div>
+        )}
+
         {item.booking?.invoiceDueDate && item.booking.status === "invoiced" && (
           <div className="mt-1 text-xs text-slate-500">
             Due:{" "}
@@ -310,6 +489,7 @@ export default function AdminActivity() {
     { key: "attendees", label: "Attendees" },
     { key: "partial", label: "Partial Checkouts" },
     { key: "alerts", label: "Alerts" },
+    { key: "admin", label: "Admin Audit" },
   ];
 
   const filterMap: Record<string, string[]> = {
@@ -318,7 +498,8 @@ export default function AdminActivity() {
     invoices: ["new_booking_invoice", "invoice_paid", "invoice_overdue"],
     attendees: ["attendee_change", "tbc_filled"],
     partial: ["partial_checkout"],
-    alerts: ["invoice_overdue", "email_failure"],
+    alerts: ["invoice_overdue", "email_failure", "admin_login_failure"],
+    admin: ADMIN_EVENT_TYPES,
   };
 
   const filteredFeed = data?.feed.filter((item) => filterMap[filter]?.includes(item.type)) ?? [];

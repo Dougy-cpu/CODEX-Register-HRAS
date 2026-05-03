@@ -6,7 +6,8 @@ import { calculatePricing, incrementPromoUsage } from "../lib/pricing";
 import { promoCodesTable } from "@workspace/db";
 import { isCodeUsedByEmail } from "./promo-codes";
 import { v4 as uuidv4 } from "uuid";
-import { deriveAdminToken, getAdminPassword } from "../middleware/admin-auth";
+import { verifyAdminToken, getAdminPassword } from "../middleware/admin-auth";
+import { logAdminAction } from "../lib/audit";
 import {
   sendIncompleteFormNotification,
   sendBookingEmails,
@@ -23,7 +24,7 @@ function isAdminRequest(req: import("express").Request): boolean {
   if (!token) return false;
   const password = getAdminPassword();
   if (!password) return false;
-  return token === deriveAdminToken(password);
+  return verifyAdminToken(token, password).valid;
 }
 
 const router: IRouter = Router();
@@ -484,6 +485,25 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
   }
 
   const [refreshed] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, id));
+
+  if (admin) {
+    const trackedKeys = Object.keys(updateData) as Array<keyof typeof updateData>;
+    const before: Record<string, unknown> = {};
+    const after: Record<string, unknown> = {};
+    for (const k of trackedKeys) {
+      before[k] = (existing as unknown as Record<string, unknown>)[k] ?? null;
+      after[k] = (refreshed as unknown as Record<string, unknown>)[k] ?? null;
+    }
+    await logAdminAction({
+      type: "admin_booking_updated",
+      bookingId: id,
+      summary: `Admin edited booking ${existing.orderReference || `#${id}`}`,
+      before,
+      after,
+      meta: { reissue: reissueResult },
+    });
+  }
+
   res.json({ ...formatBooking(refreshed), reissue: reissueResult });
 });
 

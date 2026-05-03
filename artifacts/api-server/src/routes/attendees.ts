@@ -2,8 +2,9 @@ import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { attendeesTable, bookingsTable, eventSettingsTable, activityLogTable } from "@workspace/db";
-import { deriveAdminToken, getAdminPassword } from "../middleware/admin-auth";
+import { verifyAdminToken, getAdminPassword } from "../middleware/admin-auth";
 import { sendAttendeeChangeNotification, sendWelcomeEmail } from "../lib/email";
+import { logAdminAction } from "../lib/audit";
 
 const router: IRouter = Router();
 
@@ -21,7 +22,7 @@ function isAdminRequest(req: import("express").Request): boolean {
   if (!token) return false;
   const password = getAdminPassword();
   if (!password) return false;
-  return token === deriveAdminToken(password);
+  return verifyAdminToken(token, password).valid;
 }
 
 router.post("/bookings/:bookingId/attendees", async (req, res): Promise<void> => {
@@ -99,6 +100,29 @@ router.post("/bookings/:bookingId/attendees", async (req, res): Promise<void> =>
       .returning();
   } else {
     [attendee] = await db.insert(attendeesTable).values(values).returning();
+  }
+
+  if (isAdminRequest(req)) {
+    await logAdminAction({
+      type: "admin_attendee_added",
+      bookingId,
+      attendeeId: attendee.id,
+      summary: `Admin ${existing ? "updated" : "added"} attendee ${attendee.firstName} ${attendee.lastName} on booking #${bookingId}`,
+      before: existing
+        ? {
+            firstName: existing.firstName,
+            lastName: existing.lastName,
+            workEmail: existing.workEmail,
+            isTbc: existing.isTbc,
+          }
+        : undefined,
+      after: {
+        firstName: attendee.firstName,
+        lastName: attendee.lastName,
+        workEmail: attendee.workEmail,
+        isTbc: attendee.isTbc,
+      },
+    });
   }
 
   res.status(existing ? 200 : 201).json(formatAttendee(attendee));
@@ -192,6 +216,31 @@ router.patch("/bookings/:bookingId/attendees/:attendeeId", async (req, res): Pro
     .set(updateData)
     .where(eq(attendeesTable.id, attendeeId))
     .returning();
+
+  if (isAdminRequest(req)) {
+    await logAdminAction({
+      type: "admin_attendee_updated",
+      bookingId,
+      attendeeId,
+      summary: `Admin edited attendee ${updated.firstName} ${updated.lastName} on booking #${bookingId}`,
+      before: {
+        firstName: existing.firstName,
+        lastName: existing.lastName,
+        jobTitle: existing.jobTitle,
+        company: existing.company,
+        workEmail: existing.workEmail,
+        isTbc: existing.isTbc,
+      },
+      after: {
+        firstName: updated.firstName,
+        lastName: updated.lastName,
+        jobTitle: updated.jobTitle,
+        company: updated.company,
+        workEmail: updated.workEmail,
+        isTbc: updated.isTbc,
+      },
+    });
+  }
 
   res.json(formatAttendee(updated));
 });
