@@ -372,6 +372,17 @@ async function buildConfirmationEmailHtml(
 
   const orderRef = booking.orderReference || `#${booking.id}`;
 
+  // Standalone promo summary block — surfaced in the email body whenever a
+  // promo code reduced the total, so customers can see exactly which code was
+  // applied and how much they saved without having to open the attached PDF.
+  const promoSummaryHtml =
+    promoDiscount > 0 && booking.promoCode
+      ? `<div style="margin:18px 0;padding:14px 18px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;">
+      <p style="margin:0;font-size:14px;font-weight:600;color:#166534;">Promo code applied: <span style="font-family:monospace;">${escHtml(booking.promoCode)}</span></p>
+      <p style="margin:6px 0 0;font-size:13px;color:#166534;">You saved <strong>${formatCurrency(promoDiscount)}</strong> on this booking.</p>
+    </div>`
+      : "";
+
   // Try to use the DB template
   try {
     const [dbTemplate] = await db
@@ -400,6 +411,9 @@ async function buildConfirmationEmailHtml(
         "{{poNumberSection}}": poNumberHtml,
         "{{billingEditLink}}": billingEditLinkHtml,
         "{{billingEditUrl}}": billingEditUrl,
+        "{{promoSummary}}": promoSummaryHtml,
+        "{{promoCode}}": escHtml(booking.promoCode || ""),
+        "{{promoDiscount}}": promoDiscount > 0 ? formatCurrency(promoDiscount) : "",
       };
       const calPh = getCalendarPlaceholders(settings);
       vars["{{eventCalendarLinks}}"] = calPh.eventCalendarLinks;
@@ -454,6 +468,23 @@ async function buildConfirmationEmailHtml(
           body += insert;
         }
       }
+      // If the DB template predates the new promo placeholders, append the
+      // promo summary block so customers can always see which code was applied
+      // and the amount they saved without opening the attached PDF receipt.
+      if (
+        promoSummaryHtml &&
+        !body.includes("{{promoSummary}}") &&
+        !body.includes("{{promoCode}}") &&
+        !body.includes("{{promoDiscount}}") &&
+        !body.includes("{{priceSummary}}")
+      ) {
+        if (/<\/body>/i.test(body)) {
+          body = body.replace(/<\/body>/i, `${promoSummaryHtml}</body>`);
+        } else {
+          body += promoSummaryHtml;
+        }
+      }
+
       for (const [placeholder, value] of Object.entries(vars)) {
         body = body.replaceAll(placeholder, value);
       }

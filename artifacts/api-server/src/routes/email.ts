@@ -226,7 +226,7 @@ const TEMPLATE_DEFAULTS: Record<string, { subject: string; htmlBody: string }> =
   confirmation: {
     subject: "Booking Confirmed — HR Analytics Summit 2026",
     htmlBody:
-      "<h2>Booking Confirmed, {{firstName}}!</h2><p>Thank you for registering. Your order reference is <strong>{{orderReference}}</strong>.</p><p>You have booked <strong>{{quantity}}</strong> {{passType}} pass(es). A full VAT receipt is attached to this email.</p><p>We look forward to seeing you at the HR Analytics Summit!</p>",
+      "<h2>Booking Confirmed, {{firstName}}!</h2><p>Thank you for registering. Your order reference is <strong>{{orderReference}}</strong>.</p><p>You have booked <strong>{{quantity}}</strong> {{passType}} pass(es). A full VAT receipt is attached to this email.</p>{{promoSummary}}<p>We look forward to seeing you at the HR Analytics Summit!</p>",
   },
   invoice_reminder: {
     subject: "Invoice Reminder — {{orderReference}} — HR Analytics Summit 2026",
@@ -388,6 +388,12 @@ async function buildSampleVars(
           "{{managementLink}}": sampleManagementLink,
           "{{invoicePaymentButton}}": "",
           "{{total}}": "£238.80",
+          "{{promoCode}}": "SAVE20",
+          "{{promoDiscount}}": "£20.00",
+          "{{promoSummary}}": `<div style="margin:18px 0;padding:14px 18px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;">
+      <p style="margin:0;font-size:14px;font-weight:600;color:#166534;">Promo code applied: <span style="font-family:monospace;">SAVE20</span></p>
+      <p style="margin:6px 0 0;font-size:13px;color:#166534;">You saved <strong>£20.00</strong> on this booking.</p>
+    </div>`,
         };
 
   const calPh = getCalendarPlaceholders(settings);
