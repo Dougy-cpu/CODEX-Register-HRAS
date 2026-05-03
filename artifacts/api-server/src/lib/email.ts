@@ -962,7 +962,10 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
     }
   }
   if (failedRecipients.length > 0) {
-    logger.error(
+    // Single consolidated warning per booking (per task #68 acceptance: "a
+    // single warning log per booking with the full recipient list"). Each
+    // underlying SMTP failure is already error-logged inside sendMail().
+    logger.warn(
       {
         bookingId,
         sentCount,
@@ -1133,7 +1136,8 @@ export async function sendIncompleteFormNotification(bookingId: number): Promise
     }
   }
   if (failedRecipients.length > 0) {
-    logger.error(
+    // See sendOrganiserNotification: warn-level consolidated summary.
+    logger.warn(
       {
         bookingId,
         sentCount,
@@ -1554,7 +1558,8 @@ export async function sendAttendeeChangeNotification(
       }
     }
     if (failedRecipients.length > 0) {
-      logger.error(
+      // See sendOrganiserNotification: warn-level consolidated summary.
+      logger.warn(
         {
           bookingId,
           attendeeId,

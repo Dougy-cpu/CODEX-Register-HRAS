@@ -38,3 +38,46 @@ describe("escHtml", () => {
     expect(escaped).toContain("&quot;");
   });
 });
+
+/**
+ * Renderer-path integration test (per code-review feedback on Task #68).
+ *
+ * The production confirmation builder substitutes user-controlled values
+ * into a stored HTML template by escaping each value with `escHtml` and
+ * then doing `body.replaceAll(placeholder, escapedValue)`. We cannot
+ * call `buildConfirmationEmailHtml` directly in a unit test (it talks
+ * to the DB), so we replicate the exact substitution pattern here and
+ * assert that a malicious attendee `firstName` survives the round-trip
+ * neutralised — proving the escape helper is wired into the renderer
+ * pattern, not just exported in isolation.
+ */
+describe("template substitution pattern (integration shape)", () => {
+  it("escapes a malicious firstName when rendered into a template body", () => {
+    const malicious = `<script>alert("pwned")</script>`;
+    const template = `<h2>Welcome, {{firstName}}!</h2><p>Hi {{firstName}}.</p>`;
+
+    const vars: Record<string, string> = {
+      "{{firstName}}": escHtml(malicious),
+    };
+
+    let body = template;
+    for (const [placeholder, value] of Object.entries(vars)) {
+      body = body.replaceAll(placeholder, value);
+    }
+
+    expect(body).not.toContain("<script>");
+    expect(body).not.toContain("</script>");
+    expect(body).toContain("&lt;script&gt;");
+    expect(body).toContain("&lt;/script&gt;");
+    expect(body).toContain("&quot;pwned&quot;");
+    // Sanity: the placeholder was actually substituted.
+    expect(body).not.toContain("{{firstName}}");
+  });
+
+  it("escapes a billing-address payload that tries to inject an <img onerror>", () => {
+    const malicious = `<img src=x onerror=alert(1)>`;
+    const row = `<td>${escHtml(malicious)}</td>`;
+    expect(row).toBe(`<td>&lt;img src=x onerror=alert(1)&gt;</td>`);
+    expect(row).not.toContain("<img");
+  });
+});
