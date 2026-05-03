@@ -156,6 +156,12 @@ export default function UnpaidInvoicesWidget() {
               <span className="font-medium">£{summary.totalOutstanding.toLocaleString()}</span>{" "}
               outstanding
             </p>
+            <p
+              className="text-[11px] text-muted-foreground/80 mt-0.5"
+              title="Buckets are based on days since the booking was created (≈ invoice issue date)."
+            >
+              Bucketed by days since invoice issued
+            </p>
           </div>
         </div>
 
