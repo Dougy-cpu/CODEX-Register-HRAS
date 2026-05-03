@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import Stripe from "stripe";
-import { eq, desc, or, and, sql, count } from "drizzle-orm";
+import { eq, desc, asc, or, and, sql, count, notInArray, isNull } from "drizzle-orm";
 import ExcelJS from "exceljs";
 import { db } from "@workspace/db";
 import {
@@ -1171,124 +1171,176 @@ router.get("/admin/activity", adminAuth, async (req, res): Promise<void> => {
 
 type AgingBucket = "0-7" | "8-14" | "15+";
 
-function bucketForDaysOutstanding(daysOutstanding: number): AgingBucket {
-  if (daysOutstanding <= 7) return "0-7";
-  if (daysOutstanding <= 14) return "8-14";
-  return "15+";
-}
+const BUCKET_VALUES: AgingBucket[] = ["0-7", "8-14", "15+"];
 
-function isUnpaidInvoiceBooking(b: typeof bookingsTable.$inferSelect): boolean {
-  if (b.paymentMethod !== "invoice") return false;
-  if (b.status !== "invoiced") return false;
-  // Stripe-cached terminal states are excluded so paid/voided/uncollectible
-  // invoices never reappear in the widget even if booking.status hasn't been
-  // refreshed yet.
-  const cached = b.stripeInvoiceStatus;
-  if (cached === "paid" || cached === "void" || cached === "uncollectible") return false;
-  return true;
-}
+// Common SQL fragments — kept in one place so the summary, list, and bulk
+// endpoints all use the exact same definition of "unpaid invoice" and the
+// exact same bucket boundaries.
+//
+// daysOutstanding = floor((now - created_at) / 1 day). createdAt is a close
+// proxy for invoice issue time (Stripe invoices are created seconds after
+// the booking flips to `invoiced`), so we don't need a separate issue-date
+// column.
+const daysOutstandingSql = sql<number>`
+    GREATEST(
+      0,
+      FLOOR(EXTRACT(EPOCH FROM (NOW() - ${bookingsTable.createdAt})) / 86400)
+    )::int
+  `;
 
-function daysBetween(a: Date, b: Date): number {
-  return Math.max(0, Math.floor((a.getTime() - b.getTime()) / (24 * 60 * 60 * 1000)));
-}
+const bucketSql = sql<AgingBucket>`
+    CASE
+      WHEN ${daysOutstandingSql} <= 7 THEN '0-7'
+      WHEN ${daysOutstandingSql} <= 14 THEN '8-14'
+      ELSE '15+'
+    END
+  `;
+
+// Stripe-cached terminal states are excluded so paid/voided/uncollectible
+// invoices never reappear in the widget even if booking.status hasn't been
+// refreshed yet.
+const unpaidInvoiceWhereSql = and(
+  eq(bookingsTable.paymentMethod, "invoice"),
+  eq(bookingsTable.status, "invoiced"),
+  or(
+    isNull(bookingsTable.stripeInvoiceStatus),
+    notInArray(bookingsTable.stripeInvoiceStatus, ["paid", "void", "uncollectible"]),
+  ),
+);
 
 router.get("/admin/unpaid-invoices/summary", adminAuth, async (_req, res): Promise<void> => {
-  const all = await db.select().from(bookingsTable);
-  const unpaid = all.filter(isUnpaidInvoiceBooking);
-  const now = new Date();
+  // Single aggregate query: COUNT + SUM grouped by the SQL CASE bucket.
+  const grouped = await db
+    .select({
+      bucket: bucketSql,
+      count: sql<number>`COUNT(*)::int`,
+      totalAmount: sql<string>`COALESCE(SUM(${bookingsTable.totalAmount}), 0)::text`,
+    })
+    .from(bookingsTable)
+    .where(unpaidInvoiceWhereSql)
+    .groupBy(bucketSql);
 
   const buckets: Record<AgingBucket, { count: number; totalAmount: number }> = {
     "0-7": { count: 0, totalAmount: 0 },
     "8-14": { count: 0, totalAmount: 0 },
     "15+": { count: 0, totalAmount: 0 },
   };
-
-  for (const b of unpaid) {
-    const days = daysBetween(now, b.createdAt);
-    const bucket = bucketForDaysOutstanding(days);
-    buckets[bucket].count += 1;
-    buckets[bucket].totalAmount += parseFloat(b.totalAmount?.toString() || "0");
+  let totalUnpaid = 0;
+  let totalOutstanding = 0;
+  for (const row of grouped) {
+    const b = row.bucket as AgingBucket;
+    if (!buckets[b]) continue;
+    const amt = parseFloat(row.totalAmount || "0");
+    buckets[b] = { count: row.count, totalAmount: parseFloat(amt.toFixed(2)) };
+    totalUnpaid += row.count;
+    totalOutstanding += amt;
   }
 
   res.json({
-    totalUnpaid: unpaid.length,
-    totalOutstanding: unpaid.reduce(
-      (sum, b) => sum + parseFloat(b.totalAmount?.toString() || "0"),
-      0,
-    ),
-    buckets: {
-      "0-7": {
-        count: buckets["0-7"].count,
-        totalAmount: parseFloat(buckets["0-7"].totalAmount.toFixed(2)),
-      },
-      "8-14": {
-        count: buckets["8-14"].count,
-        totalAmount: parseFloat(buckets["8-14"].totalAmount.toFixed(2)),
-      },
-      "15+": {
-        count: buckets["15+"].count,
-        totalAmount: parseFloat(buckets["15+"].totalAmount.toFixed(2)),
-      },
-    },
+    totalUnpaid,
+    totalOutstanding: parseFloat(totalOutstanding.toFixed(2)),
+    buckets,
   });
 });
 
 router.get("/admin/unpaid-invoices", adminAuth, async (req, res): Promise<void> => {
   const bucketFilter = req.query.bucket as AgingBucket | undefined;
   const page = Math.max(1, parseInt((req.query.page as string) || "1", 10));
-  const limit = Math.min(100, Math.max(1, parseInt((req.query.limit as string) || "50", 10)));
+  const limit = Math.min(100, Math.max(1, parseInt((req.query.limit as string) || "25", 10)));
+  const sortRaw = (req.query.sort as string) || "daysOutstanding";
+  const order = (req.query.order as string) === "asc" ? "asc" : "desc";
 
-  if (bucketFilter && !["0-7", "8-14", "15+"].includes(bucketFilter)) {
+  if (bucketFilter && !BUCKET_VALUES.includes(bucketFilter)) {
     res.status(400).json({ error: "Invalid bucket — must be one of 0-7, 8-14, 15+" });
     return;
   }
 
-  const all = await db
-    .select()
+  // Whitelist sortable columns — never trust the raw query parameter as a
+  // SQL identifier.
+  const sortColumns = {
+    daysOutstanding: bookingsTable.createdAt,
+    totalAmount: bookingsTable.totalAmount,
+    lastReminder: bookingsTable.lastInvoiceReminderSentAt,
+    orderReference: bookingsTable.orderReference,
+  } as const;
+  const sortKey: keyof typeof sortColumns = (
+    Object.keys(sortColumns) as Array<keyof typeof sortColumns>
+  ).includes(sortRaw as keyof typeof sortColumns)
+    ? (sortRaw as keyof typeof sortColumns)
+    : "daysOutstanding";
+  const sortColumn = sortColumns[sortKey];
+  // For "daysOutstanding" the underlying column is createdAt and the relation
+  // is inverted: more days ⇒ older createdAt ⇒ ascending createdAt.
+  const dirFn =
+    sortKey === "daysOutstanding" ? (order === "asc" ? desc : asc) : order === "asc" ? asc : desc;
+
+  // Apply bucket filter at the DB layer using the same SQL CASE expression.
+  const whereSql = bucketFilter
+    ? and(unpaidInvoiceWhereSql, sql`${bucketSql} = ${bucketFilter}`)
+    : unpaidInvoiceWhereSql;
+
+  // Total count for pagination.
+  const totalRow = await db
+    .select({ c: sql<number>`COUNT(*)::int` })
     .from(bookingsTable)
-    .where(and(eq(bookingsTable.paymentMethod, "invoice"), eq(bookingsTable.status, "invoiced")));
-  const allAttendees = await db.select().from(attendeesTable);
-  const now = new Date();
+    .where(whereSql);
+  const total = totalRow[0]?.c ?? 0;
 
-  const rows = all
-    .filter(isUnpaidInvoiceBooking)
-    .map((b) => {
-      const daysOutstanding = daysBetween(now, b.createdAt);
-      const bucket = bucketForDaysOutstanding(daysOutstanding);
-      const lead = allAttendees.find((a) => a.bookingId === b.id && a.isLead);
-      return {
-        id: b.id,
-        orderReference: b.orderReference,
-        leadName: lead ? `${lead.firstName} ${lead.lastName}` : null,
-        billingEmail: b.billingEmail || lead?.workEmail || null,
-        totalAmount: parseFloat(b.totalAmount?.toString() || "0"),
-        daysOutstanding,
-        bucket,
-        invoiceDueDate: b.invoiceDueDate ? b.invoiceDueDate.toISOString() : null,
-        lastInvoiceReminderSentAt: b.lastInvoiceReminderSentAt
-          ? b.lastInvoiceReminderSentAt.toISOString()
-          : null,
-        invoiceBadgeStatus: deriveInvoiceBadge({
-          status: b.status,
-          paymentMethod: b.paymentMethod,
-          stripeInvoiceId: b.stripeInvoiceId,
-          stripeInvoiceStatus: b.stripeInvoiceStatus,
-          invoiceDueDate: b.invoiceDueDate,
-          paidAt: b.paidAt,
-        }),
-      };
-    })
-    .filter((r) => !bucketFilter || r.bucket === bucketFilter)
-    .sort((a, b) => b.daysOutstanding - a.daysOutstanding);
-
-  const total = rows.length;
+  // Paginated list with LEFT JOIN to the lead attendee (single SQL round trip).
   const offset = (page - 1) * limit;
-  res.json({
-    rows: rows.slice(offset, offset + limit),
-    total,
-    page,
-    limit,
-  });
+  const rowsRaw = await db
+    .select({
+      id: bookingsTable.id,
+      orderReference: bookingsTable.orderReference,
+      billingEmail: bookingsTable.billingEmail,
+      totalAmount: bookingsTable.totalAmount,
+      createdAt: bookingsTable.createdAt,
+      invoiceDueDate: bookingsTable.invoiceDueDate,
+      lastInvoiceReminderSentAt: bookingsTable.lastInvoiceReminderSentAt,
+      stripeInvoiceId: bookingsTable.stripeInvoiceId,
+      stripeInvoiceStatus: bookingsTable.stripeInvoiceStatus,
+      paidAt: bookingsTable.paidAt,
+      status: bookingsTable.status,
+      paymentMethod: bookingsTable.paymentMethod,
+      daysOutstanding: daysOutstandingSql,
+      bucket: bucketSql,
+      leadFirst: attendeesTable.firstName,
+      leadLast: attendeesTable.lastName,
+      leadEmail: attendeesTable.workEmail,
+    })
+    .from(bookingsTable)
+    .leftJoin(
+      attendeesTable,
+      and(eq(attendeesTable.bookingId, bookingsTable.id), eq(attendeesTable.isLead, true)),
+    )
+    .where(whereSql)
+    .orderBy(dirFn(sortColumn), desc(bookingsTable.id))
+    .limit(limit)
+    .offset(offset);
+
+  const rows = rowsRaw.map((r) => ({
+    id: r.id,
+    orderReference: r.orderReference,
+    leadName: r.leadFirst && r.leadLast ? `${r.leadFirst} ${r.leadLast}` : null,
+    billingEmail: r.billingEmail || r.leadEmail || null,
+    totalAmount: parseFloat(r.totalAmount?.toString() || "0"),
+    daysOutstanding: Number(r.daysOutstanding),
+    bucket: r.bucket as AgingBucket,
+    invoiceDueDate: r.invoiceDueDate ? r.invoiceDueDate.toISOString() : null,
+    lastInvoiceReminderSentAt: r.lastInvoiceReminderSentAt
+      ? r.lastInvoiceReminderSentAt.toISOString()
+      : null,
+    invoiceBadgeStatus: deriveInvoiceBadge({
+      status: r.status,
+      paymentMethod: r.paymentMethod,
+      stripeInvoiceId: r.stripeInvoiceId,
+      stripeInvoiceStatus: r.stripeInvoiceStatus,
+      invoiceDueDate: r.invoiceDueDate,
+      paidAt: r.paidAt,
+    }),
+  }));
+
+  res.json({ rows, total, page, limit });
 });
 
 router.post("/admin/unpaid-invoices/bulk-remind", adminAuth, async (req, res): Promise<void> => {
@@ -1301,13 +1353,11 @@ router.post("/admin/unpaid-invoices/bulk-remind", adminAuth, async (req, res): P
     return;
   }
 
-  const all = await db.select().from(bookingsTable);
-  const now = new Date();
-  const targets = all.filter(
-    (b) =>
-      isUnpaidInvoiceBooking(b) &&
-      bucketForDaysOutstanding(daysBetween(now, b.createdAt)) === "15+",
-  );
+  // Single SQL round trip — only fetch booking ids in the 15+ bucket.
+  const targets = await db
+    .select({ id: bookingsTable.id })
+    .from(bookingsTable)
+    .where(and(unpaidInvoiceWhereSql, sql`${bucketSql} = '15+'`));
 
   const { sendInvoiceReminder } = await import("../lib/email");
   let sent = 0;

@@ -26,9 +26,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, Clock, Send } from "lucide-react";
+import { AlertTriangle, ArrowUpDown, Clock, Send } from "lucide-react";
 
 type Bucket = "0-7" | "8-14" | "15+";
+type SortKey = "daysOutstanding" | "totalAmount" | "lastReminder" | "orderReference";
+type SortOrder = "asc" | "desc";
 
 const BUCKET_META: Record<
   Bucket,
@@ -53,6 +55,8 @@ const BUCKET_META: Record<
     icon: AlertTriangle,
   },
 };
+
+const PAGE_SIZE = 25;
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return "—";
@@ -190,7 +194,7 @@ export default function UnpaidInvoicesWidget() {
       </div>
 
       <Dialog open={openBucket !== null} onOpenChange={(o) => !o && setOpenBucket(null)}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>
               Unpaid invoices — {openBucket ? BUCKET_META[openBucket].label : ""}
@@ -255,6 +259,40 @@ export default function UnpaidInvoicesWidget() {
   );
 }
 
+function SortableTh({
+  label,
+  field,
+  active,
+  order,
+  onSort,
+  align = "left",
+}: {
+  label: string;
+  field: SortKey;
+  active: SortKey;
+  order: SortOrder;
+  onSort: (f: SortKey) => void;
+  align?: "left" | "right";
+}) {
+  const isActive = active === field;
+  return (
+    <th
+      className={`px-4 py-3 select-none cursor-pointer hover:text-foreground ${
+        align === "right" ? "text-right" : ""
+      }`}
+      onClick={() => onSort(field)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <ArrowUpDown
+          className={`w-3 h-3 ${isActive ? "text-foreground" : "text-muted-foreground/40"}`}
+        />
+        {isActive && <span className="text-[10px]">{order === "asc" ? "↑" : "↓"}</span>}
+      </span>
+    </th>
+  );
+}
+
 function UnpaidInvoicesTable({
   bucket,
   onSendReminder,
@@ -264,10 +302,24 @@ function UnpaidInvoicesTable({
   onSendReminder: (bookingId: number) => void;
   sendingId: number | undefined;
 }) {
+  const [page, setPage] = useState(1);
+  const [sort, setSort] = useState<SortKey>("daysOutstanding");
+  const [order, setOrder] = useState<SortOrder>("desc");
+
   const { data, isLoading, isError, error, refetch } = useListUnpaidInvoices(
-    { bucket },
-    { query: { queryKey: ["unpaidInvoicesList", bucket] } },
+    { bucket, page, limit: PAGE_SIZE, sort, order },
+    { query: { queryKey: ["unpaidInvoicesList", bucket, page, sort, order] } },
   );
+
+  const handleSort = (field: SortKey) => {
+    if (field === sort) {
+      setOrder(order === "asc" ? "desc" : "asc");
+    } else {
+      setSort(field);
+      setOrder("desc");
+    }
+    setPage(1);
+  };
 
   if (isError) {
     return (
@@ -295,45 +347,103 @@ function UnpaidInvoicesTable({
     );
   }
 
+  const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE));
+
   return (
-    <table className="w-full text-sm text-left">
-      <thead className="bg-muted text-muted-foreground uppercase text-xs font-bold">
-        <tr>
-          <th className="px-4 py-3">Ref</th>
-          <th className="px-4 py-3">Lead</th>
-          <th className="px-4 py-3">Email</th>
-          <th className="px-4 py-3 text-right">Total</th>
-          <th className="px-4 py-3 text-right">Days</th>
-          <th className="px-4 py-3">Last Reminder</th>
-          <th className="px-4 py-3"></th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-border bg-white">
-        {data.rows.map((row) => (
-          <tr key={row.id} className="hover:bg-muted/50">
-            <td className="px-4 py-3 font-mono text-xs">{row.orderReference || "—"}</td>
-            <td className="px-4 py-3">{row.leadName || "—"}</td>
-            <td className="px-4 py-3 text-xs text-muted-foreground">{row.billingEmail || "—"}</td>
-            <td className="px-4 py-3 text-right font-medium">
-              £{row.totalAmount.toLocaleString()}
-            </td>
-            <td className="px-4 py-3 text-right">{row.daysOutstanding}</td>
-            <td className="px-4 py-3 text-xs text-muted-foreground">
-              {fmtDate(row.lastInvoiceReminderSentAt)}
-            </td>
-            <td className="px-4 py-3 text-right">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onSendReminder(row.id)}
-                disabled={sendingId === row.id}
-              >
-                {sendingId === row.id ? "Sending…" : "Send reminder"}
-              </Button>
-            </td>
+    <div className="space-y-3">
+      <table className="w-full text-sm text-left">
+        <thead className="bg-muted text-muted-foreground uppercase text-xs font-bold">
+          <tr>
+            <SortableTh
+              label="Ref"
+              field="orderReference"
+              active={sort}
+              order={order}
+              onSort={handleSort}
+            />
+            <th className="px-4 py-3">Lead</th>
+            <th className="px-4 py-3">Email</th>
+            <SortableTh
+              label="Total"
+              field="totalAmount"
+              active={sort}
+              order={order}
+              onSort={handleSort}
+              align="right"
+            />
+            <SortableTh
+              label="Days"
+              field="daysOutstanding"
+              active={sort}
+              order={order}
+              onSort={handleSort}
+              align="right"
+            />
+            <SortableTh
+              label="Last Reminder"
+              field="lastReminder"
+              active={sort}
+              order={order}
+              onSort={handleSort}
+            />
+            <th className="px-4 py-3"></th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody className="divide-y divide-border bg-white">
+          {data.rows.map((row) => (
+            <tr key={row.id} className="hover:bg-muted/50">
+              <td className="px-4 py-3 font-mono text-xs">{row.orderReference || "—"}</td>
+              <td className="px-4 py-3">{row.leadName || "—"}</td>
+              <td className="px-4 py-3 text-xs text-muted-foreground">{row.billingEmail || "—"}</td>
+              <td className="px-4 py-3 text-right font-medium">
+                £{row.totalAmount.toLocaleString()}
+              </td>
+              <td className="px-4 py-3 text-right">{row.daysOutstanding}</td>
+              <td className="px-4 py-3 text-xs text-muted-foreground">
+                {fmtDate(row.lastInvoiceReminderSentAt)}
+              </td>
+              <td className="px-4 py-3 text-right">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onSendReminder(row.id)}
+                  disabled={sendingId === row.id}
+                >
+                  {sendingId === row.id ? "Sending…" : "Send reminder"}
+                </Button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+        <span>
+          Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, data.total)} of{" "}
+          {data.total}
+        </span>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1}
+          >
+            Previous
+          </Button>
+          <span>
+            Page {page} of {totalPages}
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }

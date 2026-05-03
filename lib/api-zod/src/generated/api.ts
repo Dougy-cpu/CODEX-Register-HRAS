@@ -710,6 +710,8 @@ export const ListUnpaidInvoicesQueryParams = zod.object({
   bucket: zod.enum(["0-7", "8-14", "15+"]).optional(),
   page: zod.coerce.number().optional(),
   limit: zod.coerce.number().optional(),
+  sort: zod.enum(["daysOutstanding", "totalAmount", "lastReminder", "orderReference"]).optional(),
+  order: zod.enum(["asc", "desc"]).optional(),
 });
 
 export const ListUnpaidInvoicesResponse = zod.object({

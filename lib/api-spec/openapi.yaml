@@ -779,6 +779,18 @@ paths:
           required: false
           schema:
             type: integer
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [daysOutstanding, totalAmount, lastReminder, orderReference]
+        - name: order
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
       responses:
         "200":
           description: Page of unpaid invoice rows

@@ -6,9 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ListUnpaidInvoicesBucket } from "./listUnpaidInvoicesBucket";
+import type { ListUnpaidInvoicesOrder } from "./listUnpaidInvoicesOrder";
+import type { ListUnpaidInvoicesSort } from "./listUnpaidInvoicesSort";
 
 export type ListUnpaidInvoicesParams = {
   bucket?: ListUnpaidInvoicesBucket;
   page?: number;
   limit?: number;
+  sort?: ListUnpaidInvoicesSort;
+  order?: ListUnpaidInvoicesOrder;
 };

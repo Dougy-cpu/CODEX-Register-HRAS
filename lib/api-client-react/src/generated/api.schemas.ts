@@ -904,6 +904,8 @@ export type ListUnpaidInvoicesParams = {
   bucket?: ListUnpaidInvoicesBucket;
   page?: number;
   limit?: number;
+  sort?: ListUnpaidInvoicesSort;
+  order?: ListUnpaidInvoicesOrder;
 };
 
 export type ListUnpaidInvoicesBucket =
@@ -913,6 +915,24 @@ export const ListUnpaidInvoicesBucket = {
   "0-7": "0-7",
   "8-14": "8-14",
   "15+": "15+",
+} as const;
+
+export type ListUnpaidInvoicesSort =
+  (typeof ListUnpaidInvoicesSort)[keyof typeof ListUnpaidInvoicesSort];
+
+export const ListUnpaidInvoicesSort = {
+  daysOutstanding: "daysOutstanding",
+  totalAmount: "totalAmount",
+  lastReminder: "lastReminder",
+  orderReference: "orderReference",
+} as const;
+
+export type ListUnpaidInvoicesOrder =
+  (typeof ListUnpaidInvoicesOrder)[keyof typeof ListUnpaidInvoicesOrder];
+
+export const ListUnpaidInvoicesOrder = {
+  asc: "asc",
+  desc: "desc",
 } as const;
 
 export type ListRegistrationsParams = {
