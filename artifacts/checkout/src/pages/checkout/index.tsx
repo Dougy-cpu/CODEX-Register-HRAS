@@ -42,7 +42,7 @@ function writeBookingSessionToken(token: string): void {
   }
 }
 
-function useBookingSession() {
+function useBookingSession(): [string, () => void] {
   const [sessionToken, setSessionToken] = useState<string>("");
 
   useEffect(() => {
@@ -54,7 +54,15 @@ function useBookingSession() {
     setSessionToken(token);
   }, []);
 
-  return sessionToken;
+  // Rotate to a brand-new session token. Used when the persisted token
+  // resolves to a finalised booking and the user is starting fresh.
+  const rotate = () => {
+    const fresh = uuidv4();
+    writeBookingSessionToken(fresh);
+    setSessionToken(fresh);
+  };
+
+  return [sessionToken, rotate];
 }
 
 // Components
@@ -70,7 +78,7 @@ const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 60000;
 
 export default function CheckoutFlow() {
-  const sessionToken = useBookingSession();
+  const [sessionToken, rotateSessionToken] = useBookingSession();
   const queryClient = useQueryClient();
   const [optimisticStep, setOptimisticStep] = useState<number | null>(null);
   const [optimisticBooking, setOptimisticBooking] = useState<BookingWithAttendees | null>(null);
@@ -161,6 +169,24 @@ export default function CheckoutFlow() {
     }
   }, [booking?.status, pollingForPayment]);
 
+  // Restoration is gated on the resolved booking still being non-final.
+  // If the persisted token resolves to a paid/invoiced booking AND the user
+  // is NOT mid-Stripe-return, they're opening a fresh checkout intent — so
+  // rotate the local token to start a new session. Without this, a returning
+  // buyer would keep landing on a stale confirmation page weeks after their
+  // last purchase. Stripe-return traffic is left alone so the post-payment
+  // confirmation still renders the booking the buyer just paid for.
+  const sessionRotatedRef = useRef(false);
+  useEffect(() => {
+    if (sessionRotatedRef.current) return;
+    if (!booking || isStripeReturn || pollingForPayment) return;
+    if (booking.status === "paid" || booking.status === "invoiced") {
+      sessionRotatedRef.current = true;
+      queryClient.removeQueries({ queryKey: ["booking", sessionToken] });
+      rotateSessionToken();
+    }
+  }, [booking, isStripeReturn, pollingForPayment, queryClient, rotateSessionToken, sessionToken]);
+
   useEffect(() => {
     if (optimisticStep !== null && booking?.currentStep && booking.currentStep >= optimisticStep) {
       setOptimisticStep(null);
@@ -189,9 +215,13 @@ export default function CheckoutFlow() {
   // The first render uses replaceState (so we don't add a phantom entry);
   // subsequent changes use pushState. We also avoid pushing when the
   // current state already matches (e.g. immediately after popstate).
+  // Note: this runs even before the booking has loaded so that fresh
+  // visitors get a Step 1 history entry — without it, pressing back from
+  // Step 2 after Continue on Step 1 would exit the site instead of
+  // returning to Step 1.
   const historyInitRef = useRef(false);
   useEffect(() => {
-    if (typeof window === "undefined" || !booking) return;
+    if (typeof window === "undefined") return;
     const stateStep = (window.history.state as { checkoutStep?: number } | null)?.checkoutStep;
     if (stateStep === currentStep) {
       historyInitRef.current = true;
@@ -204,7 +234,7 @@ export default function CheckoutFlow() {
     } else {
       window.history.pushState(nextState, "");
     }
-  }, [currentStep, booking]);
+  }, [currentStep]);
 
   // popstate listener: when the user presses back, jump to whatever step the
   // popped history entry refers to. When they run out of in-checkout entries,

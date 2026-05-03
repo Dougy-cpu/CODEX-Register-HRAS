@@ -123,6 +123,14 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
   // Each user keystroke retriggers the effect, providing implicit retry.
   const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "error">("idle");
   const [autosaveAttempt, setAutosaveAttempt] = useState(0); // bump to force-retry
+  // Bounded exponential backoff for transient autosave failures: if a save
+  // cycle fails we automatically re-trigger the effect at 2s, then 6s, then
+  // 18s before giving up and waiting for the user (banner / manual retry /
+  // next keystroke). This is reset whenever the user edits or a save
+  // succeeds so the next failure window starts fresh.
+  const autoRetryCountRef = useRef(0);
+  const autoRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const AUTO_RETRY_DELAYS_MS = [2000, 6000, 18000];
 
   useEffect(() => {
     if (formsData.length === 0) return;
@@ -238,6 +246,23 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
 
       if (cancelled) return;
       setAutosaveStatus(hadError ? "error" : "idle");
+      if (hadError) {
+        const nextAttempt = autoRetryCountRef.current;
+        if (nextAttempt < AUTO_RETRY_DELAYS_MS.length) {
+          const delay = AUTO_RETRY_DELAYS_MS[nextAttempt];
+          autoRetryCountRef.current = nextAttempt + 1;
+          if (autoRetryTimerRef.current) clearTimeout(autoRetryTimerRef.current);
+          autoRetryTimerRef.current = setTimeout(() => {
+            setAutosaveAttempt((n) => n + 1);
+          }, delay);
+        }
+      } else {
+        autoRetryCountRef.current = 0;
+        if (autoRetryTimerRef.current) {
+          clearTimeout(autoRetryTimerRef.current);
+          autoRetryTimerRef.current = null;
+        }
+      }
     }, 1500);
     return () => {
       cancelled = true;
@@ -245,6 +270,23 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formsData, tbcFlags, autosaveAttempt]);
+
+  // Reset the backoff counter whenever the user edits — a fresh keystroke
+  // implies a fresh attempt window and we shouldn't carry old retry counts.
+  useEffect(() => {
+    autoRetryCountRef.current = 0;
+    if (autoRetryTimerRef.current) {
+      clearTimeout(autoRetryTimerRef.current);
+      autoRetryTimerRef.current = null;
+    }
+  }, [formsData, tbcFlags]);
+
+  // Cleanup retry timer on unmount.
+  useEffect(() => {
+    return () => {
+      if (autoRetryTimerRef.current) clearTimeout(autoRetryTimerRef.current);
+    };
+  }, []);
 
   const handleForMeToggle = (index: number, checked: boolean) => {
     const newFlags = [...forMeFlags];
