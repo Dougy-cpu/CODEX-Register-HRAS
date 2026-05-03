@@ -2073,8 +2073,12 @@ export async function resolveLatestBookingPdf(
     .where(eq(attendeesTable.bookingId, bookingId));
 
   const ref = booking.orderReference || String(bookingId);
+  // Invoice bookings always get an invoice-prefixed filename even when the
+  // custom PDF fallback is used; only true card-payment bookings get a
+  // receipt-prefixed filename.
+  const isInvoiceBooking = booking.paymentMethod === "invoice";
   let buffer: Buffer | null = null;
-  let filename = `receipt-${ref}.pdf`;
+  let filename = isInvoiceBooking ? `invoice-${ref}.pdf` : `receipt-${ref}.pdf`;
   let source: "stripe" | "custom" = "custom";
 
   if (booking.stripeInvoicePdfUrl) {
