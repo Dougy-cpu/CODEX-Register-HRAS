@@ -12,6 +12,8 @@ import { logAdminAction } from "../lib/audit";
 import {
   sendIncompleteFormNotification,
   sendReissuedInvoiceEmail,
+  sendBillingEditNotification,
+  diffBillingFields,
   getEventSettings,
   resolveLatestBookingPdf,
   resendConfirmationAndReceipt,
@@ -704,6 +706,18 @@ router.post("/bookings/by-management-token/:token/billing", async (req, res): Pr
     await db.update(bookingsTable).set(updates).where(eq(bookingsTable.id, booking.id));
   }
 
+  // Diff old vs new billing fields BEFORE the re-issue step so the organiser
+  // notification reflects exactly what the customer changed (rather than any
+  // post-reissue Stripe-driven rewrites).
+  const [postUpdate] = await db
+    .select()
+    .from(bookingsTable)
+    .where(eq(bookingsTable.id, booking.id));
+  const billingChanges = diffBillingFields(
+    booking as unknown as Record<string, unknown>,
+    postUpdate as unknown as Record<string, unknown>,
+  );
+
   // Re-issue the Stripe invoice (if any) so the PO + new billing details show.
   let reissue: { alreadyPaid?: boolean; reissued?: boolean; error?: string } = {};
   if (booking.stripeInvoiceId) {
@@ -738,6 +752,19 @@ router.post("/bookings/by-management-token/:token/billing", async (req, res): Pr
   }
 
   const [refreshed] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, booking.id));
+
+  // Fire-and-forget organiser notification (best-effort; never block the
+  // customer-facing response on email delivery). Honours notifyBillingEdit
+  // opt-in flags on notificationEmailsTable.
+  if (billingChanges.length > 0) {
+    sendBillingEditNotification(booking.id, billingChanges).catch((err) => {
+      logger.error(
+        { err, bookingId: booking.id },
+        "Failed to send billing-edit organiser notification",
+      );
+    });
+  }
+
   res.json({
     ok: true,
     reissue,

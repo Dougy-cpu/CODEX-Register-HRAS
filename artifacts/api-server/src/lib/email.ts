@@ -1217,6 +1217,191 @@ export async function sendOrganiserNotification(bookingId: number): Promise<bool
   return failedRecipients.length === 0 && sentCount > 0;
 }
 
+export type BillingEditChange = {
+  field: string;
+  label: string;
+  before: string | null;
+  after: string | null;
+};
+
+/**
+ * Build a list of {field, label, before, after} change descriptors for the
+ * billing-edit notification. Only fields that actually changed are returned.
+ * Empty/null values render as "—" in the email so organisers can see when a
+ * customer cleared a field.
+ */
+export function diffBillingFields(
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+): BillingEditChange[] {
+  const fields: Array<{ key: string; label: string }> = [
+    { key: "poNumber", label: "PO Number" },
+    { key: "billingName", label: "Billing Contact" },
+    { key: "billingCompany", label: "Company" },
+    { key: "billingEmail", label: "Invoice Email" },
+    { key: "billingAddressLine1", label: "Address Line 1" },
+    { key: "billingAddressLine2", label: "Address Line 2" },
+    { key: "billingTown", label: "Town / City" },
+    { key: "billingRegion", label: "Region / State" },
+    { key: "billingPostcode", label: "Postcode" },
+    { key: "billingCountry", label: "Country" },
+    { key: "billingPhone", label: "Contact Phone" },
+    { key: "billingVatNumber", label: "VAT Number" },
+  ];
+  const norm = (v: unknown): string | null => {
+    if (v === null || v === undefined) return null;
+    const s = String(v).trim();
+    return s.length === 0 ? null : s;
+  };
+  const out: BillingEditChange[] = [];
+  for (const { key, label } of fields) {
+    const a = norm(before[key]);
+    const b = norm(after[key]);
+    if (a !== b) out.push({ field: key, label, before: a, after: b });
+  }
+  return out;
+}
+
+/**
+ * Notify organisers when a customer self-serves a PO/billing edit on their
+ * booking via /manage/:token/billing. Honours the `notifyBillingEdit` flag on
+ * the notificationEmailsTable (defaults to true). Returns true when every
+ * recipient was reached (or when there was nothing to do).
+ */
+export async function sendBillingEditNotification(
+  bookingId: number,
+  changes: BillingEditChange[],
+): Promise<boolean> {
+  if (changes.length === 0) {
+    logger.info({ bookingId }, "Billing edit notification skipped — no field changes detected");
+    return true;
+  }
+
+  const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
+  if (!booking) return true;
+
+  const storedEmails = await db
+    .select()
+    .from(notificationEmailsTable)
+    .orderBy(notificationEmailsTable.createdAt);
+
+  const recipients: string[] = storedEmails.filter((e) => e.notifyBillingEdit).map((e) => e.email);
+  if (
+    process.env.ORGANISER_EMAIL &&
+    !recipients.includes(process.env.ORGANISER_EMAIL.toLowerCase())
+  ) {
+    recipients.push(process.env.ORGANISER_EMAIL);
+  }
+
+  if (recipients.length === 0) {
+    logger.info(
+      { bookingId },
+      "No notification recipients configured — skipping billing edit notification",
+    );
+    return true;
+  }
+
+  const settings = await getEventSettings();
+  const attendees = await db
+    .select()
+    .from(attendeesTable)
+    .where(eq(attendeesTable.bookingId, bookingId));
+  const lead = attendees.find((a) => a.isLead) || attendees[0];
+
+  const orderRef = booking.orderReference || `#${bookingId}`;
+  const editedAtStr = new Date().toLocaleString("en-GB", {
+    timeZone: "Europe/London",
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
+
+  const renderVal = (v: string | null): string =>
+    v === null
+      ? `<span style="color:#999">—</span>`
+      : `<span style="font-family:monospace">${escHtml(v)}</span>`;
+
+  const changesRows = changes
+    .map(
+      (c, i) => `
+    <tr style="background:${i % 2 === 0 ? "#f9f9f9" : "#fff"}">
+      <td style="padding:8px 10px;border:1px solid #e5e5e5;font-weight:600;width:170px">${escHtml(c.label)}</td>
+      <td style="padding:8px 10px;border:1px solid #e5e5e5;color:#b91c1c">${renderVal(c.before)}</td>
+      <td style="padding:8px 10px;border:1px solid #e5e5e5;color:#15803d">${renderVal(c.after)}</td>
+    </tr>`,
+    )
+    .join("");
+
+  const subject = `Billing details updated: ${orderRef}${lead ? ` — ${lead.firstName} ${lead.lastName}` : ""}`;
+
+  const html = wrapInBrandedLayout(
+    `
+    <h2 style="margin:0 0 8px;font-size:22px">Customer updated billing details</h2>
+    <p style="margin:0 0 24px;color:#666">A customer just edited their PO number / billing details from the self-service portal. The Stripe invoice has been re-issued and re-emailed to them automatically.</p>
+
+    <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:0.05em;color:#888">Booking</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px">
+      <tr><td style="padding:7px 0;color:#666;width:180px;border-bottom:1px solid #f0f0f0">Order Reference</td><td style="border-bottom:1px solid #f0f0f0"><strong style="font-family:monospace">${escHtml(orderRef)}</strong></td></tr>
+      ${lead ? `<tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Buyer</td><td style="border-bottom:1px solid #f0f0f0">${escHtml(lead.firstName)} ${escHtml(lead.lastName)} &lt;${escHtml(lead.workEmail)}&gt;</td></tr>` : ""}
+      <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Edited At</td><td style="border-bottom:1px solid #f0f0f0">${escHtml(editedAtStr)}</td></tr>
+      ${booking.stripeInvoiceId ? `<tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Stripe Invoice</td><td style="border-bottom:1px solid #f0f0f0;font-family:monospace">${escHtml(booking.stripeInvoiceId)}</td></tr>` : ""}
+    </table>
+
+    <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:0.05em;color:#888">Changes (${changes.length})</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:24px">
+      <thead>
+        <tr style="background:#1e293b;color:#fff">
+          <th style="padding:9px 10px;text-align:left;border:1px solid #1e293b">Field</th>
+          <th style="padding:9px 10px;text-align:left;border:1px solid #1e293b">Was</th>
+          <th style="padding:9px 10px;text-align:left;border:1px solid #1e293b">Now</th>
+        </tr>
+      </thead>
+      <tbody>${changesRows}</tbody>
+    </table>
+
+    <p style="margin:0;color:#666;font-size:13px">Update your internal records (finance / CRM) to reflect the new details. The customer has already received the re-issued invoice by email.</p>
+  `,
+    settings,
+  );
+
+  let sentCount = 0;
+  const failedRecipients: string[] = [];
+  for (const to of recipients) {
+    let ok = false;
+    try {
+      ok = await sendMail({ to, subject, html });
+    } catch (err) {
+      logger.error({ err, bookingId, to }, "Billing edit notification threw unexpectedly");
+    }
+    if (ok) {
+      sentCount++;
+    } else {
+      failedRecipients.push(to);
+    }
+  }
+  if (failedRecipients.length > 0) {
+    logger.warn(
+      {
+        bookingId,
+        sentCount,
+        failedCount: failedRecipients.length,
+        total: recipients.length,
+        failedRecipients,
+      },
+      "Billing edit notifications: one or more recipients failed",
+    );
+  }
+  logger.info(
+    { bookingId, sentCount, total: recipients.length, changeCount: changes.length },
+    "Billing edit notifications sent",
+  );
+  return failedRecipients.length === 0 && sentCount > 0;
+}
+
 export async function sendIncompleteFormNotification(bookingId: number): Promise<void> {
   const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
   if (!booking) return;

@@ -21,6 +21,7 @@ interface NotificationEmail {
   label: string | null;
   notifyComplete: boolean;
   notifyIncomplete: boolean;
+  notifyBillingEdit: boolean;
   createdAt: string;
 }
 
@@ -133,6 +134,7 @@ export default function AdminNotifications() {
   const [newLabel, setNewLabel] = useState("");
   const [newNotifyComplete, setNewNotifyComplete] = useState(true);
   const [newNotifyIncomplete, setNewNotifyIncomplete] = useState(false);
+  const [newNotifyBillingEdit, setNewNotifyBillingEdit] = useState(true);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -173,7 +175,7 @@ export default function AdminNotifications() {
       setError("Please enter an email address");
       return;
     }
-    if (!newNotifyComplete && !newNotifyIncomplete) {
+    if (!newNotifyComplete && !newNotifyIncomplete && !newNotifyBillingEdit) {
       setError("Please enable at least one notification type");
       return;
     }
@@ -186,6 +188,7 @@ export default function AdminNotifications() {
           label: newLabel.trim() || null,
           notifyComplete: newNotifyComplete,
           notifyIncomplete: newNotifyIncomplete,
+          notifyBillingEdit: newNotifyBillingEdit,
         }),
       });
       if (res.ok) {
@@ -195,6 +198,7 @@ export default function AdminNotifications() {
         setNewLabel("");
         setNewNotifyComplete(true);
         setNewNotifyIncomplete(false);
+        setNewNotifyBillingEdit(true);
       } else {
         const body = await res.json().catch(() => ({}));
         setError(body.error || "Failed to add email");
@@ -206,7 +210,7 @@ export default function AdminNotifications() {
 
   const handleToggle = async (
     id: number,
-    field: "notifyComplete" | "notifyIncomplete",
+    field: "notifyComplete" | "notifyIncomplete" | "notifyBillingEdit",
     val: boolean,
   ) => {
     setTogglingId(id);
@@ -265,6 +269,7 @@ export default function AdminNotifications() {
 
   const completeCount = (emails || []).filter((e) => e.notifyComplete).length;
   const incompleteCount = (emails || []).filter((e) => e.notifyIncomplete).length;
+  const billingEditCount = (emails || []).filter((e) => e.notifyBillingEdit).length;
 
   return (
     <AdminLayout title="Order Notifications">
@@ -323,6 +328,11 @@ export default function AdminNotifications() {
                   but has not yet completed payment. Sent once per checkout session so you can
                   follow up.
                 </p>
+                <p>
+                  <strong>Billing / PO edits</strong> — Sent when an invoice customer self-serves a
+                  PO number or billing detail change via the management link. Shows old vs new
+                  values so finance can update internal records.
+                </p>
               </div>
             </div>
 
@@ -380,6 +390,15 @@ export default function AdminNotifications() {
                       </p>
                     </div>
                   </div>
+                  <div className="flex items-center gap-3">
+                    <Toggle enabled={newNotifyBillingEdit} onChange={setNewNotifyBillingEdit} />
+                    <div>
+                      <p className="text-sm font-medium">Billing / PO edits</p>
+                      <p className="text-xs text-muted-foreground">
+                        Customer updates PO or billing details
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 {error && <p className="text-sm text-destructive">{error}</p>}
@@ -422,17 +441,18 @@ export default function AdminNotifications() {
                 </div>
               ) : (
                 <>
-                  <div className="hidden sm:grid grid-cols-[1fr_140px_140px_40px] gap-4 px-6 py-2 bg-muted/40 border-b border-border text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  <div className="hidden sm:grid grid-cols-[1fr_120px_120px_120px_40px] gap-4 px-6 py-2 bg-muted/40 border-b border-border text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     <span>Recipient</span>
-                    <span className="text-center">Complete Bookings</span>
-                    <span className="text-center">Incomplete Forms</span>
+                    <span className="text-center">Complete</span>
+                    <span className="text-center">Incomplete</span>
+                    <span className="text-center">Billing / PO</span>
                     <span />
                   </div>
                   <ul className="divide-y divide-border">
                     {(emails || []).map((e) => (
                       <li
                         key={e.id}
-                        className="grid grid-cols-1 sm:grid-cols-[1fr_140px_140px_40px] gap-4 items-center px-6 py-4"
+                        className="grid grid-cols-1 sm:grid-cols-[1fr_120px_120px_120px_40px] gap-4 items-center px-6 py-4"
                       >
                         <div className="min-w-0">
                           <p className="font-medium truncate">{e.email}</p>
@@ -458,6 +478,16 @@ export default function AdminNotifications() {
                               )}
                               Incomplete
                             </span>
+                            <span
+                              className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${e.notifyBillingEdit ? "bg-blue-100 text-blue-700" : "bg-muted text-muted-foreground line-through"}`}
+                            >
+                              {e.notifyBillingEdit ? (
+                                <CheckCircle2 className="w-3 h-3" />
+                              ) : (
+                                <XCircle className="w-3 h-3" />
+                              )}
+                              Billing / PO
+                            </span>
                           </div>
                         </div>
 
@@ -473,6 +503,14 @@ export default function AdminNotifications() {
                           <Toggle
                             enabled={e.notifyIncomplete}
                             onChange={(val) => handleToggle(e.id, "notifyIncomplete", val)}
+                            disabled={togglingId === e.id}
+                          />
+                        </div>
+
+                        <div className="hidden sm:flex justify-center">
+                          <Toggle
+                            enabled={e.notifyBillingEdit}
+                            onChange={(val) => handleToggle(e.id, "notifyBillingEdit", val)}
                             disabled={togglingId === e.id}
                           />
                         </div>
@@ -500,6 +538,10 @@ export default function AdminNotifications() {
                       <span>
                         <strong className="text-foreground">{incompleteCount}</strong> receive
                         incomplete form notifications
+                      </span>
+                      <span>
+                        <strong className="text-foreground">{billingEditCount}</strong> receive
+                        billing / PO edit notifications
                       </span>
                     </div>
                   )}

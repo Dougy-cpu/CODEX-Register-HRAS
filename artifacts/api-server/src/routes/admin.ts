@@ -861,7 +861,7 @@ router.get("/admin/notification-emails", adminAuth, async (_req, res): Promise<v
 });
 
 router.post("/admin/notification-emails", adminAuth, async (req, res): Promise<void> => {
-  const { email, label, notifyComplete, notifyIncomplete } = req.body;
+  const { email, label, notifyComplete, notifyIncomplete, notifyBillingEdit } = req.body;
   if (!email || typeof email !== "string" || !email.includes("@")) {
     res.status(400).json({ error: "A valid email address is required" });
     return;
@@ -874,6 +874,7 @@ router.post("/admin/notification-emails", adminAuth, async (req, res): Promise<v
         label: label?.trim() || null,
         notifyComplete: notifyComplete !== false,
         notifyIncomplete: notifyIncomplete !== false,
+        notifyBillingEdit: notifyBillingEdit !== false,
       })
       .returning();
     await logAdminAction({
@@ -884,6 +885,7 @@ router.post("/admin/notification-emails", adminAuth, async (req, res): Promise<v
         label: inserted.label,
         notifyComplete: inserted.notifyComplete,
         notifyIncomplete: inserted.notifyIncomplete,
+        notifyBillingEdit: inserted.notifyBillingEdit,
       },
       meta: { notificationEmailId: inserted.id },
     });
@@ -895,10 +897,11 @@ router.post("/admin/notification-emails", adminAuth, async (req, res): Promise<v
 
 router.patch("/admin/notification-emails/:id", adminAuth, async (req, res): Promise<void> => {
   const id = parseInt(req.params["id"] as string, 10);
-  const { notifyComplete, notifyIncomplete } = req.body;
+  const { notifyComplete, notifyIncomplete, notifyBillingEdit } = req.body;
   const updates: Record<string, boolean> = {};
   if (typeof notifyComplete === "boolean") updates.notifyComplete = notifyComplete;
   if (typeof notifyIncomplete === "boolean") updates.notifyIncomplete = notifyIncomplete;
+  if (typeof notifyBillingEdit === "boolean") updates.notifyBillingEdit = notifyBillingEdit;
   if (Object.keys(updates).length === 0) {
     res.status(400).json({ error: "Nothing to update" });
     return;
@@ -920,9 +923,17 @@ router.patch("/admin/notification-emails/:id", adminAuth, async (req, res): Prom
     type: "admin_notification_email_updated",
     summary: `Updated notification preferences for ${updated.email}`,
     before: prev
-      ? { notifyComplete: prev.notifyComplete, notifyIncomplete: prev.notifyIncomplete }
+      ? {
+          notifyComplete: prev.notifyComplete,
+          notifyIncomplete: prev.notifyIncomplete,
+          notifyBillingEdit: prev.notifyBillingEdit,
+        }
       : undefined,
-    after: { notifyComplete: updated.notifyComplete, notifyIncomplete: updated.notifyIncomplete },
+    after: {
+      notifyComplete: updated.notifyComplete,
+      notifyIncomplete: updated.notifyIncomplete,
+      notifyBillingEdit: updated.notifyBillingEdit,
+    },
     meta: { notificationEmailId: id },
   });
   res.json({ ...updated, createdAt: updated.createdAt.toISOString() });
