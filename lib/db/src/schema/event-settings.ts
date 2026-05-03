@@ -17,7 +17,13 @@ export const eventSettingsTable = pgTable("event_settings", {
   freeagentTokenExpiresAt: timestamp("freeagent_token_expires_at", { withTimezone: true }),
   attendeeChangesLocked: boolean("attendee_changes_locked").notNull().default(false),
   attendeeChangesLockedMessage: text("attendee_changes_locked_message"),
-  // Booking reference format
+  // Booking reference format. The literal defaults below MUST be kept in
+  // sync with `DEFAULT_REF_PREFIX`/`DEFAULT_REF_OFFSET` in
+  // `artifacts/api-server/src/lib/order-reference.ts`. We can't share a TS
+  // constant here because Drizzle column `.default()` requires a literal at
+  // schema-evaluation time and the @workspace/db package must not depend on
+  // the api-server. These values are the SQL-level seed only — every code
+  // path that synthesises a fallback reference goes through the constants.
   refPrefix: text("ref_prefix").notNull().default("HRAS26"),
   refOffset: integer("ref_offset").notNull().default(6541),
   // Notification email subject templates (support {{variables}})

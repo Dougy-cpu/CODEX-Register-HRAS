@@ -3,6 +3,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { bookingsTable, attendeesTable, eventSettingsTable } from "@workspace/db";
 import { calculatePricing, incrementPromoUsage } from "../lib/pricing";
+import { DEFAULT_REF_PREFIX, DEFAULT_REF_OFFSET } from "../lib/order-reference";
 import { promoCodesTable } from "@workspace/db";
 import { isCodeUsedByEmail } from "./promo-codes";
 import { v4 as uuidv4 } from "uuid";
@@ -45,8 +46,8 @@ async function generateOrderRef(bookingId?: number): Promise<string> {
     })
     .from(eventSettingsTable)
     .limit(1);
-  const prefix = settings?.refPrefix ?? "HRAS26";
-  const offset = settings?.refOffset ?? 6541;
+  const prefix = settings?.refPrefix ?? DEFAULT_REF_PREFIX;
+  const offset = settings?.refOffset ?? DEFAULT_REF_OFFSET;
   if (bookingId) {
     return `${prefix}-${offset + bookingId}`;
   }
@@ -99,6 +100,11 @@ router.post("/bookings", async (req, res): Promise<void> => {
 
   if (!sessionToken || !passType || !attendeeType) {
     res.status(400).json({ error: "sessionToken, passType, and attendeeType are required" });
+    return;
+  }
+
+  if (!Number.isInteger(quantity) || quantity <= 0) {
+    res.status(400).json({ error: "quantity must be a positive integer" });
     return;
   }
 
@@ -176,6 +182,11 @@ router.post("/bookings/start", async (req, res): Promise<void> => {
     !workEmail
   ) {
     res.status(400).json({ error: "Missing required fields" });
+    return;
+  }
+
+  if (!Number.isInteger(quantity) || quantity <= 0) {
+    res.status(400).json({ error: "quantity must be a positive integer" });
     return;
   }
 
@@ -434,6 +445,11 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
 
   const newPassType = passType ?? existing.passType;
   const newQuantity = quantity ?? existing.quantity;
+
+  if (!Number.isInteger(newQuantity) || newQuantity <= 0) {
+    res.status(400).json({ error: "quantity must be a positive integer" });
+    return;
+  }
   const newPromoCode =
     promoCode !== undefined ? (promoCode ? promoCode.toUpperCase() : null) : existing.promoCode;
 

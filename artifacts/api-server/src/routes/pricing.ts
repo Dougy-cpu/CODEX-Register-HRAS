@@ -8,13 +8,27 @@ const router: IRouter = Router();
 router.post("/pricing/calculate", async (req, res): Promise<void> => {
   const { passType, quantity, promoCode } = req.body;
 
-  if (!passType || !quantity) {
+  if (!passType || quantity === undefined || quantity === null) {
     res.status(400).json({ error: "passType and quantity are required" });
     return;
   }
 
-  const pricing = await calculatePricing(passType, parseInt(quantity, 10), promoCode);
-  res.json(pricing);
+  // Reject non-positive / non-integer quantities at the boundary so the UI
+  // gets a clean 400 instead of a generic 500 from calculatePricing's
+  // internal guard. We use `Number()` (not `parseInt`) so a decimal like
+  // "1.9" is rejected rather than silently truncated to 1. (Task #70.)
+  const qty = Number(quantity);
+  if (!Number.isInteger(qty) || qty <= 0) {
+    res.status(400).json({ error: "quantity must be a positive integer" });
+    return;
+  }
+
+  try {
+    const pricing = await calculatePricing(passType, qty, promoCode);
+    res.json(pricing);
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
 });
 
 router.get("/passes/inventory", async (_req, res): Promise<void> => {

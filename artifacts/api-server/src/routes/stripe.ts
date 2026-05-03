@@ -15,6 +15,7 @@ import { syncBookingToSheets } from "../lib/google-sheets";
 import { logger } from "../lib/logger";
 import { reissueBookingInvoice, applyReissueInvoiceResultTx } from "../lib/invoice";
 import { claimBookingConfirmation, runConfirmationSideEffects } from "../lib/booking-confirmation";
+import { defaultOrderRef } from "../lib/order-reference";
 
 const DECLINE_CODE_LABELS: Record<string, string> = {
   authentication_required: "Strong customer authentication required — please retry your payment",
@@ -310,7 +311,7 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
         return;
       }
 
-      const orderRef = existing.orderReference || `HRAS26-${6541 + bookingId}`;
+      const orderRef = existing.orderReference || defaultOrderRef(bookingId);
 
       // Atomic claim: only the first webhook delivery (or the racing
       // /confirm-card-payment caller) actually flips status → paid; concurrent
@@ -723,7 +724,7 @@ router.post("/stripe/confirm-card-payment", async (req, res): Promise<void> => {
       return;
     }
 
-    const orderRef = existing.orderReference || `HRAS26-${6541 + id}`;
+    const orderRef = existing.orderReference || defaultOrderRef(id);
 
     // Atomic claim of the status flip — same primitive as the webhook path so
     // a race between the browser and the webhook can never double-confirm.
@@ -827,7 +828,7 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
     return;
   }
 
-  const orderRef = booking.orderReference || `HRAS26-${6541 + id}`;
+  const orderRef = booking.orderReference || defaultOrderRef(id);
 
   try {
     // Delegate the customer-sync + invoice-create + finalize + send to the

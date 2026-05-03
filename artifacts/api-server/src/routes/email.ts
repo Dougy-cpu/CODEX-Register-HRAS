@@ -3,6 +3,7 @@ import { eq, desc } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { emailTemplatesTable, emailLogsTable, eventSettingsTable } from "@workspace/db";
 import { getEventSettings, DEFAULT_INVOICE_HELP_CONTENT } from "../lib/email";
+import { DEFAULT_REF_PREFIX, DEFAULT_REF_OFFSET } from "../lib/order-reference";
 import { adminAuth } from "../middleware/admin-auth";
 import { logAdminAction } from "../lib/audit";
 
@@ -147,8 +148,12 @@ router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> =
         ...(attendeeChangesLockedMessage !== undefined && {
           attendeeChangesLockedMessage: attendeeChangesLockedMessage || null,
         }),
-        ...(refPrefix !== undefined && { refPrefix: String(refPrefix).trim() || "HRAS26" }),
-        ...(refOffset !== undefined && { refOffset: parseInt(String(refOffset), 10) || 6541 }),
+        ...(refPrefix !== undefined && {
+          refPrefix: String(refPrefix).trim() || DEFAULT_REF_PREFIX,
+        }),
+        ...(refOffset !== undefined && {
+          refOffset: parseInt(String(refOffset), 10) || DEFAULT_REF_OFFSET,
+        }),
         ...(notifyCompleteSubject !== undefined && {
           notifyCompleteSubject: notifyCompleteSubject || null,
         }),

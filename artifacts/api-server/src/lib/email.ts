@@ -2,6 +2,7 @@ import https from "https";
 import http from "http";
 import nodemailer from "nodemailer";
 import { logger } from "./logger";
+import { defaultOrderRef, DEFAULT_REF_PREFIX, DEFAULT_REF_OFFSET } from "./order-reference";
 import { readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -90,8 +91,8 @@ const defaultSettings: Omit<EventSettings, "id" | "updatedAt"> = {
   freeagentTokenExpiresAt: null,
   attendeeChangesLocked: false,
   attendeeChangesLockedMessage: null,
-  refPrefix: "HRAS26",
-  refOffset: 6541,
+  refPrefix: DEFAULT_REF_PREFIX,
+  refOffset: DEFAULT_REF_OFFSET,
   notifyCompleteSubject: null,
   notifyIncompleteSubject: null,
   notifyAttendeeSubject: null,
@@ -1884,7 +1885,7 @@ export async function sendRefundConfirmationEmail(
 
   const name = `${lead.firstName} ${lead.lastName}`;
   const refundAmount = (refundAmountPence / 100).toFixed(2);
-  const orderRef = booking.orderReference || `HRAS26-${6541 + bookingId}`;
+  const orderRef = booking.orderReference || defaultOrderRef(bookingId);
 
   const html = wrapInBrandedLayout(
     `
@@ -1933,7 +1934,7 @@ export async function sendInvoicePaymentFailedEmail(
   const recipients = await getOrganiserEmails();
 
   const name = `${lead.firstName} ${lead.lastName}`;
-  const orderRef = booking.orderReference || `HRAS26-${6541 + bookingId}`;
+  const orderRef = booking.orderReference || defaultOrderRef(bookingId);
   const paymentUrl = booking.stripeInvoicePaymentUrl;
 
   const attemptNote = attemptCount
@@ -2013,7 +2014,7 @@ export async function sendDisputeAlertEmail(
   }
 
   const customerName = lead ? `${lead.firstName} ${lead.lastName}` : "Unknown";
-  const orderRef = booking.orderReference || `HRAS26-${6541 + bookingId}`;
+  const orderRef = booking.orderReference || defaultOrderRef(bookingId);
   const disputeAmount = (disputeAmountPence / 100).toFixed(2);
   const deadlineStr = evidenceDueBy
     ? evidenceDueBy.toLocaleDateString("en-GB", {
@@ -2079,7 +2080,7 @@ export async function sendInvoiceReminder(bookingId: number): Promise<void> {
 
   const settings = await getEventSettings();
   const to = booking.billingEmail || lead.workEmail;
-  const orderRef = booking.orderReference || `HRAS26-${6541 + bookingId}`;
+  const orderRef = booking.orderReference || defaultOrderRef(bookingId);
 
   const dueDate = booking.invoiceDueDate ? new Date(booking.invoiceDueDate) : null;
   const now = new Date();

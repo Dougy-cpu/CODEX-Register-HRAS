@@ -4,6 +4,7 @@ import { db } from "@workspace/db";
 import { bookingsTable, attendeesTable } from "@workspace/db";
 import { logger } from "./logger";
 import type { DbExecutor } from "./pricing";
+import { defaultOrderRef } from "./order-reference";
 
 const PASS_LABELS: Record<string, string> = {
   single: "Single Pass — HR Analytics Summit 2026",
@@ -249,7 +250,7 @@ export async function reissueBookingInvoice(
   const lead = attendees.find((a) => a.isLead) || attendees[0];
   if (!lead) throw new Error("No attendee found for booking");
 
-  const orderRef = booking.orderReference || `HRAS26-${6541 + bookingId}`;
+  const orderRef = booking.orderReference || defaultOrderRef(bookingId);
 
   const subtotalAfterDiscounts = parseFloat(booking.subtotalAmount?.toString() || "0");
   const groupDiscount = parseFloat(booking.groupDiscountAmount?.toString() || "0");
