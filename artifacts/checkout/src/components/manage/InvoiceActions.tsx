@@ -3,6 +3,21 @@ import { Download, Mail, Loader2, CheckCircle2, AlertCircle } from "lucide-react
 import { Button } from "@/components/ui/button";
 import { customFetch } from "@workspace/api-client-react";
 
+function parseFilenameFromContentDisposition(header: string | null): string | null {
+  if (!header) return null;
+  // Prefer RFC 5987 filename* (UTF-8) when present.
+  const star = /filename\*\s*=\s*(?:UTF-8|utf-8)''([^;]+)/i.exec(header);
+  if (star?.[1]) {
+    try {
+      return decodeURIComponent(star[1].trim());
+    } catch {
+      // fall through
+    }
+  }
+  const plain = /filename\s*=\s*"?([^";]+)"?/i.exec(header);
+  return plain?.[1]?.trim() || null;
+}
+
 interface Props {
   token: string;
   paymentMethod: string | null;
@@ -24,19 +39,31 @@ export default function InvoiceActions({ token, paymentMethod, recipientHint }: 
     setDownloading(true);
     setDownloadStatus({ kind: "idle" });
     try {
-      const blob = await customFetch<Blob>(
-        `/api/bookings/by-management-token/${token}/invoice-pdf`,
-        { responseType: "blob" },
-      );
-      const url = URL.createObjectURL(blob);
+      const url = `${import.meta.env.BASE_URL}api/bookings/by-management-token/${token}/invoice-pdf`;
+      const resp = await fetch(url, { credentials: "same-origin" });
+      if (!resp.ok) {
+        let message = `Could not download the ${documentLabel}. Please try again.`;
+        try {
+          const body = (await resp.json()) as { error?: string };
+          if (body && typeof body.error === "string") message = body.error;
+        } catch {
+          // non-JSON error body — keep default message
+        }
+        throw new Error(message);
+      }
+      const filename =
+        parseFilenameFromContentDisposition(resp.headers.get("content-disposition")) ||
+        `${documentLabel}.pdf`;
+      const blob = await resp.blob();
+      const objectUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
-      a.download = `${documentLabel}.pdf`;
+      a.href = objectUrl;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setDownloadStatus({ kind: "ok", message: `${documentLabel} downloaded.` });
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      setDownloadStatus({ kind: "ok", message: `${filename} downloaded.` });
     } catch (err) {
       setDownloadStatus({
         kind: "err",
