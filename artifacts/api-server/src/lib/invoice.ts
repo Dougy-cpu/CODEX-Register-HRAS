@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { bookingsTable, attendeesTable } from "@workspace/db";
 import { logger } from "./logger";
+import type { DbExecutor } from "./pricing";
 
 const PASS_LABELS: Record<string, string> = {
   single: "Single Pass — HR Analytics Summit 2026",
@@ -70,19 +71,7 @@ export async function getStripeInvoiceStatus(
   }
 }
 
-/**
- * Re-issue (or first issue) the Stripe invoice for a booking.
- *
- * - If the existing invoice is already paid, returns `{ alreadyPaid: true }`
- *   and the booking row is updated to status "paid".
- * - Otherwise voids the existing invoice (if any) and creates+finalizes+sends
- *   a brand new invoice with the booking's current billing details and PO
- *   number (if set). The booking row is updated with the new invoice metadata.
- */
-export async function reissueBookingInvoice(
-  stripe: Stripe,
-  bookingId: number,
-): Promise<
+export type ReissueInvoiceResult =
   | { alreadyPaid: true }
   | {
       alreadyPaid: false;
@@ -90,8 +79,57 @@ export async function reissueBookingInvoice(
       pdfUrl: string | null;
       paymentUrl: string | null;
       dueDate: Date;
-    }
-> {
+    };
+
+/**
+ * Persist the outcome of `reissueBookingInvoice` to the bookings row.
+ *
+ * Always run this through a `db.transaction` so the booking-status flip
+ * commits atomically with the promo-counter increment (when applicable).
+ * Callers that need to bundle additional booking-row updates (currentStep,
+ * orderReference, paymentMethod, etc.) can pass them via `extras`.
+ */
+export async function applyReissueInvoiceResultTx(
+  tx: DbExecutor,
+  bookingId: number,
+  result: ReissueInvoiceResult,
+  extras?: Record<string, unknown>,
+): Promise<void> {
+  if (result.alreadyPaid) {
+    await tx
+      .update(bookingsTable)
+      .set({ status: "paid", ...(extras || {}) })
+      .where(eq(bookingsTable.id, bookingId));
+  } else {
+    await tx
+      .update(bookingsTable)
+      .set({
+        status: "invoiced",
+        stripeInvoiceId: result.invoiceId,
+        stripeInvoicePdfUrl: result.pdfUrl,
+        stripeInvoicePaymentUrl: result.paymentUrl,
+        invoiceDueDate: result.dueDate,
+        ...(extras || {}),
+      })
+      .where(eq(bookingsTable.id, bookingId));
+  }
+}
+
+/**
+ * Re-issue (or first issue) the Stripe invoice for a booking.
+ *
+ * Performs the external Stripe operations only (customer sync, invoice
+ * create/finalize/send, optional voiding of the previous open invoice). The
+ * resulting booking-row writes are NOT applied here — instead the result is
+ * returned so the caller can persist it via `applyReissueInvoiceResultTx`
+ * inside the same transaction as any related promo-counter increment. This
+ * is what guarantees that `bookings.status` and `promoCodes.usedCount` can
+ * never drift apart due to a crash mid-confirmation.
+ */
+export async function reissueBookingInvoice(
+  stripe: Stripe,
+  bookingId: number,
+): Promise<ReissueInvoiceResult> {
   const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
   if (!booking) throw new Error("Booking not found");
 
@@ -104,7 +142,6 @@ export async function reissueBookingInvoice(
   if (booking.stripeInvoiceId) {
     const { paid, status } = await getStripeInvoiceStatus(stripe, booking.stripeInvoiceId);
     if (paid) {
-      await db.update(bookingsTable).set({ status: "paid" }).where(eq(bookingsTable.id, bookingId));
       return { alreadyPaid: true };
     }
     // Void the existing invoice if it's still open/finalized/uncollectible.
@@ -251,17 +288,6 @@ export async function reissueBookingInvoice(
   const dueDate = sent.due_date
     ? new Date(sent.due_date * 1000)
     : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
-
-  await db
-    .update(bookingsTable)
-    .set({
-      status: "invoiced",
-      stripeInvoiceId: sent.id,
-      stripeInvoicePdfUrl: sent.invoice_pdf || null,
-      stripeInvoicePaymentUrl: sent.hosted_invoice_url || null,
-      invoiceDueDate: dueDate,
-    })
-    .where(eq(bookingsTable.id, bookingId));
 
   return {
     alreadyPaid: false,

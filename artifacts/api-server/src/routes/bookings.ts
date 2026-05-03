@@ -16,7 +16,11 @@ import {
   getEventSettings,
 } from "../lib/email";
 import { logger } from "../lib/logger";
-import { reissueBookingInvoice, getStripeInvoiceStatus } from "../lib/invoice";
+import {
+  reissueBookingInvoice,
+  applyReissueInvoiceResultTx,
+  getStripeInvoiceStatus,
+} from "../lib/invoice";
 import { getStripe } from "./stripe";
 
 function isAdminRequest(req: import("express").Request): boolean {
@@ -468,6 +472,11 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
     if (stripe) {
       try {
         const result = await reissueBookingInvoice(stripe, id);
+        // Persist the new invoice metadata (or paid flip) inside a tx so the
+        // booking-row write is atomic.
+        await db.transaction(async (tx) => {
+          await applyReissueInvoiceResultTx(tx, id, result);
+        });
         reissueResult = result.alreadyPaid ? { alreadyPaid: true } : { reissued: true };
         if (!result.alreadyPaid) {
           try {
@@ -654,6 +663,9 @@ router.post("/bookings/by-management-token/:token/billing", async (req, res): Pr
     } else {
       try {
         const result = await reissueBookingInvoice(stripe, booking.id);
+        await db.transaction(async (tx) => {
+          await applyReissueInvoiceResultTx(tx, booking.id, result);
+        });
         if (result.alreadyPaid) {
           reissue = { alreadyPaid: true };
         } else {

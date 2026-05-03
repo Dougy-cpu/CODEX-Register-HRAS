@@ -15,7 +15,7 @@ import {
 } from "../lib/email";
 import { syncBookingToSheets } from "../lib/google-sheets";
 import { logger } from "../lib/logger";
-import { reissueBookingInvoice } from "../lib/invoice";
+import { reissueBookingInvoice, applyReissueInvoiceResultTx } from "../lib/invoice";
 
 const DECLINE_CODE_LABELS: Record<string, string> = {
   authentication_required: "Strong customer authentication required — please retry your payment",
@@ -781,8 +781,16 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
   try {
     // Delegate the customer-sync + invoice-create + finalize + send to the
     // shared helper so the create and re-issue flows can never drift apart.
+    // The helper performs ONLY external Stripe ops — the resulting booking-row
+    // writes are applied below inside a transaction so they commit atomically
+    // with the promo counter increment.
     const result = await reissueBookingInvoice(stripe, id);
     if (result.alreadyPaid) {
+      // Persist status="paid" (if not already) atomically in case our DB row
+      // was still showing partial/invoiced.
+      await db.transaction(async (tx) => {
+        await applyReissueInvoiceResultTx(tx, id, result);
+      });
       const [refreshed] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, id));
       res.json({
         invoiceId: refreshed.stripeInvoiceId || `manual-${refreshed.orderReference}`,
@@ -794,19 +802,17 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
       return;
     }
 
-    // Atomic: booking-record updates (currentStep / orderRef / paymentMethod)
-    // commit together with the promo counter increment, so a crash between
-    // them can never leave the booking finalised without its promo usage
-    // recorded (or vice versa).
+    // Atomic: status="invoiced" + invoice metadata + currentStep/orderRef/
+    // paymentMethod + promo counter increment all commit (or roll back)
+    // together. Eliminates the previous window where a crash between the
+    // helper's status write and the promo increment could leave them in
+    // inconsistent states.
     await db.transaction(async (tx) => {
-      await tx
-        .update(bookingsTable)
-        .set({
-          currentStep: 5,
-          orderReference: orderRef,
-          paymentMethod: "invoice",
-        })
-        .where(eq(bookingsTable.id, id));
+      await applyReissueInvoiceResultTx(tx, id, result, {
+        currentStep: 5,
+        orderReference: orderRef,
+        paymentMethod: "invoice",
+      });
 
       if (booking.promoCode) {
         const reserved = await incrementPromoUsage(booking.promoCode, booking.quantity, tx);
