@@ -763,35 +763,57 @@ router.post("/bookings/:id/confirm-free", async (req, res): Promise<void> => {
     }
   }
 
-  // Reserve the promo seats atomically *before* marking the booking paid so
-  // we never confirm a free booking that exceeded the cap. For unconfirmed
-  // free bookings there's no charge to refund, so it's safe to fail here.
-  if (existing.promoCode) {
-    const reserved = await incrementPromoUsage(existing.promoCode, existing.quantity);
-    if (!reserved) {
-      const [promo] = await db
-        .select()
-        .from(promoCodesTable)
-        .where(eq(promoCodesTable.code, existing.promoCode));
-      const remaining =
-        promo && promo.maxUses !== null ? Math.max(0, promo.maxUses - promo.usedCount) : 0;
-      const msg =
-        promo?.discountType === "complimentary"
-          ? remaining === 0
-            ? "This complimentary code has been fully redeemed — no tickets remain"
-            : `Only ${remaining} complimentary ticket${remaining === 1 ? "" : "s"} remain on this code — please reduce your quantity`
-          : "This promo code has already been used up";
-      res.status(400).json({ error: msg });
-      return;
+  // Reserve the promo seats AND mark the booking paid in a single
+  // transaction. If the cap check fails we throw a sentinel so the whole
+  // transaction rolls back — leaving neither a stale promo counter nor a
+  // half-confirmed booking. For unconfirmed free bookings there's no charge
+  // to refund, so failing here is the correct behaviour.
+  class PromoCapExceededError extends Error {
+    constructor(public clientMessage: string) {
+      super(clientMessage);
     }
   }
 
   const orderRef = await generateOrderRef(id);
 
-  await db
-    .update(bookingsTable)
-    .set({ status: "paid", currentStep: 5, orderReference: orderRef, updatedAt: new Date() })
-    .where(eq(bookingsTable.id, id));
+  try {
+    await db.transaction(async (tx) => {
+      if (existing.promoCode) {
+        const reserved = await incrementPromoUsage(existing.promoCode, existing.quantity, tx);
+        if (!reserved) {
+          const [promo] = await tx
+            .select()
+            .from(promoCodesTable)
+            .where(eq(promoCodesTable.code, existing.promoCode));
+          const remaining =
+            promo && promo.maxUses !== null ? Math.max(0, promo.maxUses - promo.usedCount) : 0;
+          const msg =
+            promo?.discountType === "complimentary"
+              ? remaining === 0
+                ? "This complimentary code has been fully redeemed — no tickets remain"
+                : `Only ${remaining} complimentary ticket${remaining === 1 ? "" : "s"} remain on this code — please reduce your quantity`
+              : "This promo code has already been used up";
+          throw new PromoCapExceededError(msg);
+        }
+      }
+
+      await tx
+        .update(bookingsTable)
+        .set({
+          status: "paid",
+          currentStep: 5,
+          orderReference: orderRef,
+          updatedAt: new Date(),
+        })
+        .where(eq(bookingsTable.id, id));
+    });
+  } catch (err) {
+    if (err instanceof PromoCapExceededError) {
+      res.status(400).json({ error: err.clientMessage });
+      return;
+    }
+    throw err;
+  }
 
   try {
     await sendBookingEmails(id);

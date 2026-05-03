@@ -233,28 +233,35 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
 
       const orderRef = existing.orderReference || `HRAS26-${6541 + bookingId}`;
 
-      await db
-        .update(bookingsTable)
-        .set({
-          status: "paid",
-          currentStep: 5,
-          stripePaymentIntentId: session.payment_intent as string,
-          orderReference: orderRef,
-          paymentMethod: "card",
-        })
-        .where(eq(bookingsTable.id, bookingId));
+      // Mark the booking paid AND bump the promo counter inside one
+      // transaction so a crash between the two writes can never leave the
+      // database with an inconsistent (paid-but-unincremented) state.
+      await db.transaction(async (tx) => {
+        await tx
+          .update(bookingsTable)
+          .set({
+            status: "paid",
+            currentStep: 5,
+            stripePaymentIntentId: session.payment_intent as string,
+            orderReference: orderRef,
+            paymentMethod: "card",
+          })
+          .where(eq(bookingsTable.id, bookingId));
 
-      if (existing.promoCode) {
-        const reserved = await incrementPromoUsage(existing.promoCode, existing.quantity);
-        if (!reserved) {
-          // The customer has already paid — confirm the booking and just log
-          // that the cap was technically exceeded so the organiser can review.
-          logger.warn(
-            { bookingId, promoCode: existing.promoCode, quantity: existing.quantity },
-            "Promo cap exceeded after successful card payment — booking confirmed but usage not incremented",
-          );
+        if (existing.promoCode) {
+          const reserved = await incrementPromoUsage(existing.promoCode, existing.quantity, tx);
+          if (!reserved) {
+            // The customer has already paid — confirm the booking and just log
+            // that the cap was technically exceeded so the organiser can review.
+            // We deliberately do NOT throw, so the transaction still commits
+            // the status update.
+            logger.warn(
+              { bookingId, promoCode: existing.promoCode, quantity: existing.quantity },
+              "Promo cap exceeded after successful card payment — booking confirmed but usage not incremented",
+            );
+          }
         }
-      }
+      });
 
       try {
         await sendBookingEmails(bookingId);
@@ -656,26 +663,31 @@ router.post("/stripe/confirm-card-payment", async (req, res): Promise<void> => {
 
     const orderRef = existing.orderReference || `HRAS26-${6541 + id}`;
 
-    await db
-      .update(bookingsTable)
-      .set({
-        status: "paid",
-        currentStep: 5,
-        stripePaymentIntentId: session.payment_intent as string | null,
-        orderReference: orderRef,
-        paymentMethod: "card",
-      })
-      .where(eq(bookingsTable.id, id));
+    // Atomic: status flip + promo counter increment commit together.
+    await db.transaction(async (tx) => {
+      await tx
+        .update(bookingsTable)
+        .set({
+          status: "paid",
+          currentStep: 5,
+          stripePaymentIntentId: session.payment_intent as string | null,
+          orderReference: orderRef,
+          paymentMethod: "card",
+        })
+        .where(eq(bookingsTable.id, id));
 
-    if (existing.promoCode) {
-      const reserved = await incrementPromoUsage(existing.promoCode, existing.quantity);
-      if (!reserved) {
-        logger.warn(
-          { bookingId: id, promoCode: existing.promoCode, quantity: existing.quantity },
-          "Promo cap exceeded after successful card payment — booking confirmed but usage not incremented",
-        );
+      if (existing.promoCode) {
+        const reserved = await incrementPromoUsage(existing.promoCode, existing.quantity, tx);
+        if (!reserved) {
+          // Customer has already paid — log but do not throw, so the status
+          // update still commits.
+          logger.warn(
+            { bookingId: id, promoCode: existing.promoCode, quantity: existing.quantity },
+            "Promo cap exceeded after successful card payment — booking confirmed but usage not incremented",
+          );
+        }
       }
-    }
+    });
 
     try {
       await sendBookingEmails(id);
@@ -782,24 +794,31 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
       return;
     }
 
-    await db
-      .update(bookingsTable)
-      .set({
-        currentStep: 5,
-        orderReference: orderRef,
-        paymentMethod: "invoice",
-      })
-      .where(eq(bookingsTable.id, id));
+    // Atomic: booking-record updates (currentStep / orderRef / paymentMethod)
+    // commit together with the promo counter increment, so a crash between
+    // them can never leave the booking finalised without its promo usage
+    // recorded (or vice versa).
+    await db.transaction(async (tx) => {
+      await tx
+        .update(bookingsTable)
+        .set({
+          currentStep: 5,
+          orderReference: orderRef,
+          paymentMethod: "invoice",
+        })
+        .where(eq(bookingsTable.id, id));
 
-    if (booking.promoCode) {
-      const reserved = await incrementPromoUsage(booking.promoCode, booking.quantity);
-      if (!reserved) {
-        logger.warn(
-          { bookingId: id, promoCode: booking.promoCode, quantity: booking.quantity },
-          "Promo cap exceeded after Stripe invoice issued — booking confirmed but usage not incremented",
-        );
+      if (booking.promoCode) {
+        const reserved = await incrementPromoUsage(booking.promoCode, booking.quantity, tx);
+        if (!reserved) {
+          // The Stripe invoice has already been issued — log but do not throw.
+          logger.warn(
+            { bookingId: id, promoCode: booking.promoCode, quantity: booking.quantity },
+            "Promo cap exceeded after Stripe invoice issued — booking confirmed but usage not incremented",
+          );
+        }
       }
-    }
+    });
 
     try {
       await sendBookingEmails(id);

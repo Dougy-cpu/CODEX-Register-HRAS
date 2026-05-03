@@ -3,6 +3,13 @@ import { discountTiersTable, promoCodesTable, passConfigTable } from "@workspace
 import { eq, and, lte, gte, or, isNull, sql } from "drizzle-orm";
 
 /**
+ * Either the top-level `db` instance or a transactional handle obtained from
+ * `db.transaction(async (tx) => ...)`. Both expose the same `select`/`update`
+ * surface used by `incrementPromoUsage`, so callers can pass either.
+ */
+export type DbExecutor = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
  * Atomically increment a promo code's `usedCount` after a successful booking
  * confirmation, refusing to exceed `maxUses` when set. For "complimentary"
  * codes the counter tracks tickets issued (so we add the booking's quantity);
@@ -14,16 +21,26 @@ import { eq, and, lte, gte, or, isNull, sql } from "drizzle-orm";
  *
  * The cap check and the increment are performed in a single conditional
  * UPDATE so concurrent confirmations cannot oversubscribe a capped code.
+ *
+ * Pass an optional `conn` (a transaction handle) to make the increment part of
+ * a larger atomic confirmation — the booking status update and this increment
+ * then commit (or roll back) together, so a crash mid-confirmation can never
+ * leave the booking marked paid while the promo counter is stale, or vice
+ * versa.
  */
-export async function incrementPromoUsage(code: string, quantity: number): Promise<boolean> {
+export async function incrementPromoUsage(
+  code: string,
+  quantity: number,
+  conn: DbExecutor = db,
+): Promise<boolean> {
   const normalised = code.toUpperCase();
-  const [promo] = await db
+  const [promo] = await conn
     .select({ discountType: promoCodesTable.discountType })
     .from(promoCodesTable)
     .where(eq(promoCodesTable.code, normalised));
   if (!promo) return false;
   const inc = promo.discountType === "complimentary" ? Math.max(1, quantity) : 1;
-  const result = await db
+  const result = await conn
     .update(promoCodesTable)
     .set({ usedCount: sql`${promoCodesTable.usedCount} + ${inc}` })
     .where(
