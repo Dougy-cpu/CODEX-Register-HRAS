@@ -4,6 +4,67 @@ import { logger } from "./logger";
 
 type Diffable = Record<string, unknown> | null | undefined;
 
+// Field names whose values may contain personally-identifiable or otherwise
+// sensitive data (names, emails, phone numbers, addresses, payment info).
+// We keep the key in the diff so reviewers can see *what* changed without
+// exposing the underlying value.
+const PII_KEYS = new Set([
+  "firstName",
+  "lastName",
+  "fullName",
+  "name",
+  "workEmail",
+  "personalEmail",
+  "email",
+  "billingEmail",
+  "billingContactEmail",
+  "billingContactName",
+  "phone",
+  "billingPhone",
+  "billingAddress",
+  "billingCompany",
+  "address",
+  "address1",
+  "address2",
+  "city",
+  "postcode",
+  "postalCode",
+  "country",
+  "company",
+  "jobTitle",
+  "vatNumber",
+  "poNumber",
+  "stripeCustomerId",
+  "stripePaymentIntentId",
+  "stripeInvoiceId",
+  "stripeInvoicePdfUrl",
+  "stripeInvoicePaymentUrl",
+  "ipAddress",
+  "userAgent",
+  "password",
+  "token",
+]);
+
+function maskValue(value: unknown): unknown {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return "***";
+  if (typeof value === "string") {
+    if (value.length === 0) return "";
+    return `***(${value.length})`;
+  }
+  return "***";
+}
+
+function redact(input: Diffable): Record<string, unknown> | null | undefined {
+  if (input === null || input === undefined) return input;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(input)) {
+    out[k] = PII_KEYS.has(k) ? maskValue(v) : v;
+  }
+  return out;
+}
+
 function diff(before: Diffable, after: Diffable): Record<string, { from: unknown; to: unknown }> {
   const out: Record<string, { from: unknown; to: unknown }> = {};
   const keys = new Set([...Object.keys(before || {}), ...Object.keys(after || {})]);
@@ -12,7 +73,13 @@ function diff(before: Diffable, after: Diffable): Record<string, { from: unknown
     const b = after?.[k];
     const aJson = JSON.stringify(a ?? null);
     const bJson = JSON.stringify(b ?? null);
-    if (aJson !== bJson) out[k] = { from: a ?? null, to: b ?? null };
+    if (aJson !== bJson) {
+      const isPii = PII_KEYS.has(k);
+      out[k] = {
+        from: isPii ? maskValue(a) : (a ?? null),
+        to: isPii ? maskValue(b) : (b ?? null),
+      };
+    }
   }
   return out;
 }
@@ -33,8 +100,10 @@ export async function logAdminAction(opts: {
     if (opts.before !== undefined || opts.after !== undefined) {
       const changes = diff(opts.before, opts.after);
       if (Object.keys(changes).length > 0) data.changes = changes;
-      if (opts.before !== undefined) data.before = opts.before;
-      if (opts.after !== undefined) data.after = opts.after;
+      const redactedBefore = redact(opts.before);
+      const redactedAfter = redact(opts.after);
+      if (redactedBefore !== undefined) data.before = redactedBefore;
+      if (redactedAfter !== undefined) data.after = redactedAfter;
     }
     if (opts.meta) Object.assign(data, opts.meta);
 

@@ -49,7 +49,10 @@ function hmacFor(expMs: number): string {
  * The signature is an HMAC-SHA256 over the salt + expiry keyed by a dedicated
  * server-side secret (see getSigningKey above) — never the password itself.
  */
-export function issueAdminToken(_password: string, ttlMs: number = ADMIN_TOKEN_TTL_MS): {
+export function issueAdminToken(
+  _password: string,
+  ttlMs: number = ADMIN_TOKEN_TTL_MS,
+): {
   token: string;
   expiresAt: Date;
 } {

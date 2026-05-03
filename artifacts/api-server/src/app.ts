@@ -8,6 +8,7 @@ import { rateLimit } from "express-rate-limit";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { adminLoginThrottle } from "./middleware/admin-login-throttle";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -133,27 +134,11 @@ const paymentLimiter = rateLimit({
   skip: (_req) => !isProduction,
 });
 
-// Tight per-IP cap on /api/admin/login to slow brute-force password guessing.
-// 5 attempts/minute then a 15 min cool-off, regardless of success/failure so
-// that a successful login doesn't reset the counter for an attacker that just
-// guessed correctly. Always enabled (even in dev) so behaviour matches prod
-// when the admin panel is exercised locally.
-const adminLoginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 5,
-  standardHeaders: "draft-7",
-  legacyHeaders: false,
-  message: {
-    error: "Too many admin login attempts. Please wait 15 minutes before trying again.",
-  },
-  handler: (req, res, _next, options) => {
-    logger.warn(
-      { ip: req.ip || req.socket.remoteAddress },
-      "Admin login rate limit exceeded — possible brute force attempt",
-    );
-    res.status(options.statusCode).json(options.message);
-  },
-});
+// Failure-aware throttle for /api/admin/login. The first few wrong passwords
+// are free, then each subsequent failure escalates the cool-off (1m → 5m →
+// 15m → 60m). A *successful* login wipes the counter for that IP, so a
+// legitimate admin who fat-fingered their password a couple of times is not
+// punished. Implemented in middleware/admin-login-throttle.ts.
 
 // Apply general API limiter to all /api routes except the Stripe webhook,
 // which can burst when Stripe retries events on our behalf.
@@ -164,7 +149,7 @@ app.use("/api", (req, res, next) => {
 
 // Tighter limits on mutation/creation endpoints only — reads and updates
 // on /api/bookings/* are not restricted beyond the general limiter.
-app.post("/api/admin/login", adminLoginLimiter);
+app.post("/api/admin/login", adminLoginThrottle);
 app.post("/api/bookings", bookingCreationLimiter);
 app.post("/api/stripe/create-checkout-session", paymentLimiter);
 app.post("/api/stripe/create-invoice", paymentLimiter);

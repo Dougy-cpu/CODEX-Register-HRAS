@@ -197,8 +197,8 @@ router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> =
     type: "admin_event_settings_updated",
     summary: "Updated event settings",
     meta: {
-      changedFields: Object.keys(req.body || {}).filter((k) =>
-        (req.body as Record<string, unknown>)[k] !== undefined,
+      changedFields: Object.keys(req.body || {}).filter(
+        (k) => (req.body as Record<string, unknown>)[k] !== undefined,
       ),
     },
   });

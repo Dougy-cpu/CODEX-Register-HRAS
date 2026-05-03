@@ -72,20 +72,20 @@ Tables: `bookings`, `attendees`, `promo_codes`, `discount_tiers`, `email_templat
 
 Set these in the Replit Secrets panel:
 
-| Variable                  | Purpose                                  | Required For        |
-| ------------------------- | ---------------------------------------- | ------------------- |
-| `STRIPE_SECRET_KEY`       | Stripe card payments                     | Stripe checkout     |
-| `STRIPE_WEBHOOK_SECRET`   | Stripe webhook signature verification    | Stripe webhooks     |
-| `SMTP_HOST`               | Email sending                            | Email notifications |
-| `SMTP_PORT`               | Email sending (default: 587)             | Email notifications |
-| `SMTP_USER`               | Email SMTP username                      | Email notifications |
-| `SMTP_PASS`               | Email SMTP password                      | Email notifications |
-| `FROM_EMAIL`              | Sender email address                     | Email notifications |
-| `FREEAGENT_CLIENT_ID`     | FreeAgent OAuth (legacy, unused)         | —                   |
-| `FREEAGENT_CLIENT_SECRET` | FreeAgent OAuth (legacy, unused)         | —                   |
-| `FREEAGENT_REFRESH_TOKEN` | FreeAgent OAuth (legacy, unused)         | —                   |
-| `ADMIN_PASSWORD`          | Admin panel password (REQUIRED, must not be a common weak value) | Admin panel         |
-| `ADMIN_TOKEN_SECRET`      | 32+ char random secret used to sign admin session tokens (optional — ephemeral key generated at startup if absent, meaning sessions don't survive restarts) | Admin panel |
+| Variable                  | Purpose                                                                                                                                                     | Required For        |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| `STRIPE_SECRET_KEY`       | Stripe card payments                                                                                                                                        | Stripe checkout     |
+| `STRIPE_WEBHOOK_SECRET`   | Stripe webhook signature verification                                                                                                                       | Stripe webhooks     |
+| `SMTP_HOST`               | Email sending                                                                                                                                               | Email notifications |
+| `SMTP_PORT`               | Email sending (default: 587)                                                                                                                                | Email notifications |
+| `SMTP_USER`               | Email SMTP username                                                                                                                                         | Email notifications |
+| `SMTP_PASS`               | Email SMTP password                                                                                                                                         | Email notifications |
+| `FROM_EMAIL`              | Sender email address                                                                                                                                        | Email notifications |
+| `FREEAGENT_CLIENT_ID`     | FreeAgent OAuth (legacy, unused)                                                                                                                            | —                   |
+| `FREEAGENT_CLIENT_SECRET` | FreeAgent OAuth (legacy, unused)                                                                                                                            | —                   |
+| `FREEAGENT_REFRESH_TOKEN` | FreeAgent OAuth (legacy, unused)                                                                                                                            | —                   |
+| `ADMIN_PASSWORD`          | Admin panel password (REQUIRED, must not be a common weak value)                                                                                            | Admin panel         |
+| `ADMIN_TOKEN_SECRET`      | 32+ char random secret used to sign admin session tokens (optional — ephemeral key generated at startup if absent, meaning sessions don't survive restarts) | Admin panel         |
 
 ## Admin Panel
 

@@ -21,6 +21,10 @@ import {
   timingSafeStringEqual,
 } from "../middleware/admin-auth";
 import { logAdminAction } from "../lib/audit";
+import {
+  recordAdminLoginFailure,
+  recordAdminLoginSuccess,
+} from "../middleware/admin-login-throttle";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -91,16 +95,19 @@ router.post("/admin/login", async (req, res): Promise<void> => {
 
   const supplied = typeof password === "string" ? password : "";
   if (!supplied || !timingSafeStringEqual(supplied, adminPassword)) {
-    logger.warn({ ip }, "Admin login failed");
+    const { failures, lockedForMs } = recordAdminLoginFailure(req);
+    logger.warn({ ip, failures, lockedForMs }, "Admin login failed");
     await logAdminAction({
       type: "admin_login_failure",
       actor: ip,
-      summary: "Failed admin login attempt",
+      summary: `Failed admin login attempt (failure #${failures} from this IP)`,
+      meta: { failures, lockedForMs },
     });
     res.status(401).json({ error: "Invalid credentials" });
     return;
   }
 
+  recordAdminLoginSuccess(req);
   const { token, expiresAt } = issueAdminToken(adminPassword);
   logger.info({ ip, expiresAt: expiresAt.toISOString() }, "Admin login succeeded");
   await logAdminAction({
@@ -675,7 +682,11 @@ router.delete("/admin/promo-codes/:id", adminAuth, async (req, res): Promise<voi
   await logAdminAction({
     type: "admin_promo_deleted",
     summary: `Deleted promo code ${existing.code}`,
-    before: { code: existing.code, discountType: existing.discountType, isActive: existing.isActive },
+    before: {
+      code: existing.code,
+      discountType: existing.discountType,
+      isActive: existing.isActive,
+    },
     meta: { promoId: id },
   });
   res.sendStatus(204);
@@ -854,7 +865,9 @@ router.delete("/admin/notification-emails/:id", adminAuth, async (req, res): Pro
   await db.delete(notificationEmailsTable).where(eq(notificationEmailsTable.id, id));
   await logAdminAction({
     type: "admin_notification_email_deleted",
-    summary: prev ? `Removed notification email ${prev.email}` : `Removed notification email #${id}`,
+    summary: prev
+      ? `Removed notification email ${prev.email}`
+      : `Removed notification email #${id}`,
     before: prev ? { email: prev.email, label: prev.label } : undefined,
     meta: { notificationEmailId: id },
   });
