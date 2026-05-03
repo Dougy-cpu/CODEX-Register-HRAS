@@ -79,6 +79,11 @@ export interface Booking {
   /** @nullable */
   stripeInvoiceStatusSyncedAt?: Date | null;
   invoiceBadgeStatus?: BookingInvoiceBadgeStatus;
+  confirmationEmailSent?: boolean;
+  welcomeEmailsSent?: boolean;
+  organiserNotified?: boolean;
+  sheetsSynced?: boolean;
+  needsAttention?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

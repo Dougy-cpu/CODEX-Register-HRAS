@@ -615,6 +615,121 @@ async function buildConfirmationEmailHtml(
   };
 }
 
+/**
+ * Send the customer-facing confirmation email (with PDF receipt / Stripe
+ * invoice attached) for a booking. Returns true if the message was actually
+ * accepted by the SMTP server, false otherwise.
+ *
+ * Split out from `sendBookingEmails` so the booking-confirmation helper can
+ * track confirmation vs. welcome delivery as independent retryable side-effects.
+ */
+export async function sendConfirmationAndReceiptEmail(bookingId: number): Promise<boolean> {
+  const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
+  if (!booking) {
+    logger.warn({ bookingId }, "Booking not found for confirmation email");
+    return false;
+  }
+  const settings = await getEventSettings();
+  const attendees = await db
+    .select()
+    .from(attendeesTable)
+    .where(eq(attendeesTable.bookingId, bookingId));
+  const lead = attendees.find((a) => a.isLead) || attendees[0];
+  if (!lead) {
+    logger.warn({ bookingId }, "No lead attendee found for confirmation email");
+    return false;
+  }
+
+  const { html: confirmationHtml, subject: confirmationSubject } = await buildConfirmationEmailHtml(
+    booking,
+    attendees,
+    lead,
+    settings,
+  );
+
+  let pdfBuffer: Buffer | null = null;
+  let pdfFilename = `receipt-${booking.orderReference || bookingId}.pdf`;
+  const stripeInvoicePdfUrl = booking.stripeInvoicePdfUrl;
+  if (stripeInvoicePdfUrl) {
+    try {
+      pdfBuffer = await downloadHttpsPdf(stripeInvoicePdfUrl);
+      if (pdfBuffer) {
+        pdfFilename = `invoice-${booking.orderReference || bookingId}.pdf`;
+      }
+    } catch (err) {
+      logger.warn({ err }, "Could not download Stripe PDF — falling back to custom receipt");
+    }
+  }
+  if (!pdfBuffer) {
+    try {
+      pdfBuffer = await generatePdfReceipt(booking, attendees);
+    } catch (err) {
+      logger.error({ err }, "Failed to generate PDF receipt");
+    }
+  }
+
+  const attachments: Array<{ filename: string; content: Buffer; contentType: string }> = [];
+  if (pdfBuffer) {
+    attachments.push({ filename: pdfFilename, content: pdfBuffer, contentType: "application/pdf" });
+  }
+  const companyInfoPdf = getCompanyInfoPdf();
+  if (companyInfoPdf && booking.paymentMethod === "invoice") {
+    attachments.push({
+      filename: "DBL-company-information.pdf",
+      content: companyInfoPdf,
+      contentType: "application/pdf",
+    });
+  }
+
+  const confirmSent = await sendMail({
+    to: lead.workEmail,
+    subject: confirmationSubject,
+    html: confirmationHtml,
+    attachments,
+    fromName: settings.fromName,
+    fromEmail: settings.fromEmail,
+  });
+
+  await logEmail(
+    bookingId,
+    lead.workEmail,
+    "confirmation",
+    confirmSent ? "sent" : "failed",
+    confirmSent ? undefined : "SMTP not configured or send failed",
+  );
+  if (pdfBuffer) {
+    await logEmail(bookingId, lead.workEmail, "receipt", confirmSent ? "sent" : "failed");
+  }
+
+  return confirmSent;
+}
+
+/**
+ * Send the per-attendee welcome email to every confirmed (non-TBC) attendee
+ * on a booking. Returns true only if EVERY welcome email was accepted by SMTP
+ * — partial success returns false so the booking-confirmation helper retries
+ * the whole batch on the next webhook replay (welcomes are deduped per
+ * recipient by sendWelcomeEmail's own once-per-attendee guard).
+ */
+export async function sendAttendeeWelcomeEmails(bookingId: number): Promise<boolean> {
+  const attendees = await db
+    .select()
+    .from(attendeesTable)
+    .where(eq(attendeesTable.bookingId, bookingId));
+  const welcomeAttendees = attendees.filter((a) => !a.isTbc);
+  let allOk = true;
+  for (const attendee of welcomeAttendees) {
+    try {
+      const ok = await sendWelcomeEmail(bookingId, attendee.firstName, attendee.workEmail);
+      if (!ok) allOk = false;
+    } catch (err) {
+      allOk = false;
+      logger.error({ err, bookingId, recipient: attendee.workEmail }, "Welcome email threw");
+    }
+  }
+  return allOk;
+}
+
 export async function sendBookingEmails(bookingId: number): Promise<void> {
   const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
 
@@ -910,9 +1025,11 @@ export async function resendConfirmationAndReceipt(
   return sent ? { recipient } : null;
 }
 
-export async function sendOrganiserNotification(bookingId: number): Promise<void> {
+export async function sendOrganiserNotification(bookingId: number): Promise<boolean> {
   const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
-  if (!booking) return;
+  // Booking not found → nothing to retry; treat as a terminal success so the
+  // delivery flag isn't left flapping forever.
+  if (!booking) return true;
 
   const storedEmails = await db
     .select()
@@ -932,7 +1049,9 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
       { bookingId },
       "No notification recipients configured — skipping organiser notification",
     );
-    return;
+    // No recipients = nothing to deliver; terminal success so the flag flips
+    // and we don't keep re-attempting on every webhook replay.
+    return true;
   }
 
   const settings = await getEventSettings();
@@ -1091,6 +1210,10 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
     );
   }
   logger.info({ bookingId, sentCount, total: recipients.length }, "Organiser notifications sent");
+  // Treat the side-effect as successful only if every recipient was reached.
+  // Any partial failure must release the organiserNotified flag so a webhook
+  // retry / admin redeliver can re-attempt the unsent recipients.
+  return failedRecipients.length === 0 && sentCount > 0;
 }
 
 export async function sendIncompleteFormNotification(bookingId: number): Promise<void> {
@@ -1477,7 +1600,7 @@ export async function sendWelcomeEmail(
   bookingId: number | null,
   firstName: string,
   toEmail: string,
-): Promise<void> {
+): Promise<boolean> {
   try {
     const [template] = await db
       .select()
@@ -1486,7 +1609,7 @@ export async function sendWelcomeEmail(
 
     if (!template) {
       logger.warn("No welcome email template found");
-      return;
+      return false;
     }
 
     const settings = await getEventSettings();
@@ -1537,8 +1660,10 @@ export async function sendWelcomeEmail(
       sent ? "sent" : "failed",
       sent ? undefined : "SMTP not configured or send failed",
     );
+    return sent;
   } catch (err) {
     logger.error({ err }, "Failed to send welcome email");
+    return false;
   }
 }
 

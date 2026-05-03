@@ -134,6 +134,11 @@ export interface Booking {
   /** @nullable */
   stripeInvoiceStatusSyncedAt?: string | null;
   invoiceBadgeStatus?: BookingInvoiceBadgeStatus;
+  confirmationEmailSent?: boolean;
+  welcomeEmailsSent?: boolean;
+  organiserNotified?: boolean;
+  sheetsSynced?: boolean;
+  needsAttention?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -693,10 +698,30 @@ export interface RegistrationSummary {
   /** @nullable */
   stripeInvoiceStatus?: string | null;
   invoiceBadgeStatus?: RegistrationSummaryInvoiceBadgeStatus;
+  /** True once the customer-facing confirmation+receipt email has been sent. */
+  confirmationEmailSent?: boolean;
+  /** True once welcome emails have been sent to all attendees. */
+  welcomeEmailsSent?: boolean;
+  /** True once the organiser has been notified of this booking. */
+  organiserNotified?: boolean;
+  /** True once this booking has been synced to the Google Sheet. */
+  sheetsSynced?: boolean;
+  /** True if the booking is confirmed (paid or invoiced) but at least one delivery flag is still false. */
+  needsAttention?: boolean;
   currentStep: number;
   createdAt: string;
   updatedAt: string;
 }
+
+export type RegistrationRedeliveryResultRedelivery = {
+  ran: string[];
+  skipped: string[];
+  failed: string[];
+};
+
+export type RegistrationRedeliveryResult = Booking & {
+  redelivery: RegistrationRedeliveryResultRedelivery;
+};
 
 export interface RegistrationList {
   registrations: RegistrationSummary[];
@@ -950,9 +975,23 @@ export type ListRegistrationsParams = {
   status?: string;
   passType?: string;
   search?: string;
+  /**
+   * When true, only return confirmed (paid or invoiced) bookings with at least one undelivered confirmation side-effect.
+   */
+  needsAttention?: ListRegistrationsNeedsAttention;
   page?: number;
   limit?: number;
 };
+
+export type ListRegistrationsNeedsAttention =
+  (typeof ListRegistrationsNeedsAttention)[keyof typeof ListRegistrationsNeedsAttention];
+
+export const ListRegistrationsNeedsAttention = {
+  true: "true",
+  false: "false",
+  NUMBER_1: "1",
+  NUMBER_0: "0",
+} as const;
 
 export type ExportRegistrationsParams = {
   status?: string;

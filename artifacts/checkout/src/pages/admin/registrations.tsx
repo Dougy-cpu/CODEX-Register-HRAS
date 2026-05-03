@@ -101,6 +101,51 @@ function ExpandedRegistrationDetail({
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<string | null>(null);
   const [stripeActionResult, setStripeActionResult] = useState<string | null>(null);
+  const [redeliverState, setRedeliverState] = useState<"idle" | "loading" | "success" | "error">(
+    "idle",
+  );
+  const [redeliverMessage, setRedeliverMessage] = useState<string | null>(null);
+
+  const handleRedeliver = async () => {
+    setRedeliverState("loading");
+    setRedeliverMessage(null);
+    try {
+      const token = localStorage.getItem("admin_token") || "";
+      const res = await fetch(`/api/admin/registrations/${id}/redeliver`, {
+        method: "POST",
+        headers: { "x-admin-token": token },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error || "Redeliver failed");
+      }
+      const body = (await res.json().catch(() => ({}))) as {
+        redelivery?: { ran: string[]; skipped: string[]; failed: string[] };
+      };
+      const r = body.redelivery;
+      if (r) {
+        if (r.failed.length > 0) {
+          setRedeliverMessage(
+            `Some side-effects still failed: ${r.failed.join(", ")} — check API logs.`,
+          );
+          setRedeliverState("error");
+        } else if (r.ran.length === 0) {
+          setRedeliverMessage("Nothing to redeliver — every flag was already green.");
+          setRedeliverState("success");
+        } else {
+          setRedeliverMessage(`Redelivered: ${r.ran.join(", ")}.`);
+          setRedeliverState("success");
+        }
+      } else {
+        setRedeliverState("success");
+      }
+      await refetch();
+      onStatusChanged();
+    } catch (err) {
+      setRedeliverMessage(err instanceof Error ? err.message : "Redeliver failed");
+      setRedeliverState("error");
+    }
+  };
   const [reminderState, setReminderState] = useState<"idle" | "loading" | "success" | "error">(
     "idle",
   );
@@ -559,6 +604,73 @@ function ExpandedRegistrationDetail({
           Use this to mark invoice payments received directly to Tide, or to cancel a booking.
         </span>
       </div>
+
+      {/* Delivery status — per-side-effect flags + redeliver action */}
+      {data && (data.status === "paid" || data.status === "invoiced") && (
+        <div
+          className={`border p-4 ${data.needsAttention ? "bg-amber-50 border-amber-300" : "bg-emerald-50 border-emerald-200"}`}
+        >
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h4
+              className={`font-bold uppercase text-xs tracking-wider ${data.needsAttention ? "text-amber-800" : "text-emerald-800"}`}
+            >
+              Delivery Status
+              {data.needsAttention && (
+                <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase text-amber-900 bg-amber-200 px-1.5 py-0.5 rounded">
+                  <AlertTriangle className="w-2.5 h-2.5" /> Needs attention
+                </span>
+              )}
+            </h4>
+            <button
+              onClick={handleRedeliver}
+              disabled={redeliverState === "loading"}
+              className={`inline-flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded transition-all ${
+                redeliverState === "loading"
+                  ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                  : data.needsAttention
+                    ? "bg-amber-600 text-white hover:bg-amber-700"
+                    : "bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100"
+              }`}
+            >
+              {redeliverState === "loading" && (
+                <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-current" />
+              )}
+              {redeliverState === "loading" ? "Redelivering…" : "Redeliver"}
+            </button>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+            {(
+              [
+                ["confirmationEmailSent", "Confirmation email"],
+                ["welcomeEmailsSent", "Welcome emails"],
+                ["organiserNotified", "Organiser notified"],
+                ["sheetsSynced", "Sheets sync"],
+              ] as const
+            ).map(([key, label]) => {
+              const ok = (data as unknown as Record<string, boolean>)[key];
+              return (
+                <div key={key} className="flex items-center gap-2">
+                  {ok ? (
+                    <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                  ) : (
+                    <X className="w-4 h-4 text-amber-700 shrink-0" />
+                  )}
+                  <span className={ok ? "text-emerald-900" : "text-amber-900 font-medium"}>
+                    {label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          {redeliverMessage && (
+            <p
+              className={`mt-3 text-xs ${redeliverState === "error" ? "text-red-700" : "text-emerald-800"}`}
+            >
+              {redeliverMessage}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Invoice details — shown when payment method is invoice */}
       {data?.paymentMethod === "invoice" && (
@@ -1229,6 +1341,7 @@ export default function AdminRegistrations() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("all");
   const [passType, setPassType] = useState<string>("all");
+  const [needsAttentionOnly, setNeedsAttentionOnly] = useState(false);
   const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -1238,13 +1351,14 @@ export default function AdminRegistrations() {
 
   const queryClient = useQueryClient();
 
-  const queryKey = ["registrations", search, status, passType, page];
+  const queryKey = ["registrations", search, status, passType, needsAttentionOnly, page];
 
   const { data, isLoading } = useListRegistrations(
     {
       search: search.trim() || undefined,
       status: status !== "all" ? status : undefined,
       passType: passType !== "all" ? passType : undefined,
+      needsAttention: needsAttentionOnly ? "true" : undefined,
       page,
       limit: 20,
     },
@@ -1426,6 +1540,21 @@ export default function AdminRegistrations() {
             </SelectContent>
           </Select>
         </div>
+        <div className="flex items-end shrink-0">
+          <label className="inline-flex items-center gap-2 h-12 px-3 bg-white border border-border cursor-pointer text-sm font-semibold text-amber-900 hover:bg-amber-50">
+            <Checkbox
+              checked={needsAttentionOnly}
+              onCheckedChange={(v) => {
+                setNeedsAttentionOnly(v === true);
+                setPage(1);
+                setSelected(new Set());
+              }}
+              aria-label="Show only bookings needing attention"
+            />
+            <AlertTriangle className="w-4 h-4 text-amber-600" />
+            Needs attention
+          </label>
+        </div>
         <Button
           onClick={handleExport}
           disabled={exporting}
@@ -1531,6 +1660,14 @@ export default function AdminRegistrations() {
                               <Clock className="w-2.5 h-2.5" /> Overdue
                             </span>
                           )}
+                        {reg.needsAttention && (
+                          <span
+                            className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-amber-900 bg-amber-200 px-1.5 py-0.5 rounded"
+                            title="One or more confirmation side-effects (email, organiser notif, Sheets sync) have not been delivered"
+                          >
+                            <AlertTriangle className="w-2.5 h-2.5" /> Needs attention
+                          </span>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="text-sm">

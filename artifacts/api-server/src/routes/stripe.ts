@@ -1,13 +1,11 @@
 import { Router, type IRouter } from "express";
 import Stripe from "stripe";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { bookingsTable, attendeesTable, promoCodesTable } from "@workspace/db";
 import { isCodeUsedByEmail } from "./promo-codes";
 import { incrementPromoUsage } from "../lib/pricing";
 import {
-  sendBookingEmails,
-  sendOrganiserNotification,
   sendCheckoutExpiredEmail,
   sendRefundConfirmationEmail,
   sendInvoicePaymentFailedEmail,
@@ -16,6 +14,7 @@ import {
 import { syncBookingToSheets } from "../lib/google-sheets";
 import { logger } from "../lib/logger";
 import { reissueBookingInvoice, applyReissueInvoiceResultTx } from "../lib/invoice";
+import { claimBookingConfirmation, runConfirmationSideEffects } from "../lib/booking-confirmation";
 
 const DECLINE_CODE_LABELS: Record<string, string> = {
   authentication_required: "Strong customer authentication required — please retry your payment",
@@ -53,16 +52,13 @@ const router: IRouter = Router();
  * Shared handler for Stripe `invoice.paid` and `invoice.payment_succeeded` events.
  *
  * Idempotency:
- *  - The status flip + emails are gated on `paidConfirmationEmailSentAt IS NULL`,
- *    claimed via a conditional UPDATE so concurrent webhook deliveries (and the
- *    two near-identical Stripe events) cannot fire duplicate emails.
- *  - Subsequent calls become a no-op once the row is claimed.
- *
- * Side effects on first successful call:
- *  - status → "paid", paidAt set, stripeInvoiceStatus cached as "paid"
- *  - sendBookingEmails (confirmation + welcome — same as card flow)
- *  - sendOrganiserNotification
- *  - syncBookingToSheets
+ *  - The status flip is performed by `claimBookingConfirmation`, a single
+ *    conditional UPDATE that only flips a non-paid row → paid. Concurrent
+ *    webhook deliveries lose the race silently.
+ *  - Side-effects are routed through `runConfirmationSideEffects`, which
+ *    uses per-flag atomic claims so each side-effect runs at most once
+ *    on the happy path AND retries automatically when Stripe replays the
+ *    webhook for an already-confirmed booking with stuck flags.
  */
 async function handleInvoicePaidEvent(event: Stripe.Event): Promise<void> {
   const invoice = event.data.object as Stripe.Invoice;
@@ -95,15 +91,6 @@ async function handleInvoicePaidEvent(event: Stripe.Event): Promise<void> {
     })
     .where(eq(bookingsTable.id, booking.id));
 
-  // Already sent the paid emails — nothing more to do.
-  if (booking.paidConfirmationEmailSentAt) {
-    logger.info(
-      { bookingId: booking.id, invoiceId, eventType: event.type },
-      "invoice paid: emails already sent, skipping",
-    );
-    return;
-  }
-
   const rawPaymentIntent = (invoice as unknown as Record<string, unknown>).payment_intent;
   const paymentIntentId: string | null =
     typeof rawPaymentIntent === "string"
@@ -112,82 +99,42 @@ async function handleInvoicePaidEvent(event: Stripe.Event): Promise<void> {
         ? (rawPaymentIntent as { id: string }).id
         : null;
 
-  // Flip status to paid (idempotent: only the first webhook to find a non-paid row
-  // wins). We deliberately keep paymentMethod = "invoice" so invoice-specific UI
-  // (badge, manage page invoice section) keeps rendering after settlement; we only
-  // record the payment intent for traceability.
-  await db
-    .update(bookingsTable)
-    .set({
-      status: "paid",
-      paidAt: booking.paidAt ?? new Date(),
-      updatedAt: new Date(),
-      ...(paymentIntentId ? { stripePaymentIntentId: paymentIntentId } : {}),
-    })
-    .where(eq(bookingsTable.id, booking.id));
-
-  // Side effects that are safe to re-run (sheet sync is upsert; organiser notif we
-  // accept as best-effort) — ok to run more than once across retries; they only
-  // happen here on the path where status wasn't yet paid OR emails haven't sent.
-  try {
-    await syncBookingToSheets(booking.id);
-  } catch (err) {
-    logger.error({ err, bookingId: booking.id }, "invoice paid: sheets sync failed");
-  }
-
-  try {
-    await sendOrganiserNotification(booking.id);
-  } catch (err) {
-    logger.error(
-      { err, bookingId: booking.id },
-      "invoice paid: failed to send organiser notification",
-    );
-  }
-
-  // Atomic claim for the customer-facing emails: only one webhook delivery may flip
-  // paidConfirmationEmailSentAt from NULL → now(). If sendBookingEmails fails we
-  // reset the timestamp back to NULL and rethrow so Stripe retries the webhook
-  // (otherwise a transient SMTP blip would silently lose the confirmation forever).
-  const emailClaim = await db
-    .update(bookingsTable)
-    .set({ paidConfirmationEmailSentAt: new Date() })
-    .where(and(eq(bookingsTable.id, booking.id), isNull(bookingsTable.paidConfirmationEmailSentAt)))
-    .returning({ id: bookingsTable.id });
-
-  if (emailClaim.length === 0) {
-    logger.info(
-      { bookingId: booking.id, invoiceId, eventType: event.type },
-      "invoice paid: confirmation emails already claimed by another delivery, skipping",
-    );
-    return;
-  }
-
-  logger.info(
+  // Atomic claim. We allow the flip from "invoiced" → "paid" (the typical
+  // happy path: invoice issued, then customer pays the hosted Stripe link)
+  // as well as from partial/pending_payment in case the invoice flow skipped
+  // those intermediates. paymentMethod stays "invoice" so invoice-specific
+  // UI keeps rendering after settlement.
+  const claimed = await claimBookingConfirmation(
+    booking.id,
+    "paid",
     {
-      bookingId: booking.id,
-      invoiceId,
-      orderRef: booking.orderReference,
-      paymentIntentId,
-      eventType: event.type,
+      paidConfirmationEmailSentAt: new Date(),
+      ...(paymentIntentId ? { stripePaymentIntentId: paymentIntentId } : {}),
     },
-    "invoice paid: booking marked paid, sending confirmation emails",
+    ["partial", "pending_payment", "invoiced"],
   );
 
-  try {
-    await sendBookingEmails(booking.id);
-  } catch (err) {
-    // Release the claim so a webhook retry can try again — better one-day-late
-    // than never.
-    await db
-      .update(bookingsTable)
-      .set({ paidConfirmationEmailSentAt: null })
-      .where(eq(bookingsTable.id, booking.id));
-    logger.error(
-      { err, bookingId: booking.id },
-      "invoice paid: failed to send confirmation/welcome emails — released claim for retry",
+  if (claimed) {
+    logger.info(
+      {
+        bookingId: booking.id,
+        invoiceId,
+        orderRef: booking.orderReference,
+        paymentIntentId,
+        eventType: event.type,
+      },
+      "invoice paid: booking claimed → paid, running side-effects",
     );
-    throw err;
+  } else {
+    // Already paid — fall through to side-effect retry so a stuck flag from
+    // a previous webhook delivery (e.g. SMTP blip) gets a fresh chance.
+    logger.info(
+      { bookingId: booking.id, invoiceId, eventType: event.type },
+      "invoice paid: already confirmed — retrying any unfinished side-effects",
+    );
   }
+
+  await runConfirmationSideEffects(booking.id);
 }
 
 async function isPromoOncePerCustomerViolation(
@@ -363,64 +310,43 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
         return;
       }
 
-      if (existing.status === "paid" || existing.status === "invoiced") {
-        logger.info(
-          { bookingId, status: existing.status },
-          "Stripe webhook: already processed, skipping duplicate event",
-        );
-        res.json({ received: true });
-        return;
-      }
-
       const orderRef = existing.orderReference || `HRAS26-${6541 + bookingId}`;
 
-      // Mark the booking paid AND bump the promo counter inside one
-      // transaction so a crash between the two writes can never leave the
-      // database with an inconsistent (paid-but-unincremented) state.
-      await db.transaction(async (tx) => {
-        await tx
-          .update(bookingsTable)
-          .set({
-            status: "paid",
-            currentStep: 5,
-            stripePaymentIntentId: session.payment_intent as string,
-            orderReference: orderRef,
-            paymentMethod: "card",
-          })
-          .where(eq(bookingsTable.id, bookingId));
-
-        if (existing.promoCode) {
-          const reserved = await incrementPromoUsage(existing.promoCode, existing.quantity, tx);
-          if (!reserved) {
-            // The customer has already paid — confirm the booking and just log
-            // that the cap was technically exceeded so the organiser can review.
-            // We deliberately do NOT throw, so the transaction still commits
-            // the status update.
-            logger.warn(
-              { bookingId, promoCode: existing.promoCode, quantity: existing.quantity },
-              "Promo cap exceeded after successful card payment — booking confirmed but usage not incremented",
-            );
-          }
-        }
+      // Atomic claim: only the first webhook delivery (or the racing
+      // /confirm-card-payment caller) actually flips status → paid; concurrent
+      // duplicate events get back null and skip straight to side-effect retry.
+      const claimed = await claimBookingConfirmation(bookingId, "paid", {
+        currentStep: 5,
+        stripePaymentIntentId: session.payment_intent as string,
+        orderReference: orderRef,
+        paymentMethod: "card",
       });
 
-      try {
-        await sendBookingEmails(bookingId);
-      } catch (err) {
-        logger.error({ err, bookingId }, "Failed to send booking emails after payment");
+      if (claimed) {
+        // Bump the promo counter ONCE, only on the path that actually flipped
+        // the status — preserves the previous "atomic with the status flip"
+        // intent (Task #59) and prevents double-increment on webhook replays.
+        if (existing.promoCode) {
+          try {
+            const reserved = await incrementPromoUsage(existing.promoCode, existing.quantity);
+            if (!reserved) {
+              logger.warn(
+                { bookingId, promoCode: existing.promoCode, quantity: existing.quantity },
+                "Promo cap exceeded after successful card payment — booking confirmed but usage not incremented",
+              );
+            }
+          } catch (err) {
+            logger.error({ err, bookingId }, "Failed to increment promo usage after card payment");
+          }
+        }
+      } else {
+        logger.info(
+          { bookingId, status: existing.status },
+          "checkout.session.completed: already confirmed — retrying any unfinished side-effects",
+        );
       }
 
-      try {
-        await sendOrganiserNotification(bookingId);
-      } catch (err) {
-        logger.error({ err, bookingId }, "Failed to send organiser notification after payment");
-      }
-
-      try {
-        await syncBookingToSheets(bookingId);
-      } catch (err) {
-        logger.error({ err, bookingId }, "Failed to sync booking to Google Sheets");
-      }
+      await runConfirmationSideEffects(bookingId);
     }
   }
 
@@ -758,8 +684,12 @@ router.post("/stripe/confirm-card-payment", async (req, res): Promise<void> => {
   if (existing.status === "paid" || existing.status === "invoiced") {
     logger.info(
       { bookingId: id, status: existing.status },
-      "confirm-card-payment: already processed",
+      "confirm-card-payment: already processed — retrying any unfinished side-effects",
     );
+    // Replay safety: if a previous confirm/webhook left a side-effect stuck
+    // (e.g. SMTP blip), running it again is the customer's only way to
+    // trigger a retry without admin intervention.
+    await runConfirmationSideEffects(id);
     res.json({ alreadyProcessed: true, orderReference: existing.orderReference || "" });
     return;
   }
@@ -795,56 +725,45 @@ router.post("/stripe/confirm-card-payment", async (req, res): Promise<void> => {
 
     const orderRef = existing.orderReference || `HRAS26-${6541 + id}`;
 
-    // Atomic: status flip + promo counter increment commit together.
-    await db.transaction(async (tx) => {
-      await tx
-        .update(bookingsTable)
-        .set({
-          status: "paid",
-          currentStep: 5,
-          stripePaymentIntentId: session.payment_intent as string | null,
-          orderReference: orderRef,
-          paymentMethod: "card",
-        })
-        .where(eq(bookingsTable.id, id));
+    // Atomic claim of the status flip — same primitive as the webhook path so
+    // a race between the browser and the webhook can never double-confirm.
+    const claimed = await claimBookingConfirmation(id, "paid", {
+      currentStep: 5,
+      stripePaymentIntentId: session.payment_intent as string | null,
+      orderReference: orderRef,
+      paymentMethod: "card",
+    });
 
+    if (claimed) {
       if (existing.promoCode) {
-        const reserved = await incrementPromoUsage(existing.promoCode, existing.quantity, tx);
-        if (!reserved) {
-          // Customer has already paid — log but do not throw, so the status
-          // update still commits.
-          logger.warn(
-            { bookingId: id, promoCode: existing.promoCode, quantity: existing.quantity },
-            "Promo cap exceeded after successful card payment — booking confirmed but usage not incremented",
+        try {
+          const reserved = await incrementPromoUsage(existing.promoCode, existing.quantity);
+          if (!reserved) {
+            logger.warn(
+              { bookingId: id, promoCode: existing.promoCode, quantity: existing.quantity },
+              "Promo cap exceeded after successful card payment — booking confirmed but usage not incremented",
+            );
+          }
+        } catch (err) {
+          logger.error(
+            { err, bookingId: id },
+            "Failed to increment promo usage after card payment",
           );
         }
       }
-    });
-
-    try {
-      await sendBookingEmails(id);
-    } catch (err) {
-      logger.error(
-        { err, bookingId: id },
-        "Failed to send booking emails after confirm-card-payment",
+      logger.info(
+        { bookingId: id, orderRef },
+        "confirm-card-payment: booking confirmed — running side-effects",
+      );
+    } else {
+      logger.info(
+        { bookingId: id, orderRef },
+        "confirm-card-payment: webhook beat us — retrying any unfinished side-effects",
       );
     }
-    try {
-      await sendOrganiserNotification(id);
-    } catch (err) {
-      logger.error({ err, bookingId: id }, "Failed to send organiser notification after confirm");
-    }
-    try {
-      await syncBookingToSheets(id);
-    } catch (err) {
-      logger.error({ err, bookingId: id }, "Failed to sync to Google Sheets after confirm");
-    }
 
-    logger.info(
-      { bookingId: id, orderRef },
-      "confirm-card-payment: booking confirmed and emails sent",
-    );
-    res.json({ alreadyProcessed: false, orderReference: orderRef });
+    await runConfirmationSideEffects(id);
+    res.json({ alreadyProcessed: !claimed, orderReference: orderRef });
   } catch (err) {
     const e = err as { raw?: { message?: string }; message?: string };
     const msg = e?.raw?.message || e?.message || "Stripe error";
@@ -958,21 +877,10 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
       }
     });
 
-    try {
-      await sendBookingEmails(id);
-    } catch (err) {
-      logger.error({ err }, "Failed to send booking emails after Stripe invoice");
-    }
-    try {
-      await sendOrganiserNotification(id);
-    } catch (err) {
-      logger.error({ err }, "Failed to send organiser notification");
-    }
-    try {
-      await syncBookingToSheets(id);
-    } catch (err) {
-      logger.error({ err }, "Failed to sync to Google Sheets");
-    }
+    // Run the same per-flag retry pipeline as the card paths so a failed
+    // confirmation email here is automatically retried on the next webhook
+    // (or admin redeliver) instead of being silently lost.
+    await runConfirmationSideEffects(id);
 
     res.json({
       invoiceId: result.invoiceId,

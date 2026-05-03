@@ -51,6 +51,7 @@ import type {
   PromoCodeValidationResult,
   PublicEventSettings,
   RegistrationList,
+  RegistrationRedeliveryResult,
   StripeSessionResponse,
   SuccessResponse,
   TestEmailBody,
@@ -2603,6 +2604,94 @@ export function useListRegistrations<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * Retries the confirmation email, welcome emails, organiser notification,
+and Sheets sync for any flag that is still false on a paid/invoiced booking.
+Each side-effect is gated on its own boolean flag, so already-delivered
+ones are skipped. Use after fixing an SMTP / Sheets outage to clear the
+"needs attention" badge.
+
+ * @summary Re-run any unfinished post-confirmation side-effects (admin)
+ */
+export const getRedeliverRegistrationUrl = (id: number) => {
+  return `/api/admin/registrations/${id}/redeliver`;
+};
+
+export const redeliverRegistration = async (
+  id: number,
+  options?: RequestInit,
+): Promise<RegistrationRedeliveryResult> => {
+  return customFetch<RegistrationRedeliveryResult>(getRedeliverRegistrationUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getRedeliverRegistrationMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof redeliverRegistration>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof redeliverRegistration>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["redeliverRegistration"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof redeliverRegistration>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return redeliverRegistration(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RedeliverRegistrationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof redeliverRegistration>>
+>;
+
+export type RedeliverRegistrationMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Re-run any unfinished post-confirmation side-effects (admin)
+ */
+export const useRedeliverRegistration = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof redeliverRegistration>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof redeliverRegistration>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getRedeliverRegistrationMutationOptions(options));
+};
 
 /**
  * @summary Get a registration with full attendee details (admin)

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { bookingsTable, attendeesTable, eventSettingsTable } from "@workspace/db";
 import { calculatePricing, incrementPromoUsage } from "../lib/pricing";
@@ -10,13 +10,12 @@ import { verifyAdminToken, getAdminPassword } from "../middleware/admin-auth";
 import { logAdminAction } from "../lib/audit";
 import {
   sendIncompleteFormNotification,
-  sendBookingEmails,
-  sendOrganiserNotification,
   sendReissuedInvoiceEmail,
   getEventSettings,
   resolveLatestBookingPdf,
   resendConfirmationAndReceipt,
 } from "../lib/email";
+import { runConfirmationSideEffects } from "../lib/booking-confirmation";
 import { logger } from "../lib/logger";
 import {
   reissueBookingInvoice,
@@ -881,6 +880,9 @@ router.post("/bookings/:id/confirm-free", async (req, res): Promise<void> => {
   }
 
   if (existing.status === "paid" || existing.status === "invoiced") {
+    // Replay safety — if a previous confirm left a side-effect stuck
+    // (e.g. SMTP blip on confirmation email), retry it here.
+    await runConfirmationSideEffects(id);
     res.json({ alreadyConfirmed: true, orderReference: existing.orderReference });
     return;
   }
@@ -912,16 +914,18 @@ router.post("/bookings/:id/confirm-free", async (req, res): Promise<void> => {
     }
   }
 
-  // Reserve the promo seats AND mark the booking paid in a single
-  // transaction. If the cap check fails we throw a sentinel so the whole
-  // transaction rolls back — leaving neither a stale promo counter nor a
-  // half-confirmed booking. For unconfirmed free bookings there's no charge
-  // to refund, so failing here is the correct behaviour.
+  // Reserve the promo seats AND atomically flip the booking from
+  // partial/pending_payment → paid in a single transaction. The status
+  // flip uses a `WHERE status IN (...)` claim so two concurrent
+  // /confirm-free calls cannot both win — the loser sees an empty
+  // RETURNING, throws the sentinel, rolls back the promo increment, and
+  // returns the alreadyConfirmed branch on its retry/poll.
   class PromoCapExceededError extends Error {
     constructor(public clientMessage: string) {
       super(clientMessage);
     }
   }
+  class ConfirmRaceLostError extends Error {}
 
   const orderRef = await generateOrderRef(id);
 
@@ -946,34 +950,48 @@ router.post("/bookings/:id/confirm-free", async (req, res): Promise<void> => {
         }
       }
 
-      await tx
+      const claimed = await tx
         .update(bookingsTable)
         .set({
           status: "paid",
           currentStep: 5,
           orderReference: orderRef,
+          paidAt: new Date(),
           updatedAt: new Date(),
         })
-        .where(eq(bookingsTable.id, id));
+        .where(
+          and(
+            eq(bookingsTable.id, id),
+            inArray(bookingsTable.status, ["partial", "pending_payment"]),
+          ),
+        )
+        .returning({ id: bookingsTable.id });
+
+      if (claimed.length === 0) {
+        // Another caller flipped this booking first (or it was cancelled
+        // in the meantime). Roll back the promo increment.
+        throw new ConfirmRaceLostError();
+      }
     });
   } catch (err) {
     if (err instanceof PromoCapExceededError) {
       res.status(400).json({ error: err.clientMessage });
       return;
     }
+    if (err instanceof ConfirmRaceLostError) {
+      const [latest] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, id));
+      if (latest && (latest.status === "paid" || latest.status === "invoiced")) {
+        await runConfirmationSideEffects(id);
+        res.json({ alreadyConfirmed: true, orderReference: latest.orderReference });
+        return;
+      }
+      res.status(409).json({ error: "Booking is no longer in a confirmable state" });
+      return;
+    }
     throw err;
   }
 
-  try {
-    await sendBookingEmails(id);
-  } catch (err) {
-    logger.error({ err, bookingId: id }, "confirm-free: failed to send confirmation emails");
-  }
-  try {
-    await sendOrganiserNotification(id);
-  } catch (err) {
-    logger.error({ err, bookingId: id }, "confirm-free: failed to send organiser notification");
-  }
+  await runConfirmationSideEffects(id);
 
   res.json({ confirmed: true, orderReference: orderRef });
 });

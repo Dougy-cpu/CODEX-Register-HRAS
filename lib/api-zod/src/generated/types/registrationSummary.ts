@@ -35,6 +35,16 @@ export interface RegistrationSummary {
   /** @nullable */
   stripeInvoiceStatus?: string | null;
   invoiceBadgeStatus?: RegistrationSummaryInvoiceBadgeStatus;
+  /** True once the customer-facing confirmation+receipt email has been sent. */
+  confirmationEmailSent?: boolean;
+  /** True once welcome emails have been sent to all attendees. */
+  welcomeEmailsSent?: boolean;
+  /** True once the organiser has been notified of this booking. */
+  organiserNotified?: boolean;
+  /** True once this booking has been synced to the Google Sheet. */
+  sheetsSynced?: boolean;
+  /** True if the booking is confirmed (paid or invoiced) but at least one delivery flag is still false. */
+  needsAttention?: boolean;
   currentStep: number;
   createdAt: Date;
   updatedAt: Date;

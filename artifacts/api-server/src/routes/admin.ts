@@ -28,6 +28,7 @@ import {
 import { logger } from "../lib/logger";
 import { refreshStripeInvoiceStatusIfStale } from "../lib/invoice";
 import { deriveInvoiceBadge } from "../lib/invoice-status";
+import { deliveryStatusForBooking, runConfirmationSideEffects } from "../lib/booking-confirmation";
 
 const router: IRouter = Router();
 
@@ -40,6 +41,7 @@ function getStripe(): Stripe | null {
 function formatBooking(b: typeof bookingsTable.$inferSelect) {
   return {
     ...b,
+    ...deliveryStatusForBooking(b),
     subtotalAmount: parseFloat(b.subtotalAmount?.toString() || "0"),
     vatAmount: parseFloat(b.vatAmount?.toString() || "0"),
     totalAmount: parseFloat(b.totalAmount?.toString() || "0"),
@@ -208,6 +210,8 @@ router.get("/admin/registrations", adminAuth, async (req, res): Promise<void> =>
   const statusFilter = req.query.status as string | undefined;
   const passTypeFilter = req.query.passType as string | undefined;
   const search = req.query.search as string | undefined;
+  const needsAttentionFilter =
+    req.query.needsAttention === "true" || req.query.needsAttention === "1";
 
   const allBookings = await db.select().from(bookingsTable).orderBy(desc(bookingsTable.createdAt));
   const allAttendees = await db.select().from(attendeesTable);
@@ -218,6 +222,12 @@ router.get("/admin/registrations", adminAuth, async (req, res): Promise<void> =>
   }
   if (passTypeFilter) {
     filtered = filtered.filter((b) => b.passType === passTypeFilter);
+  }
+  if (needsAttentionFilter) {
+    // "Needs attention" = paid/invoiced booking with at least one
+    // confirmation side-effect still un-delivered. Keeps the panel honest
+    // about silent failures (SMTP blip, Sheets API hiccup, etc).
+    filtered = filtered.filter((b) => deliveryStatusForBooking(b).needsAttention);
   }
 
   if (search) {
@@ -416,6 +426,45 @@ router.get("/admin/registrations/:id", adminAuth, async (req, res): Promise<void
     ...formatBooking(booking),
     attendees: attendees.map(formatAttendee),
   });
+});
+
+/**
+ * Manually re-run any post-confirmation side-effects that haven't yet
+ * succeeded for this booking (confirmation email, welcome emails, organiser
+ * notification, Sheets sync). Safe to call repeatedly — each side-effect is
+ * gated on its own boolean flag, so already-delivered ones are skipped.
+ *
+ * Use case: a Stripe webhook delivered fine but our SMTP relay was down at
+ * the time, so the confirmation email is stuck. Admin can flip the booking
+ * back to "delivered" without manually replaying the Stripe event.
+ */
+router.post("/admin/registrations/:id/redeliver", adminAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+
+  const [existing] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, id));
+  if (!existing) {
+    res.status(404).json({ error: "Booking not found" });
+    return;
+  }
+  if (existing.status !== "paid" && existing.status !== "invoiced") {
+    res.status(400).json({
+      error: "Only confirmed (paid/invoiced) bookings can be redelivered",
+    });
+    return;
+  }
+
+  const result = await runConfirmationSideEffects(id);
+
+  await logAdminAction({
+    type: "admin_booking_redelivered",
+    bookingId: id,
+    summary: `Redelivered booking ${existing.orderReference || `#${id}`}: ran=[${result.ran.join(",")}] failed=[${result.failed.join(",")}]`,
+    meta: result,
+  });
+
+  const [refreshed] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, id));
+  res.json({ ...formatBooking(refreshed), redelivery: result });
 });
 
 router.patch("/admin/registrations/:id/status", adminAuth, async (req, res): Promise<void> => {

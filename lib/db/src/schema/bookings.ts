@@ -76,6 +76,15 @@ export const bookingsTable = pgTable("bookings", {
   hearAboutUs: text("hear_about_us"),
   managementToken: text("management_token").unique(),
   partialNotificationSent: boolean("partial_notification_sent").notNull().default(false),
+  // Per-side-effect delivery flags. Flipped to true ONLY when the matching
+  // post-confirmation side-effect actually succeeded. Used by the
+  // booking-confirmation helper to retry only the missing pieces on webhook
+  // replay or admin "redeliver" — and surfaced in the admin Registrations
+  // panel as a "needs attention" badge so a stuck delivery is visible.
+  confirmationEmailSent: boolean("confirmation_email_sent").notNull().default(false),
+  welcomeEmailsSent: boolean("welcome_emails_sent").notNull().default(false),
+  organiserNotified: boolean("organiser_notified").notNull().default(false),
+  sheetsSynced: boolean("sheets_synced").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()

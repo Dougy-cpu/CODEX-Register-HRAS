@@ -875,6 +875,13 @@ paths:
           required: false
           schema:
             type: string
+        - name: needsAttention
+          in: query
+          required: false
+          description: When true, only return confirmed (paid or invoiced) bookings with at least one undelivered confirmation side-effect.
+          schema:
+            type: string
+            enum: ["true", "false", "1", "0"]
         - name: page
           in: query
           required: false
@@ -894,6 +901,45 @@ paths:
                 $ref: "#/components/schemas/RegistrationList"
         "401":
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/registrations/{id}/redeliver:
+    post:
+      operationId: redeliverRegistration
+      tags: [admin]
+      summary: Re-run any unfinished post-confirmation side-effects (admin)
+      description: |
+        Retries the confirmation email, welcome emails, organiser notification,
+        and Sheets sync for any flag that is still false on a paid/invoiced booking.
+        Each side-effect is gated on its own boolean flag, so already-delivered
+        ones are skipped. Use after fixing an SMTP / Sheets outage to clear the
+        "needs attention" badge.
+      security:
+        - AdminToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated registration with redelivery summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationRedeliveryResult"
+        "400":
+          description: Booking is not yet confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Booking not found
           content:
             application/json:
               schema:
@@ -1160,6 +1206,16 @@ components:
         invoiceBadgeStatus:
           type: string
           enum: [paid, voided, overdue, sent, pending]
+        confirmationEmailSent:
+          type: boolean
+        welcomeEmailsSent:
+          type: boolean
+        organiserNotified:
+          type: boolean
+        sheetsSynced:
+          type: boolean
+        needsAttention:
+          type: boolean
         createdAt:
           type: string
           format: date-time
@@ -1877,6 +1933,21 @@ components:
         invoiceBadgeStatus:
           type: string
           enum: [paid, voided, overdue, sent, pending]
+        confirmationEmailSent:
+          type: boolean
+          description: True once the customer-facing confirmation+receipt email has been sent.
+        welcomeEmailsSent:
+          type: boolean
+          description: True once welcome emails have been sent to all attendees.
+        organiserNotified:
+          type: boolean
+          description: True once the organiser has been notified of this booking.
+        sheetsSynced:
+          type: boolean
+          description: True once this booking has been synced to the Google Sheet.
+        needsAttention:
+          type: boolean
+          description: True if the booking is confirmed (paid or invoiced) but at least one delivery flag is still false.
         currentStep:
           type: integer
         createdAt:
@@ -1895,6 +1966,29 @@ components:
         - currentStep
         - createdAt
         - updatedAt
+
+    RegistrationRedeliveryResult:
+      allOf:
+        - $ref: "#/components/schemas/Booking"
+        - type: object
+          properties:
+            redelivery:
+              type: object
+              properties:
+                ran:
+                  type: array
+                  items:
+                    type: string
+                skipped:
+                  type: array
+                  items:
+                    type: string
+                failed:
+                  type: array
+                  items:
+                    type: string
+              required: [ran, skipped, failed]
+          required: [redelivery]
 
     RegistrationList:
       type: object
