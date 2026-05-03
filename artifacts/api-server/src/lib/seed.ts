@@ -12,7 +12,8 @@ export async function runMigrations() {
   }
 }
 
-const DEFAULT_CONFIRMATION_SUBJECT = "Booking Confirmed — {{orderReference}} — HR Analytics Summit 2026";
+const DEFAULT_CONFIRMATION_SUBJECT =
+  "Booking Confirmed — {{orderReference}} — HR Analytics Summit 2026";
 
 const DEFAULT_CONFIRMATION_BODY = `
 <h2>Booking Confirmed!</h2>
@@ -94,8 +95,18 @@ const DEFAULT_DISCOUNT_TIERS = [
   { passType: "single" as const, minQuantity: 4, discountPercent: "10", label: "4+ passes" },
   { passType: "single" as const, minQuantity: 8, discountPercent: "15", label: "8+ passes" },
   { passType: "single" as const, minQuantity: 12, discountPercent: "20", label: "12+ passes" },
-  { passType: "business" as const, minQuantity: 2, discountPercent: "10", label: "2+ Business Passes" },
-  { passType: "business" as const, minQuantity: 5, discountPercent: "15", label: "5+ Business Passes" },
+  {
+    passType: "business" as const,
+    minQuantity: 2,
+    discountPercent: "10",
+    label: "2+ Business Passes",
+  },
+  {
+    passType: "business" as const,
+    minQuantity: 5,
+    discountPercent: "15",
+    label: "5+ Business Passes",
+  },
 ];
 
 export async function seed() {
@@ -147,7 +158,19 @@ export async function seed() {
           currentPrice: "199.00",
           originalPrice: "429.00",
           pricingPeriodName: "Super Early Bird",
-          benefits: ["Conference Sessions", "Networking Sessions", "Happy Hour Networking", "Personalised Agenda", "Access to Pre-Event Social", "Exhibition Hall", "Award-winning Food & Drink", "On-Demand Recordings", "Additional Content Access", "Presentation Slides", "Post-Event Content"],
+          benefits: [
+            "Conference Sessions",
+            "Networking Sessions",
+            "Happy Hour Networking",
+            "Personalised Agenda",
+            "Access to Pre-Event Social",
+            "Exhibition Hall",
+            "Award-winning Food & Drink",
+            "On-Demand Recordings",
+            "Additional Content Access",
+            "Presentation Slides",
+            "Post-Event Content",
+          ],
           extraBenefits: [],
         },
         {
@@ -155,7 +178,17 @@ export async function seed() {
           currentPrice: "499.00",
           originalPrice: "999.00",
           pricingPeriodName: "Super Early Bird",
-          benefits: ["Conference Sessions", "Networking Sessions", "Happy Hour with Entertainment", "Exhibition Hall", "Award-winning Food & Drink", "On-Demand Recordings", "Additional Content Access", "Presentation Slides", "Post-Event Content"],
+          benefits: [
+            "Conference Sessions",
+            "Networking Sessions",
+            "Happy Hour with Entertainment",
+            "Exhibition Hall",
+            "Award-winning Food & Drink",
+            "On-Demand Recordings",
+            "Additional Content Access",
+            "Presentation Slides",
+            "Post-Event Content",
+          ],
           extraBenefits: ["Exclusive Attendee Report", "Company Branding at the Summit"],
         },
       ]);

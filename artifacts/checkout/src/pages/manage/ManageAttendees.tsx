@@ -2,7 +2,18 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import { z } from "zod";
-import { CheckCircle2, User, Clock, ChevronDown, ChevronUp, Loader2, AlertCircle, Calendar, MapPin, Lock } from "lucide-react";
+import {
+  CheckCircle2,
+  User,
+  Clock,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  AlertCircle,
+  Calendar,
+  MapPin,
+  Lock,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,7 +29,7 @@ const attendeeSchema = z.object({
   workEmail: z.string().email("Valid email is required"),
   phone: z.string().optional(),
   dietaryAccessibility: z.string().optional(),
-  gdprConsent: z.boolean().refine(val => val === true, {
+  gdprConsent: z.boolean().refine((val) => val === true, {
     message: "You must agree to the terms before saving",
   }),
 });
@@ -104,10 +115,12 @@ function AttendeeCard({
   const isTbc = attendee.isTbc && !saved;
 
   return (
-    <div className={`bg-white border rounded-sm overflow-hidden transition-all ${isTbc ? "border-amber-300" : "border-border"}`}>
+    <div
+      className={`bg-white border rounded-sm overflow-hidden transition-all ${isTbc ? "border-amber-300" : "border-border"}`}
+    >
       <div className="flex items-center justify-between p-5 gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          {saved || (!attendee.isTbc) ? (
+          {saved || !attendee.isTbc ? (
             <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
               <User className="w-4 h-4 text-primary" />
             </div>
@@ -119,19 +132,25 @@ function AttendeeCard({
           <div className="min-w-0">
             {saved ? (
               <>
-                <p className="font-bold truncate">{form.firstName} {form.lastName}</p>
+                <p className="font-bold truncate">
+                  {form.firstName} {form.lastName}
+                </p>
                 <p className="text-xs text-green-600 font-medium flex items-center gap-1">
                   <CheckCircle2 className="w-3 h-3" /> Details saved
                 </p>
               </>
             ) : attendee.isTbc ? (
               <>
-                <p className="font-bold text-amber-700">Attendee {attendee.seatIndex} — Details Needed</p>
+                <p className="font-bold text-amber-700">
+                  Attendee {attendee.seatIndex} — Details Needed
+                </p>
                 <p className="text-xs text-amber-600 font-medium">No details entered yet</p>
               </>
             ) : (
               <>
-                <p className="font-bold truncate">{attendee.firstName} {attendee.lastName}</p>
+                <p className="font-bold truncate">
+                  {attendee.firstName} {attendee.lastName}
+                </p>
                 <p className="text-sm text-muted-foreground truncate">{attendee.workEmail}</p>
               </>
             )}
@@ -154,7 +173,11 @@ function AttendeeCard({
             }`}
           >
             {isTbc ? "Fill in Details" : saved ? "Edit" : "Edit Details"}
-            {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            {expanded ? (
+              <ChevronUp className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5" />
+            )}
           </button>
         )}
       </div>
@@ -171,7 +194,9 @@ function AttendeeCard({
                   placeholder="Jane"
                   className={errors.firstName ? "border-red-400" : ""}
                 />
-                {errors.firstName && <p className="text-xs text-red-500 mt-1">{errors.firstName}</p>}
+                {errors.firstName && (
+                  <p className="text-xs text-red-500 mt-1">{errors.firstName}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-semibold mb-1.5">Last Name *</label>
@@ -230,7 +255,9 @@ function AttendeeCard({
             </div>
 
             <div>
-              <label className="block text-sm font-semibold mb-1.5">Dietary / Accessibility Requirements</label>
+              <label className="block text-sm font-semibold mb-1.5">
+                Dietary / Accessibility Requirements
+              </label>
               <Input
                 value={form.dietaryAccessibility}
                 onChange={(e) => setForm((f) => ({ ...f, dietaryAccessibility: e.target.value }))}
@@ -251,11 +278,27 @@ function AttendeeCard({
                 <div className="space-y-1 leading-none">
                   <label className="font-normal text-base cursor-pointer">
                     I understand how my data will be processed in accordance with{" "}
-                    <a href="https://peoplestrategyhub.com/your-data-gdpr" target="_blank" rel="noreferrer" className="underline text-primary hover:text-primary/80">GDPR</a>
-                    {" "}and{" "}
-                    <a href="https://www.hranalyticssummit.com/terms-and-conditions" target="_blank" rel="noreferrer" className="underline text-primary hover:text-primary/80">Conference T&Cs</a>
+                    <a
+                      href="https://peoplestrategyhub.com/your-data-gdpr"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline text-primary hover:text-primary/80"
+                    >
+                      GDPR
+                    </a>{" "}
+                    and{" "}
+                    <a
+                      href="https://www.hranalyticssummit.com/terms-and-conditions"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline text-primary hover:text-primary/80"
+                    >
+                      Conference T&Cs
+                    </a>
                   </label>
-                  {errors.gdprConsent && <p className="text-xs text-destructive">{errors.gdprConsent}</p>}
+                  {errors.gdprConsent && (
+                    <p className="text-xs text-destructive">{errors.gdprConsent}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -313,8 +356,7 @@ export default function ManageAttendees() {
 
   const { data, isLoading, isError } = useQuery<ManageBookingResponse>({
     queryKey: ["booking-by-token", token],
-    queryFn: () =>
-      customFetch<ManageBookingResponse>(`/api/bookings/by-management-token/${token}`),
+    queryFn: () => customFetch<ManageBookingResponse>(`/api/bookings/by-management-token/${token}`),
     enabled: !!token,
     retry: false,
   });
@@ -329,7 +371,9 @@ export default function ManageAttendees() {
         <div className="text-center max-w-md">
           <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h1 className="text-2xl font-bold mb-2">Invalid Link</h1>
-          <p className="text-muted-foreground">This management link is not valid. Please check your confirmation email.</p>
+          <p className="text-muted-foreground">
+            This management link is not valid. Please check your confirmation email.
+          </p>
         </div>
       </div>
     );
@@ -349,7 +393,10 @@ export default function ManageAttendees() {
         <div className="text-center max-w-md">
           <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h1 className="text-2xl font-bold mb-2">Booking Not Found</h1>
-          <p className="text-muted-foreground">We couldn't find a booking for this link. It may have expired or been used already. Please check your confirmation email.</p>
+          <p className="text-muted-foreground">
+            We couldn't find a booking for this link. It may have expired or been used already.
+            Please check your confirmation email.
+          </p>
         </div>
       </div>
     );
@@ -382,8 +429,7 @@ export default function ManageAttendees() {
           <h1 className="text-3xl font-bold mb-2">Manage Attendees</h1>
           <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground mt-1 mb-3">
             <span className="flex items-center gap-1.5">
-              <Calendar className="w-4 h-4 text-primary flex-shrink-0" />
-              3 September 2026
+              <Calendar className="w-4 h-4 text-primary flex-shrink-0" />3 September 2026
             </span>
             <span className="flex items-center gap-1.5">
               <MapPin className="w-4 h-4 text-primary flex-shrink-0" />
@@ -391,9 +437,13 @@ export default function ManageAttendees() {
             </span>
           </div>
           <p className="text-sm text-muted-foreground">
-            Order reference: <span className="font-mono font-semibold text-foreground">{booking.orderReference || "PENDING"}</span>
+            Order reference:{" "}
+            <span className="font-mono font-semibold text-foreground">
+              {booking.orderReference || "PENDING"}
+            </span>
             {" · "}
-            {booking.quantity} {booking.passType === "single" ? "Single Pass" : "Business Pass"}{booking.quantity !== 1 ? "es" : ""}
+            {booking.quantity} {booking.passType === "single" ? "Single Pass" : "Business Pass"}
+            {booking.quantity !== 1 ? "es" : ""}
           </p>
         </div>
 
@@ -415,7 +465,8 @@ export default function ManageAttendees() {
                 {tbcCount} attendee {tbcCount === 1 ? "detail" : "details"} still needed
               </p>
               <p className="text-sm text-amber-700 mt-0.5">
-                Please fill in the details below before the event. You can return to this page at any time using the link in your confirmation email.
+                Please fill in the details below before the event. You can return to this page at
+                any time using the link in your confirmation email.
               </p>
             </div>
           </div>
@@ -446,8 +497,12 @@ export default function ManageAttendees() {
         </div>
 
         <p className="text-xs text-muted-foreground mt-8 text-center">
-          HR Analytics Summit · 3 September 2026 · 155 Bishopsgate, London<br />
-          Questions? Email <a href="mailto:hello@hranalyticssummit.com" className="underline">hello@hranalyticssummit.com</a>
+          HR Analytics Summit · 3 September 2026 · 155 Bishopsgate, London
+          <br />
+          Questions? Email{" "}
+          <a href="mailto:hello@hranalyticssummit.com" className="underline">
+            hello@hranalyticssummit.com
+          </a>
         </p>
       </main>
     </div>

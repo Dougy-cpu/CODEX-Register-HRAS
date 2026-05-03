@@ -8,6 +8,8 @@
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
     "lint": "eslint .",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
     "test": "vitest run --passWithNoTests"
   },
   "private": true,

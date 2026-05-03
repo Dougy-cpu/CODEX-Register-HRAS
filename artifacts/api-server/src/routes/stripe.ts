@@ -47,14 +47,22 @@ const DISPUTE_REASON_LABELS: Record<string, string> = {
   unrecognized: "Unrecognised transaction",
 };
 
-
 const router: IRouter = Router();
 
-async function isPromoOncePerCustomerViolation(bookingId: number, promoCode: string | null): Promise<boolean> {
+async function isPromoOncePerCustomerViolation(
+  bookingId: number,
+  promoCode: string | null,
+): Promise<boolean> {
   if (!promoCode) return false;
-  const [promo] = await db.select().from(promoCodesTable).where(eq(promoCodesTable.code, promoCode));
+  const [promo] = await db
+    .select()
+    .from(promoCodesTable)
+    .where(eq(promoCodesTable.code, promoCode));
   if (!promo?.oncePerCustomer) return false;
-  const allAttendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
+  const allAttendees = await db
+    .select()
+    .from(attendeesTable)
+    .where(eq(attendeesTable.bookingId, bookingId));
   const leadAttendee = allAttendees.find((a) => a.isLead) || allAttendees[0];
   const email = (leadAttendee?.workEmail || "").trim().toLowerCase();
   if (!email) return false;
@@ -92,14 +100,17 @@ router.post("/stripe/create-checkout-session", async (req, res): Promise<void> =
   }
 
   const sessionHeader = req.headers["x-booking-session"] as string | undefined;
-  const ownsBooking = sessionHeader && booking.sessionToken && sessionHeader === booking.sessionToken;
+  const ownsBooking =
+    sessionHeader && booking.sessionToken && sessionHeader === booking.sessionToken;
   if (!ownsBooking) {
     res.status(403).json({ error: "Forbidden — invalid booking session" });
     return;
   }
 
   if (await isPromoOncePerCustomerViolation(booking.id, booking.promoCode)) {
-    res.status(400).json({ error: "This promo code has already been used on a previous booking with this email" });
+    res.status(400).json({
+      error: "This promo code has already been used on a previous booking with this email",
+    });
     return;
   }
 
@@ -199,7 +210,10 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
     const bookingId = parseInt(session.metadata?.bookingId || "0", 10);
 
     if (bookingId) {
-      const [existing] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
+      const [existing] = await db
+        .select()
+        .from(bookingsTable)
+        .where(eq(bookingsTable.id, bookingId));
 
       if (!existing) {
         logger.warn({ bookingId }, "Stripe webhook: booking not found, skipping");
@@ -208,7 +222,10 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
       }
 
       if (existing.status === "paid" || existing.status === "invoiced") {
-        logger.info({ bookingId, status: existing.status }, "Stripe webhook: already processed, skipping duplicate event");
+        logger.info(
+          { bookingId, status: existing.status },
+          "Stripe webhook: already processed, skipping duplicate event",
+        );
         res.json({ received: true });
         return;
       }
@@ -278,7 +295,10 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
     }
 
     if (booking.status === "paid") {
-      logger.info({ bookingId: booking.id, invoiceId }, "invoice.paid: already marked paid, skipping");
+      logger.info(
+        { bookingId: booking.id, invoiceId },
+        "invoice.paid: already marked paid, skipping",
+      );
       res.json({ received: true });
       return;
     }
@@ -296,27 +316,41 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
       .set({
         status: "paid",
         updatedAt: new Date(),
-        ...(paymentIntentId ? { paymentMethod: "card" as const, stripePaymentIntentId: paymentIntentId } : {}),
+        ...(paymentIntentId
+          ? { paymentMethod: "card" as const, stripePaymentIntentId: paymentIntentId }
+          : {}),
       })
       .where(eq(bookingsTable.id, booking.id));
 
     logger.info(
-      { bookingId: booking.id, invoiceId, orderRef: booking.orderReference, paymentIntentId, paymentMethod: paymentIntentId ? "card" : booking.paymentMethod },
-      "invoice.paid: booking marked as paid"
+      {
+        bookingId: booking.id,
+        invoiceId,
+        orderRef: booking.orderReference,
+        paymentIntentId,
+        paymentMethod: paymentIntentId ? "card" : booking.paymentMethod,
+      },
+      "invoice.paid: booking marked as paid",
     );
 
     // Re-sync to Google Sheets so the status column reflects "paid"
     try {
       await syncBookingToSheets(booking.id);
     } catch (err) {
-      logger.error({ err, bookingId: booking.id }, "invoice.paid: failed to re-sync to Google Sheets");
+      logger.error(
+        { err, bookingId: booking.id },
+        "invoice.paid: failed to re-sync to Google Sheets",
+      );
     }
 
     // Notify the organiser that the invoice has been settled
     try {
       await sendOrganiserNotification(booking.id);
     } catch (err) {
-      logger.error({ err, bookingId: booking.id }, "invoice.paid: failed to send organiser notification");
+      logger.error(
+        { err, bookingId: booking.id },
+        "invoice.paid: failed to send organiser notification",
+      );
     }
   }
 
@@ -327,7 +361,10 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
     const bookingId = parseInt(session.metadata?.bookingId || "0", 10);
 
     if (bookingId) {
-      const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
+      const [booking] = await db
+        .select()
+        .from(bookingsTable)
+        .where(eq(bookingsTable.id, bookingId));
 
       if (booking && booking.status === "pending_payment") {
         await db
@@ -340,7 +377,10 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
         try {
           await sendCheckoutExpiredEmail(bookingId);
         } catch (err) {
-          logger.error({ err, bookingId }, "checkout.session.expired: failed to send expired email");
+          logger.error(
+            { err, bookingId },
+            "checkout.session.expired: failed to send expired email",
+          );
         }
       }
     }
@@ -349,7 +389,8 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
   // A charge was refunded — mark the booking as refunded and email the customer, but only for full refunds.
   if (event.type === "charge.refunded") {
     const charge = event.data.object as Stripe.Charge;
-    const paymentIntentId = typeof charge.payment_intent === "string" ? charge.payment_intent : null;
+    const paymentIntentId =
+      typeof charge.payment_intent === "string" ? charge.payment_intent : null;
     const isFullRefund = charge.refunded === true || charge.amount_refunded >= charge.amount;
 
     if (paymentIntentId) {
@@ -359,25 +400,42 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
         .where(eq(bookingsTable.stripePaymentIntentId, paymentIntentId));
 
       if (booking && !isFullRefund) {
-        logger.info({ bookingId: booking.id, paymentIntentId, amountRefunded: charge.amount_refunded, total: charge.amount }, "charge.refunded: partial refund — booking status unchanged");
+        logger.info(
+          {
+            bookingId: booking.id,
+            paymentIntentId,
+            amountRefunded: charge.amount_refunded,
+            total: charge.amount,
+          },
+          "charge.refunded: partial refund — booking status unchanged",
+        );
       } else if (booking && isFullRefund && booking.status !== "refunded") {
         await db
           .update(bookingsTable)
           .set({ status: "refunded", updatedAt: new Date() })
           .where(eq(bookingsTable.id, booking.id));
 
-        logger.info({ bookingId: booking.id, paymentIntentId, amountRefunded: charge.amount_refunded }, "charge.refunded: full refund — booking marked refunded");
+        logger.info(
+          { bookingId: booking.id, paymentIntentId, amountRefunded: charge.amount_refunded },
+          "charge.refunded: full refund — booking marked refunded",
+        );
 
         try {
           await sendRefundConfirmationEmail(booking.id, charge.amount_refunded);
         } catch (err) {
-          logger.error({ err, bookingId: booking.id }, "charge.refunded: failed to send refund confirmation email");
+          logger.error(
+            { err, bookingId: booking.id },
+            "charge.refunded: failed to send refund confirmation email",
+          );
         }
 
         try {
           await syncBookingToSheets(booking.id);
         } catch (err) {
-          logger.error({ err, bookingId: booking.id }, "charge.refunded: failed to re-sync to Google Sheets");
+          logger.error(
+            { err, bookingId: booking.id },
+            "charge.refunded: failed to re-sync to Google Sheets",
+          );
         }
       }
     }
@@ -397,7 +455,10 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
     if (booking) {
       // Attempt to retrieve the payment intent to get the specific decline reason
       let declineReason: string | undefined;
-      const piId = typeof (invoice as unknown as Record<string, unknown>).payment_intent === "string" ? (invoice as unknown as Record<string, unknown>).payment_intent as string : null;
+      const piId =
+        typeof (invoice as unknown as Record<string, unknown>).payment_intent === "string"
+          ? ((invoice as unknown as Record<string, unknown>).payment_intent as string)
+          : null;
       if (piId && stripe) {
         try {
           const pi = await stripe.paymentIntents.retrieve(piId);
@@ -407,17 +468,26 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
             declineReason = DECLINE_CODE_LABELS[code] || err.message || undefined;
           }
         } catch (piErr) {
-          logger.warn({ piErr, piId }, "invoice.payment_failed: could not retrieve payment intent for decline reason");
+          logger.warn(
+            { piErr, piId },
+            "invoice.payment_failed: could not retrieve payment intent for decline reason",
+          );
         }
       }
 
       const attemptCount = invoice.attempt_count ?? undefined;
-      logger.info({ bookingId: booking.id, invoiceId, declineReason, attemptCount }, "invoice.payment_failed: notifying customer");
+      logger.info(
+        { bookingId: booking.id, invoiceId, declineReason, attemptCount },
+        "invoice.payment_failed: notifying customer",
+      );
 
       try {
         await sendInvoicePaymentFailedEmail(booking.id, declineReason, attemptCount);
       } catch (err) {
-        logger.error({ err, bookingId: booking.id }, "invoice.payment_failed: failed to send notification email");
+        logger.error(
+          { err, bookingId: booking.id },
+          "invoice.payment_failed: failed to send notification email",
+        );
       }
     }
   }
@@ -436,7 +506,10 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
           const charge = await stripe.charges.retrieve(chargeId);
           piId = typeof charge.payment_intent === "string" ? charge.payment_intent : null;
         } catch (chargeErr) {
-          logger.warn({ chargeErr, chargeId }, "charge.dispute.created: could not retrieve charge to resolve payment intent");
+          logger.warn(
+            { chargeErr, chargeId },
+            "charge.dispute.created: could not retrieve charge to resolve payment intent",
+          );
         }
       }
     }
@@ -458,21 +531,33 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
           ? new Date(dispute.evidence_details.due_by * 1000)
           : null;
 
-        logger.info({ bookingId: booking.id, disputeId: dispute.id, reason: dispute.reason, dueBy }, "dispute.created: booking marked as disputed");
+        logger.info(
+          { bookingId: booking.id, disputeId: dispute.id, reason: dispute.reason, dueBy },
+          "dispute.created: booking marked as disputed",
+        );
 
         try {
           await sendDisputeAlertEmail(booking.id, dispute.id, dispute.amount, reasonLabel, dueBy);
         } catch (err) {
-          logger.error({ err, bookingId: booking.id, disputeId: dispute.id }, "dispute.created: failed to send alert email");
+          logger.error(
+            { err, bookingId: booking.id, disputeId: dispute.id },
+            "dispute.created: failed to send alert email",
+          );
         }
 
         try {
           await syncBookingToSheets(booking.id);
         } catch (err) {
-          logger.error({ err, bookingId: booking.id }, "dispute.created: failed to re-sync to Google Sheets");
+          logger.error(
+            { err, bookingId: booking.id },
+            "dispute.created: failed to re-sync to Google Sheets",
+          );
         }
       } else {
-        logger.info({ piId, disputeId: dispute.id }, "dispute.created: no matching booking found, skipping");
+        logger.info(
+          { piId, disputeId: dispute.id },
+          "dispute.created: no matching booking found, skipping",
+        );
       }
     }
   }
@@ -523,14 +608,18 @@ router.post("/stripe/confirm-card-payment", async (req, res): Promise<void> => {
   }
 
   const sessionHeader = req.headers["x-booking-session"] as string | undefined;
-  const ownsBooking = sessionHeader && existing.sessionToken && sessionHeader === existing.sessionToken;
+  const ownsBooking =
+    sessionHeader && existing.sessionToken && sessionHeader === existing.sessionToken;
   if (!ownsBooking) {
     res.status(403).json({ error: "Forbidden — invalid booking session" });
     return;
   }
 
   if (existing.status === "paid" || existing.status === "invoiced") {
-    logger.info({ bookingId: id, status: existing.status }, "confirm-card-payment: already processed");
+    logger.info(
+      { bookingId: id, status: existing.status },
+      "confirm-card-payment: already processed",
+    );
     res.json({ alreadyProcessed: true, orderReference: existing.orderReference || "" });
     return;
   }
@@ -546,27 +635,36 @@ router.post("/stripe/confirm-card-payment", async (req, res): Promise<void> => {
     // Verify this Stripe session was created for this booking (prevents cross-session abuse)
     const sessionBookingId = session.metadata?.bookingId;
     if (!sessionBookingId || String(sessionBookingId) !== String(id)) {
-      logger.warn({ bookingId: id, sessionBookingId, sessionId }, "confirm-card-payment: session/booking mismatch");
+      logger.warn(
+        { bookingId: id, sessionBookingId, sessionId },
+        "confirm-card-payment: session/booking mismatch",
+      );
       res.status(403).json({ error: "Stripe session does not belong to this booking" });
       return;
     }
 
     // Verify the stored stripeSessionId matches (if we have one)
     if (existing.stripeSessionId && existing.stripeSessionId !== sessionId) {
-      logger.warn({ bookingId: id, storedSessionId: existing.stripeSessionId, sessionId }, "confirm-card-payment: sessionId mismatch");
+      logger.warn(
+        { bookingId: id, storedSessionId: existing.stripeSessionId, sessionId },
+        "confirm-card-payment: sessionId mismatch",
+      );
       res.status(403).json({ error: "Stripe session ID does not match booking record" });
       return;
     }
 
     const orderRef = existing.orderReference || `HRAS26-${6541 + id}`;
 
-    await db.update(bookingsTable).set({
-      status: "paid",
-      currentStep: 5,
-      stripePaymentIntentId: session.payment_intent as string | null,
-      orderReference: orderRef,
-      paymentMethod: "card",
-    }).where(eq(bookingsTable.id, id));
+    await db
+      .update(bookingsTable)
+      .set({
+        status: "paid",
+        currentStep: 5,
+        stripePaymentIntentId: session.payment_intent as string | null,
+        orderReference: orderRef,
+        paymentMethod: "card",
+      })
+      .where(eq(bookingsTable.id, id));
 
     if (existing.promoCode) {
       const reserved = await incrementPromoUsage(existing.promoCode, existing.quantity);
@@ -578,11 +676,29 @@ router.post("/stripe/confirm-card-payment", async (req, res): Promise<void> => {
       }
     }
 
-    try { await sendBookingEmails(id); } catch (err) { logger.error({ err, bookingId: id }, "Failed to send booking emails after confirm-card-payment"); }
-    try { await sendOrganiserNotification(id); } catch (err) { logger.error({ err, bookingId: id }, "Failed to send organiser notification after confirm"); }
-    try { await syncBookingToSheets(id); } catch (err) { logger.error({ err, bookingId: id }, "Failed to sync to Google Sheets after confirm"); }
+    try {
+      await sendBookingEmails(id);
+    } catch (err) {
+      logger.error(
+        { err, bookingId: id },
+        "Failed to send booking emails after confirm-card-payment",
+      );
+    }
+    try {
+      await sendOrganiserNotification(id);
+    } catch (err) {
+      logger.error({ err, bookingId: id }, "Failed to send organiser notification after confirm");
+    }
+    try {
+      await syncBookingToSheets(id);
+    } catch (err) {
+      logger.error({ err, bookingId: id }, "Failed to sync to Google Sheets after confirm");
+    }
 
-    logger.info({ bookingId: id, orderRef }, "confirm-card-payment: booking confirmed and emails sent");
+    logger.info(
+      { bookingId: id, orderRef },
+      "confirm-card-payment: booking confirmed and emails sent",
+    );
     res.json({ alreadyProcessed: false, orderReference: orderRef });
   } catch (err: any) {
     const msg = err?.raw?.message || err?.message || "Stripe error";
@@ -590,8 +706,6 @@ router.post("/stripe/confirm-card-payment", async (req, res): Promise<void> => {
     res.status(502).json({ error: `Failed to verify payment: ${msg}` });
   }
 });
-
-
 
 router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
   const stripe = getStripe();
@@ -615,7 +729,8 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
   }
 
   const sessionHeader = req.headers["x-booking-session"] as string | undefined;
-  const ownsBooking = sessionHeader && booking.sessionToken && sessionHeader === booking.sessionToken;
+  const ownsBooking =
+    sessionHeader && booking.sessionToken && sessionHeader === booking.sessionToken;
   if (!ownsBooking) {
     res.status(403).json({ error: "Forbidden — invalid booking session" });
     return;
@@ -633,7 +748,9 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
   }
 
   if (await isPromoOncePerCustomerViolation(booking.id, booking.promoCode)) {
-    res.status(400).json({ error: "This promo code has already been used on a previous booking with this email" });
+    res.status(400).json({
+      error: "This promo code has already been used on a previous booking with this email",
+    });
     return;
   }
 
@@ -663,11 +780,14 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
       return;
     }
 
-    await db.update(bookingsTable).set({
-      currentStep: 5,
-      orderReference: orderRef,
-      paymentMethod: "invoice",
-    }).where(eq(bookingsTable.id, id));
+    await db
+      .update(bookingsTable)
+      .set({
+        currentStep: 5,
+        orderReference: orderRef,
+        paymentMethod: "invoice",
+      })
+      .where(eq(bookingsTable.id, id));
 
     if (booking.promoCode) {
       const reserved = await incrementPromoUsage(booking.promoCode, booking.quantity);
@@ -679,9 +799,21 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
       }
     }
 
-    try { await sendBookingEmails(id); } catch (err) { logger.error({ err }, "Failed to send booking emails after Stripe invoice"); }
-    try { await sendOrganiserNotification(id); } catch (err) { logger.error({ err }, "Failed to send organiser notification"); }
-    try { await syncBookingToSheets(id); } catch (err) { logger.error({ err }, "Failed to sync to Google Sheets"); }
+    try {
+      await sendBookingEmails(id);
+    } catch (err) {
+      logger.error({ err }, "Failed to send booking emails after Stripe invoice");
+    }
+    try {
+      await sendOrganiserNotification(id);
+    } catch (err) {
+      logger.error({ err }, "Failed to send organiser notification");
+    }
+    try {
+      await syncBookingToSheets(id);
+    } catch (err) {
+      logger.error({ err }, "Failed to sync to Google Sheets");
+    }
 
     res.json({
       invoiceId: result.invoiceId,
@@ -696,7 +828,6 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
     res.status(502).json({ error: `Failed to create invoice: ${msg}` });
     return;
   }
-
 });
 
 export default router;

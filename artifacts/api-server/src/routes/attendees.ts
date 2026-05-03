@@ -42,10 +42,24 @@ router.post("/bookings/:bookingId/attendees", async (req, res): Promise<void> =>
     }
   }
 
-  const { firstName, lastName, jobTitle, company, workEmail, phone, dietaryAccessibility, gdprConsent, isLead, seatIndex, isTbc } = req.body;
+  const {
+    firstName,
+    lastName,
+    jobTitle,
+    company,
+    workEmail,
+    phone,
+    dietaryAccessibility,
+    gdprConsent,
+    isLead,
+    seatIndex,
+    isTbc,
+  } = req.body;
 
   if (!isTbc && (!firstName || !lastName || !jobTitle || !company || !workEmail)) {
-    res.status(400).json({ error: "firstName, lastName, jobTitle, company, workEmail are required" });
+    res
+      .status(400)
+      .json({ error: "firstName, lastName, jobTitle, company, workEmail are required" });
     return;
   }
 
@@ -58,12 +72,12 @@ router.post("/bookings/:bookingId/attendees", async (req, res): Promise<void> =>
     firstName: isTbc ? "TBC" : firstName,
     lastName: isTbc ? "TBC" : lastName,
     jobTitle: isTbc ? "TBC" : jobTitle,
-    company: isTbc ? (company || "TBC") : company,
+    company: isTbc ? company || "TBC" : company,
     workEmail: isTbc ? tbcEmail : workEmail,
     phone: phone || null,
-    dietaryAccessibility: isTbc ? null : (dietaryAccessibility || null),
+    dietaryAccessibility: isTbc ? null : dietaryAccessibility || null,
     gdprConsent: isTbc ? false : !!gdprConsent,
-    gdprConsentAt: (!isTbc && gdprConsent) ? new Date() : null,
+    gdprConsentAt: !isTbc && gdprConsent ? new Date() : null,
     isLead: !!isLead,
     seatIndex: resolvedSeatIndex,
   };
@@ -78,25 +92,25 @@ router.post("/bookings/:bookingId/attendees", async (req, res): Promise<void> =>
 
   let attendee;
   if (existing) {
-    ([attendee] = await db
+    [attendee] = await db
       .update(attendeesTable)
       .set(values)
       .where(eq(attendeesTable.id, existing.id))
-      .returning());
+      .returning();
   } else {
-    ([attendee] = await db
-      .insert(attendeesTable)
-      .values(values)
-      .returning());
+    [attendee] = await db.insert(attendeesTable).values(values).returning();
   }
 
   res.status(existing ? 200 : 201).json(formatAttendee(attendee));
-
 });
 
 router.patch("/bookings/:bookingId/attendees/:attendeeId", async (req, res): Promise<void> => {
-  const rawBooking = Array.isArray(req.params.bookingId) ? req.params.bookingId[0] : req.params.bookingId;
-  const rawAttendee = Array.isArray(req.params.attendeeId) ? req.params.attendeeId[0] : req.params.attendeeId;
+  const rawBooking = Array.isArray(req.params.bookingId)
+    ? req.params.bookingId[0]
+    : req.params.bookingId;
+  const rawAttendee = Array.isArray(req.params.attendeeId)
+    ? req.params.attendeeId[0]
+    : req.params.attendeeId;
   const bookingId = parseInt(rawBooking, 10);
   const attendeeId = parseInt(rawAttendee, 10);
 
@@ -124,7 +138,17 @@ router.patch("/bookings/:bookingId/attendees/:attendeeId", async (req, res): Pro
     return;
   }
 
-  const { firstName, lastName, jobTitle, company, workEmail, phone, dietaryAccessibility, gdprConsent, isTbc } = req.body;
+  const {
+    firstName,
+    lastName,
+    jobTitle,
+    company,
+    workEmail,
+    phone,
+    dietaryAccessibility,
+    gdprConsent,
+    isTbc,
+  } = req.body;
 
   const updateData: Partial<typeof attendeesTable.$inferInsert> = {};
 
@@ -155,7 +179,8 @@ router.patch("/bookings/:bookingId/attendees/:attendeeId", async (req, res): Pro
     if (company !== undefined) updateData.company = company;
     if (workEmail !== undefined) updateData.workEmail = workEmail;
     if (phone !== undefined) updateData.phone = phone || null;
-    if (dietaryAccessibility !== undefined) updateData.dietaryAccessibility = dietaryAccessibility || null;
+    if (dietaryAccessibility !== undefined)
+      updateData.dietaryAccessibility = dietaryAccessibility || null;
     if (gdprConsent !== undefined) {
       updateData.gdprConsent = !!gdprConsent;
       updateData.gdprConsentAt = gdprConsent ? new Date() : null;
@@ -177,14 +202,27 @@ router.patch("/attendees/:id/managed", async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const attendeeId = parseInt(raw, 10);
 
-  const { managementToken, firstName, lastName, jobTitle, company, workEmail, phone, dietaryAccessibility, gdprConsent } = req.body;
+  const {
+    managementToken,
+    firstName,
+    lastName,
+    jobTitle,
+    company,
+    workEmail,
+    phone,
+    dietaryAccessibility,
+    gdprConsent,
+  } = req.body;
 
   if (!managementToken) {
     res.status(400).json({ error: "managementToken is required" });
     return;
   }
 
-  const [attendee] = await db.select().from(attendeesTable).where(eq(attendeesTable.id, attendeeId));
+  const [attendee] = await db
+    .select()
+    .from(attendeesTable)
+    .where(eq(attendeesTable.id, attendeeId));
   if (!attendee) {
     res.status(404).json({ error: "Attendee not found" });
     return;
@@ -221,7 +259,9 @@ router.patch("/attendees/:id/managed", async (req, res): Promise<void> => {
   }
 
   if (!firstName || !lastName || !jobTitle || !company || !workEmail) {
-    res.status(400).json({ error: "firstName, lastName, jobTitle, company, workEmail are required" });
+    res
+      .status(400)
+      .json({ error: "firstName, lastName, jobTitle, company, workEmail are required" });
     return;
   }
 
@@ -247,18 +287,26 @@ router.patch("/attendees/:id/managed", async (req, res): Promise<void> => {
   res.json(formatAttendee(updated));
 
   // Log to activity_log
-  db.insert(activityLogTable).values({
-    type: wasTbc ? "tbc_filled" : "attendee_change",
-    bookingId: booking.id,
-    attendeeId,
-    data: { firstName, lastName, jobTitle, company, workEmail, wasTbc },
-  }).catch(() => {});
+  db.insert(activityLogTable)
+    .values({
+      type: wasTbc ? "tbc_filled" : "attendee_change",
+      bookingId: booking.id,
+      attendeeId,
+      data: { firstName, lastName, jobTitle, company, workEmail, wasTbc },
+    })
+    .catch(() => {});
 
   // Send welcome email to the attendee who just registered/updated
   sendWelcomeEmail(booking.id, firstName, workEmail).catch(() => {});
 
   // Fire and forget — notify organisers that an attendee updated their details
-  sendAttendeeChangeNotification(booking.id, attendeeId, { firstName, lastName, jobTitle, company, workEmail }).catch(() => {});
+  sendAttendeeChangeNotification(booking.id, attendeeId, {
+    firstName,
+    lastName,
+    jobTitle,
+    company,
+    workEmail,
+  }).catch(() => {});
 });
 
 export default router;

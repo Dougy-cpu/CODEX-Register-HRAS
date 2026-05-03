@@ -40,7 +40,8 @@ export default function CheckoutFlow() {
   const [optimisticBooking, setOptimisticBooking] = useState<BookingWithAttendees | null>(null);
   const [step1Error, setStep1Error] = useState<string | null>(null);
 
-  const isStripeReturn = typeof window !== "undefined" &&
+  const isStripeReturn =
+    typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).has(STRIPE_RETURN_PARAM);
 
   const [pollingForPayment, setPollingForPayment] = useState(isStripeReturn);
@@ -52,7 +53,7 @@ export default function CheckoutFlow() {
     query: {
       queryKey: ["booking", sessionToken],
       enabled: !!sessionToken,
-    }
+    },
   });
 
   useEffect(() => {
@@ -63,7 +64,12 @@ export default function CheckoutFlow() {
     pollStartRef.current = Date.now();
 
     const tryConfirmCardPayment = async () => {
-      if (stripeSessionId && booking?.id && booking.status !== "paid" && booking.status !== "invoiced") {
+      if (
+        stripeSessionId &&
+        booking?.id &&
+        booking.status !== "paid" &&
+        booking.status !== "invoiced"
+      ) {
         try {
           await customFetch("/api/stripe/confirm-card-payment", {
             method: "POST",
@@ -99,7 +105,7 @@ export default function CheckoutFlow() {
     return () => {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pollingForPayment, sessionToken, booking?.id]);
 
   useEffect(() => {
@@ -116,7 +122,10 @@ export default function CheckoutFlow() {
     }
   }, [booking?.currentStep, optimisticStep]);
 
-  const onAdvance = (step: number | null, formData?: { attendeeType: string; sessionToken: string }) => {
+  const onAdvance = (
+    step: number | null,
+    formData?: { attendeeType: string; sessionToken: string },
+  ) => {
     setOptimisticStep(step);
     if (step !== null && formData) {
       setStep1Error(null);
@@ -161,7 +170,9 @@ export default function CheckoutFlow() {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           <div>
             <p className="text-2xl font-bold mb-2">Confirming your payment&hellip;</p>
-            <p className="text-muted-foreground">Please wait while we finalise your registration.</p>
+            <p className="text-muted-foreground">
+              Please wait while we finalise your registration.
+            </p>
           </div>
         </div>
       </CheckoutLayout>
@@ -172,10 +183,12 @@ export default function CheckoutFlow() {
     return (
       <CheckoutLayout currentStep={4}>
         <div className="flex flex-col items-center justify-center py-24 gap-6 text-center">
-          <p className="text-2xl font-bold mb-2">Payment confirmation is taking longer than expected.</p>
+          <p className="text-2xl font-bold mb-2">
+            Payment confirmation is taking longer than expected.
+          </p>
           <p className="text-muted-foreground">
-            If you completed payment, your registration will be confirmed shortly and you'll receive a confirmation email.
-            You can safely close this page.
+            If you completed payment, your registration will be confirmed shortly and you'll receive
+            a confirmation email. You can safely close this page.
           </p>
         </div>
       </CheckoutLayout>
@@ -188,7 +201,15 @@ export default function CheckoutFlow() {
   const renderStep = () => {
     switch (currentStep) {
       case 1:
-        return <Step1Lead sessionToken={sessionToken} booking={booking} onAdvance={onAdvance} submitError={step1Error} onSubmitError={setStep1Error} />;
+        return (
+          <Step1Lead
+            sessionToken={sessionToken}
+            booking={booking}
+            onAdvance={onAdvance}
+            submitError={step1Error}
+            onSubmitError={setStep1Error}
+          />
+        );
       case 2:
         return effectiveBooking ? <Step2Passes booking={effectiveBooking} /> : null;
       case 3:
@@ -198,7 +219,15 @@ export default function CheckoutFlow() {
       case 5:
         return effectiveBooking ? <Confirmation booking={effectiveBooking} /> : null;
       default:
-        return <Step1Lead sessionToken={sessionToken} booking={booking} onAdvance={onAdvance} submitError={step1Error} onSubmitError={setStep1Error} />;
+        return (
+          <Step1Lead
+            sessionToken={sessionToken}
+            booking={booking}
+            onAdvance={onAdvance}
+            submitError={step1Error}
+            onSubmitError={setStep1Error}
+          />
+        );
     }
   };
 

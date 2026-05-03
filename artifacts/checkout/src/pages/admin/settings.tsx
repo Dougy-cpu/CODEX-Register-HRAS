@@ -3,7 +3,21 @@ import AdminLayout from "@/components/layout/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, Lock, Unlock, Settings2, Loader2, Globe, ShieldCheck, CalendarDays, ChevronUp, ChevronDown, Trash2, Plus, ListChecks } from "lucide-react";
+import {
+  Check,
+  Lock,
+  Unlock,
+  Settings2,
+  Loader2,
+  Globe,
+  ShieldCheck,
+  CalendarDays,
+  ChevronUp,
+  ChevronDown,
+  Trash2,
+  Plus,
+  ListChecks,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 
@@ -38,16 +52,25 @@ interface EventSettings {
 function tzOffsetMinutes(tz: string, utcDate: Date): number {
   try {
     const fmt = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz, hourCycle: "h23",
-      year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit", second: "2-digit",
+      timeZone: tz,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
     });
     const parts = fmt.formatToParts(utcDate);
     const map: Record<string, string> = {};
     for (const p of parts) if (p.type !== "literal") map[p.type] = p.value;
     const asUtc = Date.UTC(
-      Number(map.year), Number(map.month) - 1, Number(map.day),
-      Number(map.hour), Number(map.minute), Number(map.second),
+      Number(map.year),
+      Number(map.month) - 1,
+      Number(map.day),
+      Number(map.hour),
+      Number(map.minute),
+      Number(map.second),
     );
     return (asUtc - utcDate.getTime()) / 60000;
   } catch {
@@ -63,9 +86,13 @@ function isoToTzWallClock(iso: string | null | undefined, tz: string): string {
   if (isNaN(d.getTime())) return "";
   try {
     const fmt = new Intl.DateTimeFormat("en-CA", {
-      timeZone: tz, hourCycle: "h23",
-      year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit",
+      timeZone: tz,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
     });
     const parts = fmt.formatToParts(d);
     const map: Record<string, string> = {};
@@ -105,7 +132,10 @@ function adminFetch(path: string, init?: RequestInit) {
   });
 }
 
-async function saveLockSettings(locked: boolean, message: string | null): Promise<{ ok: boolean; error?: string }> {
+async function saveLockSettings(
+  locked: boolean,
+  message: string | null,
+): Promise<{ ok: boolean; error?: string }> {
   try {
     const res = await adminFetch("/api/admin/event-settings", {
       method: "PUT",
@@ -186,7 +216,9 @@ export default function AdminSettings() {
         setHauTotalAnswered(data.totalAnswered ?? 0);
         setHauTotalBookings(data.totalBookings ?? 0);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     setHauLoading(false);
   }, []);
 
@@ -199,7 +231,7 @@ export default function AdminSettings() {
   useEffect(() => {
     setLoading(true);
     adminFetch("/api/admin/event-settings")
-      .then(res => res.ok ? res.json() : null)
+      .then((res) => (res.ok ? res.json() : null))
       .then((data: EventSettings | null) => {
         if (data) {
           const lockState = {
@@ -242,8 +274,13 @@ export default function AdminSettings() {
     const label = hauNewLabel.trim();
     if (!label) return;
     setHauAdding(true);
-    const optimistic: HauOption = { id: Date.now(), label, position: hauOptions.length, responseCount: 0 };
-    setHauOptions(prev => [...prev, optimistic]);
+    const optimistic: HauOption = {
+      id: Date.now(),
+      label,
+      position: hauOptions.length,
+      responseCount: 0,
+    };
+    setHauOptions((prev) => [...prev, optimistic]);
     setHauNewLabel("");
     try {
       const res = await adminFetch("/api/admin/hear-about-us-options", {
@@ -253,25 +290,25 @@ export default function AdminSettings() {
       if (res.ok) {
         await loadHauOptions();
       } else {
-        setHauOptions(prev => prev.filter(o => o.id !== optimistic.id));
+        setHauOptions((prev) => prev.filter((o) => o.id !== optimistic.id));
         setHauNewLabel(label);
       }
     } catch {
-      setHauOptions(prev => prev.filter(o => o.id !== optimistic.id));
+      setHauOptions((prev) => prev.filter((o) => o.id !== optimistic.id));
       setHauNewLabel(label);
     }
     setHauAdding(false);
   };
 
   const hauDeleteOption = async (id: number) => {
-    const removedIdx = hauOptions.findIndex(o => o.id === id);
+    const removedIdx = hauOptions.findIndex((o) => o.id === id);
     if (removedIdx === -1) return;
     const removed = hauOptions[removedIdx];
 
-    setHauOptions(opt => opt.filter(o => o.id !== id));
+    setHauOptions((opt) => opt.filter((o) => o.id !== id));
 
     const restoreOption = () => {
-      setHauOptions(curr => {
+      setHauOptions((curr) => {
         const next = [...curr];
         next.splice(Math.min(removedIdx, next.length), 0, removed);
         return next;
@@ -282,12 +319,20 @@ export default function AdminSettings() {
       const res = await adminFetch(`/api/admin/hear-about-us-options/${id}`, { method: "DELETE" });
       if (!res.ok) {
         restoreOption();
-        toast({ title: "Could not remove option", description: "The option was restored. Please try again.", variant: "destructive" });
+        toast({
+          title: "Could not remove option",
+          description: "The option was restored. Please try again.",
+          variant: "destructive",
+        });
         return;
       }
     } catch {
       restoreOption();
-      toast({ title: "Could not remove option", description: "Network error — the option was restored.", variant: "destructive" });
+      toast({
+        title: "Could not remove option",
+        description: "Network error — the option was restored.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -306,7 +351,9 @@ export default function AdminSettings() {
               if (res.ok) {
                 await loadHauOptions();
               }
-            } catch { /* ignore — user can re-add manually */ }
+            } catch {
+              /* ignore — user can re-add manually */
+            }
           }}
         >
           Undo
@@ -316,7 +363,7 @@ export default function AdminSettings() {
   };
 
   const hauMoveOption = async (id: number, direction: "up" | "down") => {
-    const idx = hauOptions.findIndex(o => o.id === id);
+    const idx = hauOptions.findIndex((o) => o.id === id);
     if (idx === -1) return;
     const swapIdx = direction === "up" ? idx - 1 : idx + 1;
     if (swapIdx < 0 || swapIdx >= hauOptions.length) return;
@@ -328,7 +375,9 @@ export default function AdminSettings() {
         method: "PUT",
         body: JSON.stringify({ direction }),
       });
-    } catch { /* revert would be ideal but this is a rare path */ }
+    } catch {
+      /* revert would be ideal but this is a rare path */
+    }
   };
 
   const persistLock = useCallback(async (locked: boolean, message: string | null) => {
@@ -347,14 +396,14 @@ export default function AdminSettings() {
   const handleToggleLock = (locked: boolean) => {
     const message = form.attendeeChangesLockedMessage || DEFAULT_LOCKED_MESSAGE;
     latestLockRef.current = { locked, message };
-    setForm(f => ({ ...f, attendeeChangesLocked: locked }));
+    setForm((f) => ({ ...f, attendeeChangesLocked: locked }));
     persistLock(locked, message);
   };
 
   const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const message = e.target.value;
     latestLockRef.current = { ...latestLockRef.current, message };
-    setForm(f => ({ ...f, attendeeChangesLockedMessage: message }));
+    setForm((f) => ({ ...f, attendeeChangesLockedMessage: message }));
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       const { locked, message: msg } = latestLockRef.current;
@@ -428,8 +477,14 @@ export default function AdminSettings() {
   const handleSaveRef = async () => {
     const prefix = form.refPrefix.trim();
     const offset = parseInt(String(form.refOffset), 10);
-    if (!prefix) { setRefError("Prefix is required"); return; }
-    if (isNaN(offset) || offset < 0) { setRefError("Offset must be a non-negative number"); return; }
+    if (!prefix) {
+      setRefError("Prefix is required");
+      return;
+    }
+    if (isNaN(offset) || offset < 0) {
+      setRefError("Offset must be a non-negative number");
+      return;
+    }
     setRefSaving(true);
     setRefError("");
     setRefSaved(false);
@@ -458,7 +513,6 @@ export default function AdminSettings() {
         </div>
       ) : (
         <div className="max-w-2xl space-y-8">
-
           {/* ── Event & Org Details ── */}
           <form onSubmit={handleSave} className="bg-white border border-border">
             <div className="px-6 py-4 border-b border-border flex items-center gap-3">
@@ -468,47 +522,96 @@ export default function AdminSettings() {
             <div className="p-6 space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Event Name</label>
-                  <Input value={form.eventName} onChange={e => setForm(f => ({ ...f, eventName: e.target.value }))} />
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                    Event Name
+                  </label>
+                  <Input
+                    value={form.eventName}
+                    onChange={(e) => setForm((f) => ({ ...f, eventName: e.target.value }))}
+                  />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Event Date</label>
-                  <Input value={form.eventDate} onChange={e => setForm(f => ({ ...f, eventDate: e.target.value }))} />
-                  <p className="mt-1 text-[11px] text-muted-foreground leading-snug">Display label only (shown in emails &amp; receipts). The exact start/end times for calendar invites live in the Calendar &amp; Scheduling section below.</p>
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                    Event Date
+                  </label>
+                  <Input
+                    value={form.eventDate}
+                    onChange={(e) => setForm((f) => ({ ...f, eventDate: e.target.value }))}
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground leading-snug">
+                    Display label only (shown in emails &amp; receipts). The exact start/end times
+                    for calendar invites live in the Calendar &amp; Scheduling section below.
+                  </p>
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Venue</label>
-                  <Input value={form.eventVenue} onChange={e => setForm(f => ({ ...f, eventVenue: e.target.value }))} />
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                    Venue
+                  </label>
+                  <Input
+                    value={form.eventVenue}
+                    onChange={(e) => setForm((f) => ({ ...f, eventVenue: e.target.value }))}
+                  />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Postcode</label>
-                  <Input value={form.eventVenuePostcode} onChange={e => setForm(f => ({ ...f, eventVenuePostcode: e.target.value }))} />
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                    Postcode
+                  </label>
+                  <Input
+                    value={form.eventVenuePostcode}
+                    onChange={(e) => setForm((f) => ({ ...f, eventVenuePostcode: e.target.value }))}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Organisation Name</label>
-                  <Input value={form.orgName} onChange={e => setForm(f => ({ ...f, orgName: e.target.value }))} />
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                    Organisation Name
+                  </label>
+                  <Input
+                    value={form.orgName}
+                    onChange={(e) => setForm((f) => ({ ...f, orgName: e.target.value }))}
+                  />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Organisation Address</label>
-                  <Input value={form.orgAddress} onChange={e => setForm(f => ({ ...f, orgAddress: e.target.value }))} />
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                    Organisation Address
+                  </label>
+                  <Input
+                    value={form.orgAddress}
+                    onChange={(e) => setForm((f) => ({ ...f, orgAddress: e.target.value }))}
+                  />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Website</label>
-                <Input value={form.orgWebsite} onChange={e => setForm(f => ({ ...f, orgWebsite: e.target.value }))} />
+                <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                  Website
+                </label>
+                <Input
+                  value={form.orgWebsite}
+                  onChange={(e) => setForm((f) => ({ ...f, orgWebsite: e.target.value }))}
+                />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Email Sender Name</label>
-                  <Input value={form.fromName} onChange={e => setForm(f => ({ ...f, fromName: e.target.value }))} />
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                    Email Sender Name
+                  </label>
+                  <Input
+                    value={form.fromName}
+                    onChange={(e) => setForm((f) => ({ ...f, fromName: e.target.value }))}
+                  />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Email Sender Address</label>
-                  <Input type="email" value={form.fromEmail} onChange={e => setForm(f => ({ ...f, fromEmail: e.target.value }))} />
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                    Email Sender Address
+                  </label>
+                  <Input
+                    type="email"
+                    value={form.fromEmail}
+                    onChange={(e) => setForm((f) => ({ ...f, fromEmail: e.target.value }))}
+                  />
                 </div>
               </div>
 
@@ -521,8 +624,14 @@ export default function AdminSettings() {
                   className={`h-10 px-6 ${saved ? "bg-green-600 hover:bg-green-700" : "bg-primary hover:bg-primary/90"} text-white`}
                 >
                   {saved ? (
-                    <span className="flex items-center gap-1.5"><Check className="w-4 h-4" /> Saved</span>
-                  ) : saving ? "Saving…" : "Save Changes"}
+                    <span className="flex items-center gap-1.5">
+                      <Check className="w-4 h-4" /> Saved
+                    </span>
+                  ) : saving ? (
+                    "Saving…"
+                  ) : (
+                    "Save Changes"
+                  )}
                 </Button>
               </div>
             </div>
@@ -536,43 +645,87 @@ export default function AdminSettings() {
             </div>
             <div className="p-6 space-y-6">
               <p className="text-sm text-muted-foreground">
-                Times entered here are interpreted in <code className="text-xs bg-muted px-1 py-0.5 rounded">{form.eventTimezone || "Europe/London"}</code> and used to build the Google / Outlook / .ics calendar invites. The <code className="text-xs bg-muted px-1 py-0.5 rounded">{"{{eventCalendarLinks}}"}</code> placeholder in welcome &amp; confirmation emails renders once both start &amp; end are set.
+                Times entered here are interpreted in{" "}
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">
+                  {form.eventTimezone || "Europe/London"}
+                </code>{" "}
+                and used to build the Google / Outlook / .ics calendar invites. The{" "}
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">
+                  {"{{eventCalendarLinks}}"}
+                </code>{" "}
+                placeholder in welcome &amp; confirmation emails renders once both start &amp; end
+                are set.
               </p>
 
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Starts At ({form.eventTimezone || "Europe/London"})</label>
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                      Starts At ({form.eventTimezone || "Europe/London"})
+                    </label>
                     <Input
                       type="datetime-local"
-                      value={isoToTzWallClock(form.eventStartAt, form.eventTimezone || "Europe/London")}
-                      onChange={e => setForm(f => ({ ...f, eventStartAt: tzWallClockToIso(e.target.value, f.eventTimezone || "Europe/London") }))}
+                      value={isoToTzWallClock(
+                        form.eventStartAt,
+                        form.eventTimezone || "Europe/London",
+                      )}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          eventStartAt: tzWallClockToIso(
+                            e.target.value,
+                            f.eventTimezone || "Europe/London",
+                          ),
+                        }))
+                      }
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Ends At ({form.eventTimezone || "Europe/London"})</label>
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                      Ends At ({form.eventTimezone || "Europe/London"})
+                    </label>
                     <Input
                       type="datetime-local"
-                      value={isoToTzWallClock(form.eventEndAt, form.eventTimezone || "Europe/London")}
-                      onChange={e => setForm(f => ({ ...f, eventEndAt: tzWallClockToIso(e.target.value, f.eventTimezone || "Europe/London") }))}
+                      value={isoToTzWallClock(
+                        form.eventEndAt,
+                        form.eventTimezone || "Europe/London",
+                      )}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          eventEndAt: tzWallClockToIso(
+                            e.target.value,
+                            f.eventTimezone || "Europe/London",
+                          ),
+                        }))
+                      }
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Timezone (IANA)</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                    Timezone (IANA)
+                  </label>
                   <Input
                     value={form.eventTimezone}
-                    onChange={e => setForm(f => ({ ...f, eventTimezone: e.target.value }))}
+                    onChange={(e) => setForm((f) => ({ ...f, eventTimezone: e.target.value }))}
                     placeholder="Europe/London"
                   />
-                  <p className="mt-1 text-[11px] text-muted-foreground leading-snug">Examples: Europe/London, America/New_York, Asia/Singapore. Recipients' calendar apps will translate to their own local time automatically.</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground leading-snug">
+                    Examples: Europe/London, America/New_York, Asia/Singapore. Recipients' calendar
+                    apps will translate to their own local time automatically.
+                  </p>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Description (shown in calendar invite)</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                    Description (shown in calendar invite)
+                  </label>
                   <Textarea
                     rows={3}
                     value={form.eventDescription ?? ""}
-                    onChange={e => setForm(f => ({ ...f, eventDescription: e.target.value || null }))}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, eventDescription: e.target.value || null }))
+                    }
                     placeholder="Join the UK's leading HR analytics conference…"
                   />
                 </div>
@@ -580,58 +733,101 @@ export default function AdminSettings() {
 
               <div className="space-y-4 pt-2 border-t border-border">
                 <div className="flex items-center justify-between pt-4">
-                  <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Pre-Event Social (Optional)</h3>
+                  <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
+                    Pre-Event Social (Optional)
+                  </h3>
                   <label className="flex items-center gap-2 text-sm cursor-pointer">
                     <input
                       type="checkbox"
                       checked={form.socialEnabled}
-                      onChange={e => setForm(f => ({ ...f, socialEnabled: e.target.checked }))}
+                      onChange={(e) => setForm((f) => ({ ...f, socialEnabled: e.target.checked }))}
                       className="w-4 h-4 accent-primary"
                     />
                     <span className="font-semibold">Enabled</span>
                   </label>
                 </div>
-                <fieldset disabled={!form.socialEnabled} className={form.socialEnabled ? "space-y-4" : "space-y-4 opacity-50"}>
+                <fieldset
+                  disabled={!form.socialEnabled}
+                  className={form.socialEnabled ? "space-y-4" : "space-y-4 opacity-50"}
+                >
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Event Name</label>
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                      Event Name
+                    </label>
                     <Input
                       value={form.socialName ?? ""}
-                      onChange={e => setForm(f => ({ ...f, socialName: e.target.value || null }))}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, socialName: e.target.value || null }))
+                      }
                       placeholder="Pre-Summit Drinks"
                     />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Starts At</label>
+                      <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                        Starts At
+                      </label>
                       <Input
                         type="datetime-local"
-                        value={isoToTzWallClock(form.socialStartAt, form.eventTimezone || "Europe/London")}
-                        onChange={e => setForm(f => ({ ...f, socialStartAt: tzWallClockToIso(e.target.value, f.eventTimezone || "Europe/London") }))}
+                        value={isoToTzWallClock(
+                          form.socialStartAt,
+                          form.eventTimezone || "Europe/London",
+                        )}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            socialStartAt: tzWallClockToIso(
+                              e.target.value,
+                              f.eventTimezone || "Europe/London",
+                            ),
+                          }))
+                        }
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Ends At</label>
+                      <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                        Ends At
+                      </label>
                       <Input
                         type="datetime-local"
-                        value={isoToTzWallClock(form.socialEndAt, form.eventTimezone || "Europe/London")}
-                        onChange={e => setForm(f => ({ ...f, socialEndAt: tzWallClockToIso(e.target.value, f.eventTimezone || "Europe/London") }))}
+                        value={isoToTzWallClock(
+                          form.socialEndAt,
+                          form.eventTimezone || "Europe/London",
+                        )}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            socialEndAt: tzWallClockToIso(
+                              e.target.value,
+                              f.eventTimezone || "Europe/London",
+                            ),
+                          }))
+                        }
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Venue</label>
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                      Venue
+                    </label>
                     <Input
                       value={form.socialVenue ?? ""}
-                      onChange={e => setForm(f => ({ ...f, socialVenue: e.target.value || null }))}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, socialVenue: e.target.value || null }))
+                      }
                       placeholder="The Botanist, Broadgate Circle"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Description</label>
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                      Description
+                    </label>
                     <Textarea
                       rows={2}
                       value={form.socialDescription ?? ""}
-                      onChange={e => setForm(f => ({ ...f, socialDescription: e.target.value || null }))}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, socialDescription: e.target.value || null }))
+                      }
                       placeholder="Drinks &amp; networking the evening before the summit."
                     />
                   </div>
@@ -648,8 +844,14 @@ export default function AdminSettings() {
                   className={`h-10 px-6 ${calSaved ? "bg-green-600 hover:bg-green-700" : "bg-primary hover:bg-primary/90"} text-white`}
                 >
                   {calSaved ? (
-                    <span className="flex items-center gap-1.5"><Check className="w-4 h-4" /> Saved</span>
-                  ) : calSaving ? "Saving…" : "Save Calendar Settings"}
+                    <span className="flex items-center gap-1.5">
+                      <Check className="w-4 h-4" /> Saved
+                    </span>
+                  ) : calSaving ? (
+                    "Saving…"
+                  ) : (
+                    "Save Calendar Settings"
+                  )}
                 </Button>
               </div>
             </div>
@@ -665,16 +867,23 @@ export default function AdminSettings() {
               )}
               <h2 className="font-bold text-base">Attendee Self-Service</h2>
               <div className="ml-auto flex items-center gap-2">
-                {lockSaving && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+                {lockSaving && (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+                )}
                 {lockSaved && !lockSaving && <Check className="w-3.5 h-3.5 text-green-600" />}
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${form.attendeeChangesLocked ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
+                <span
+                  className={`text-xs font-semibold px-2.5 py-1 rounded-full ${form.attendeeChangesLocked ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}
+                >
                   {form.attendeeChangesLocked ? "Locked" : "Open"}
                 </span>
               </div>
             </div>
             <div className="p-6 space-y-5">
               <p className="text-sm text-muted-foreground">
-                Control whether attendees can update their own details via the self-service management link. When locked, all <code className="text-xs bg-muted px-1 py-0.5 rounded">/manage/:token</code> links show a message instead of edit controls. Changes save immediately.
+                Control whether attendees can update their own details via the self-service
+                management link. When locked, all{" "}
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">/manage/:token</code> links
+                show a message instead of edit controls. Changes save immediately.
               </p>
 
               <div className="flex items-center gap-4">
@@ -688,12 +897,18 @@ export default function AdminSettings() {
                       : "border-border bg-white hover:border-muted-foreground"
                   }`}
                 >
-                  <Unlock className={`w-5 h-5 flex-shrink-0 ${!form.attendeeChangesLocked ? "text-green-600" : "text-muted-foreground"}`} />
+                  <Unlock
+                    className={`w-5 h-5 flex-shrink-0 ${!form.attendeeChangesLocked ? "text-green-600" : "text-muted-foreground"}`}
+                  />
                   <div className="text-left">
-                    <p className={`font-semibold text-sm ${!form.attendeeChangesLocked ? "text-green-700" : "text-foreground"}`}>
+                    <p
+                      className={`font-semibold text-sm ${!form.attendeeChangesLocked ? "text-green-700" : "text-foreground"}`}
+                    >
                       Allow changes
                     </p>
-                    <p className="text-xs text-muted-foreground">Attendees can update their details</p>
+                    <p className="text-xs text-muted-foreground">
+                      Attendees can update their details
+                    </p>
                   </div>
                 </button>
                 <button
@@ -706,12 +921,18 @@ export default function AdminSettings() {
                       : "border-border bg-white hover:border-muted-foreground"
                   }`}
                 >
-                  <Lock className={`w-5 h-5 flex-shrink-0 ${form.attendeeChangesLocked ? "text-red-500" : "text-muted-foreground"}`} />
+                  <Lock
+                    className={`w-5 h-5 flex-shrink-0 ${form.attendeeChangesLocked ? "text-red-500" : "text-muted-foreground"}`}
+                  />
                   <div className="text-left">
-                    <p className={`font-semibold text-sm ${form.attendeeChangesLocked ? "text-red-700" : "text-foreground"}`}>
+                    <p
+                      className={`font-semibold text-sm ${form.attendeeChangesLocked ? "text-red-700" : "text-foreground"}`}
+                    >
                       Lock changes
                     </p>
-                    <p className="text-xs text-muted-foreground">Show message, disable edit controls</p>
+                    <p className="text-xs text-muted-foreground">
+                      Show message, disable edit controls
+                    </p>
                   </div>
                 </button>
               </div>
@@ -728,7 +949,8 @@ export default function AdminSettings() {
                   placeholder={DEFAULT_LOCKED_MESSAGE}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Displayed prominently on the attendee management page when the lock is active. Saves automatically after you stop typing.
+                  Displayed prominently on the attendee management page when the lock is active.
+                  Saves automatically after you stop typing.
                 </p>
               </div>
 
@@ -744,40 +966,54 @@ export default function AdminSettings() {
             </div>
             <div className="p-6 space-y-5">
               <p className="text-sm text-muted-foreground">
-                References are generated as <strong>PREFIX-[OFFSET + booking ID]</strong>.
-                Adjust these when re-running the system for a new event to keep reference sequences clean and avoid conflicts with previous years.
+                References are generated as <strong>PREFIX-[OFFSET + booking ID]</strong>. Adjust
+                these when re-running the system for a new event to keep reference sequences clean
+                and avoid conflicts with previous years.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Prefix</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                    Prefix
+                  </label>
                   <Input
                     value={form.refPrefix}
-                    onChange={e => setForm(f => ({ ...f, refPrefix: e.target.value }))}
+                    onChange={(e) => setForm((f) => ({ ...f, refPrefix: e.target.value }))}
                     placeholder="HRAS26"
                     className="font-mono"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">e.g. HRAS27 for next year's event</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    e.g. HRAS27 for next year's event
+                  </p>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Offset</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                    Offset
+                  </label>
                   <Input
                     type="number"
                     min={0}
                     value={form.refOffset}
-                    onChange={e => setForm(f => ({ ...f, refOffset: parseInt(e.target.value, 10) || 0 }))}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, refOffset: parseInt(e.target.value, 10) || 0 }))
+                    }
                     placeholder="6541"
                     className="font-mono"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">Added to the booking ID to form the number</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Added to the booking ID to form the number
+                  </p>
                 </div>
               </div>
 
               {/* Preview */}
               <div className="bg-muted/40 border border-border rounded p-3 flex items-center gap-3">
-                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Preview:</span>
+                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                  Preview:
+                </span>
                 <span className="font-mono text-sm font-semibold text-foreground">
-                  {form.refPrefix.trim() || "PREFIX"}-{(form.refOffset || 0) + 1} &nbsp;/&nbsp; {form.refPrefix.trim() || "PREFIX"}-{(form.refOffset || 0) + 2} &nbsp;/&nbsp; …
+                  {form.refPrefix.trim() || "PREFIX"}-{(form.refOffset || 0) + 1} &nbsp;/&nbsp;{" "}
+                  {form.refPrefix.trim() || "PREFIX"}-{(form.refOffset || 0) + 2} &nbsp;/&nbsp; …
                 </span>
               </div>
 
@@ -791,10 +1027,16 @@ export default function AdminSettings() {
                   className={`h-10 px-6 ${refSaved ? "bg-green-600 hover:bg-green-700" : "bg-primary hover:bg-primary/90"} text-white`}
                 >
                   {refSaved ? (
-                    <span className="flex items-center gap-1.5"><Check className="w-4 h-4" /> Saved</span>
+                    <span className="flex items-center gap-1.5">
+                      <Check className="w-4 h-4" /> Saved
+                    </span>
                   ) : refSaving ? (
-                    <span className="flex items-center gap-1.5"><Loader2 className="w-4 h-4 animate-spin" /> Saving…</span>
-                  ) : "Save Reference Format"}
+                    <span className="flex items-center gap-1.5">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Saving…
+                    </span>
+                  ) : (
+                    "Save Reference Format"
+                  )}
                 </Button>
               </div>
             </div>
@@ -808,60 +1050,77 @@ export default function AdminSettings() {
             </div>
             <div className="p-6 space-y-4">
               <p className="text-sm text-muted-foreground">
-                All secrets below must be set in <strong>Replit → Secrets</strong> (the padlock icon in the sidebar) before publishing. These are never stored in code.
+                All secrets below must be set in <strong>Replit → Secrets</strong> (the padlock icon
+                in the sidebar) before publishing. These are never stored in code.
               </p>
 
               <div className="space-y-2">
-                {([
-                  {
-                    key: "STRIPE_SECRET_KEY",
-                    description: "Stripe live secret key (starts with sk_live_…). Found in the Stripe Dashboard → Developers → API keys.",
-                    required: true,
-                  },
-                  {
-                    key: "STRIPE_WEBHOOK_SECRET",
-                    description: "Webhook signing secret from the Stripe Dashboard → Webhooks endpoint. Must point to https://register.hranalyticssummit.com/api/stripe/webhook.",
-                    required: true,
-                  },
-                  {
-                    key: "DATABASE_URL",
-                    description: "PostgreSQL connection string. Auto-provisioned by Replit — do not change unless migrating to an external database.",
-                    required: true,
-                  },
-                  {
-                    key: "ADMIN_PASSWORD",
-                    description: "Password to log in to the admin panel at /admin. Choose a strong, unique password.",
-                    required: true,
-                  },
-                  {
-                    key: "SMTP_HOST",
-                    description: "Outbound email server hostname (e.g. smtp.resend.com or smtp.sendgrid.net).",
-                    required: false,
-                  },
-                  {
-                    key: "SMTP_PORT",
-                    description: "SMTP port (typically 587 for TLS or 465 for SSL).",
-                    required: false,
-                  },
-                  {
-                    key: "SMTP_USER",
-                    description: "SMTP username / API key for authentication.",
-                    required: false,
-                  },
-                  {
-                    key: "SMTP_PASS",
-                    description: "SMTP password or API secret.",
-                    required: false,
-                  },
-                ] as { key: string; description: string; required: boolean }[]).map(({ key, description, required }) => (
-                  <div key={key} className="flex gap-3 items-start p-3 border border-border rounded bg-muted/20">
+                {(
+                  [
+                    {
+                      key: "STRIPE_SECRET_KEY",
+                      description:
+                        "Stripe live secret key (starts with sk_live_…). Found in the Stripe Dashboard → Developers → API keys.",
+                      required: true,
+                    },
+                    {
+                      key: "STRIPE_WEBHOOK_SECRET",
+                      description:
+                        "Webhook signing secret from the Stripe Dashboard → Webhooks endpoint. Must point to https://register.hranalyticssummit.com/api/stripe/webhook.",
+                      required: true,
+                    },
+                    {
+                      key: "DATABASE_URL",
+                      description:
+                        "PostgreSQL connection string. Auto-provisioned by Replit — do not change unless migrating to an external database.",
+                      required: true,
+                    },
+                    {
+                      key: "ADMIN_PASSWORD",
+                      description:
+                        "Password to log in to the admin panel at /admin. Choose a strong, unique password.",
+                      required: true,
+                    },
+                    {
+                      key: "SMTP_HOST",
+                      description:
+                        "Outbound email server hostname (e.g. smtp.resend.com or smtp.sendgrid.net).",
+                      required: false,
+                    },
+                    {
+                      key: "SMTP_PORT",
+                      description: "SMTP port (typically 587 for TLS or 465 for SSL).",
+                      required: false,
+                    },
+                    {
+                      key: "SMTP_USER",
+                      description: "SMTP username / API key for authentication.",
+                      required: false,
+                    },
+                    {
+                      key: "SMTP_PASS",
+                      description: "SMTP password or API secret.",
+                      required: false,
+                    },
+                  ] as { key: string; description: string; required: boolean }[]
+                ).map(({ key, description, required }) => (
+                  <div
+                    key={key}
+                    className="flex gap-3 items-start p-3 border border-border rounded bg-muted/20"
+                  >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
-                        <code className="font-mono text-xs font-semibold text-foreground">{key}</code>
+                        <code className="font-mono text-xs font-semibold text-foreground">
+                          {key}
+                        </code>
                         {required ? (
-                          <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-red-100 text-red-700">Required</span>
+                          <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-red-100 text-red-700">
+                            Required
+                          </span>
                         ) : (
-                          <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Optional</span>
+                          <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                            Optional
+                          </span>
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">{description}</p>
@@ -871,7 +1130,12 @@ export default function AdminSettings() {
               </div>
 
               <div className="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-800">
-                <strong>Stripe live mode:</strong> Ensure <code className="bg-blue-100 px-1 py-0.5 rounded">STRIPE_SECRET_KEY</code> begins with <code className="bg-blue-100 px-1 py-0.5 rounded">sk_live_</code> (not <code className="bg-blue-100 px-1 py-0.5 rounded">sk_test_</code>) before publishing. The app uses whichever key is present — no code changes are needed to switch from test to live mode.
+                <strong>Stripe live mode:</strong> Ensure{" "}
+                <code className="bg-blue-100 px-1 py-0.5 rounded">STRIPE_SECRET_KEY</code> begins
+                with <code className="bg-blue-100 px-1 py-0.5 rounded">sk_live_</code> (not{" "}
+                <code className="bg-blue-100 px-1 py-0.5 rounded">sk_test_</code>) before
+                publishing. The app uses whichever key is present — no code changes are needed to
+                switch from test to live mode.
               </div>
             </div>
           </div>
@@ -880,11 +1144,14 @@ export default function AdminSettings() {
           <div className="bg-white border border-border">
             <div className="px-6 py-4 border-b border-border flex items-center gap-3">
               <ListChecks className="w-5 h-5 text-primary" />
-              <h2 className="font-bold text-base">Registration Form — "How did you hear about us?"</h2>
+              <h2 className="font-bold text-base">
+                Registration Form — "How did you hear about us?"
+              </h2>
             </div>
             <div className="p-6 space-y-6">
               <p className="text-sm text-muted-foreground">
-                Manage the options shown in the "How did you hear about the event?" dropdown on the booking form. Changes take effect immediately for new registrations.
+                Manage the options shown in the "How did you hear about the event?" dropdown on the
+                booking form. Changes take effect immediately for new registrations.
               </p>
 
               {hauLoading ? (
@@ -896,7 +1163,10 @@ export default function AdminSettings() {
                   {/* Option list */}
                   <div className="border border-border rounded overflow-hidden divide-y divide-border">
                     {hauOptions.map((opt, idx) => (
-                      <div key={opt.id} className="flex items-center gap-3 px-4 py-2.5 bg-white hover:bg-muted/20 transition-colors">
+                      <div
+                        key={opt.id}
+                        className="flex items-center gap-3 px-4 py-2.5 bg-white hover:bg-muted/20 transition-colors"
+                      >
                         <div className="flex flex-col gap-0.5">
                           <button
                             type="button"
@@ -916,7 +1186,9 @@ export default function AdminSettings() {
                           </button>
                         </div>
                         <span className="flex-1 text-sm">{opt.label}</span>
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${opt.responseCount > 0 ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+                        <span
+                          className={`text-xs font-semibold px-2 py-0.5 rounded-full ${opt.responseCount > 0 ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}
+                        >
                           {opt.responseCount > 0 ? opt.responseCount : "—"}
                         </span>
                         <button
@@ -930,7 +1202,9 @@ export default function AdminSettings() {
                       </div>
                     ))}
                     {hauOptions.length === 0 && (
-                      <div className="px-4 py-6 text-sm text-muted-foreground text-center">No options yet — add one below.</div>
+                      <div className="px-4 py-6 text-sm text-muted-foreground text-center">
+                        No options yet — add one below.
+                      </div>
                     )}
                   </div>
 
@@ -938,8 +1212,8 @@ export default function AdminSettings() {
                   <div className="flex gap-2">
                     <Input
                       value={hauNewLabel}
-                      onChange={e => setHauNewLabel(e.target.value)}
-                      onKeyDown={e => e.key === "Enter" && hauAddOption()}
+                      onChange={(e) => setHauNewLabel(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && hauAddOption()}
                       placeholder="New option label…"
                       className="h-9 flex-1"
                       disabled={hauAdding}
@@ -951,7 +1225,14 @@ export default function AdminSettings() {
                       size="sm"
                       className="h-9 px-4"
                     >
-                      {hauAdding ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Plus className="w-4 h-4 mr-1.5" />Add</>}
+                      {hauAdding ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4 mr-1.5" />
+                          Add
+                        </>
+                      )}
                     </Button>
                   </div>
 
@@ -959,26 +1240,34 @@ export default function AdminSettings() {
                   {hauTotalBookings > 0 && (
                     <div className="border border-border rounded p-4 space-y-3">
                       <div className="flex items-center justify-between">
-                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Response Breakdown</p>
+                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                          Response Breakdown
+                        </p>
                         <p className="text-xs text-muted-foreground">
-                          {hauTotalAnswered} of {hauTotalBookings} booking{hauTotalBookings !== 1 ? "s" : ""} answered
+                          {hauTotalAnswered} of {hauTotalBookings} booking
+                          {hauTotalBookings !== 1 ? "s" : ""} answered
                         </p>
                       </div>
                       {hauTotalAnswered > 0 ? (
                         <div className="space-y-2">
                           {hauOptions
-                            .filter(o => o.responseCount > 0)
+                            .filter((o) => o.responseCount > 0)
                             .sort((a, b) => b.responseCount - a.responseCount)
-                            .map(opt => {
+                            .map((opt) => {
                               const pct = Math.round((opt.responseCount / hauTotalAnswered) * 100);
                               return (
                                 <div key={opt.id} className="space-y-0.5">
                                   <div className="flex justify-between text-xs">
                                     <span className="text-foreground">{opt.label}</span>
-                                    <span className="text-muted-foreground font-semibold">{opt.responseCount} ({pct}%)</span>
+                                    <span className="text-muted-foreground font-semibold">
+                                      {opt.responseCount} ({pct}%)
+                                    </span>
                                   </div>
                                   <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                                    <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${pct}%` }} />
+                                    <div
+                                      className="h-full bg-primary rounded-full transition-all"
+                                      style={{ width: `${pct}%` }}
+                                    />
                                   </div>
                                 </div>
                               );
@@ -1002,21 +1291,43 @@ export default function AdminSettings() {
             </div>
             <div className="p-6 space-y-4">
               <p className="text-sm text-muted-foreground">
-                To make this app live at <strong>register.hranalyticssummit.com</strong>, add a single DNS record in your Squarespace domain settings. No changes are needed to your main Squarespace website.
+                To make this app live at <strong>register.hranalyticssummit.com</strong>, add a
+                single DNS record in your Squarespace domain settings. No changes are needed to your
+                main Squarespace website.
               </p>
 
               <div className="bg-amber-50 border border-amber-200 rounded p-4">
-                <p className="text-sm font-semibold text-amber-800 mb-3">Step-by-step instructions (Squarespace)</p>
+                <p className="text-sm font-semibold text-amber-800 mb-3">
+                  Step-by-step instructions (Squarespace)
+                </p>
                 <ol className="text-sm text-amber-900 space-y-2 list-decimal list-inside">
-                  <li>Log in to <strong>Squarespace</strong> and go to <strong>Settings → Domains</strong>.</li>
-                  <li>Click on <strong>hranalyticssummit.com</strong>, then open <strong>DNS Settings</strong>.</li>
-                  <li>Click <strong>Add Record</strong> and choose <strong>CNAME</strong>.</li>
+                  <li>
+                    Log in to <strong>Squarespace</strong> and go to{" "}
+                    <strong>Settings → Domains</strong>.
+                  </li>
+                  <li>
+                    Click on <strong>hranalyticssummit.com</strong>, then open{" "}
+                    <strong>DNS Settings</strong>.
+                  </li>
+                  <li>
+                    Click <strong>Add Record</strong> and choose <strong>CNAME</strong>.
+                  </li>
                   <li>
                     Set the fields as follows:
                     <div className="mt-2 font-mono text-xs bg-white border border-amber-300 rounded p-3 space-y-1">
-                      <div><span className="text-muted-foreground w-16 inline-block">Type:</span> CNAME</div>
-                      <div><span className="text-muted-foreground w-16 inline-block">Host:</span> register</div>
-                      <div><span className="text-muted-foreground w-16 inline-block">Points to:</span> <em className="not-italic text-amber-800">[Your Replit deployment domain — e.g. my-app.replit.app]</em></div>
+                      <div>
+                        <span className="text-muted-foreground w-16 inline-block">Type:</span> CNAME
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground w-16 inline-block">Host:</span>{" "}
+                        register
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground w-16 inline-block">Points to:</span>{" "}
+                        <em className="not-italic text-amber-800">
+                          [Your Replit deployment domain — e.g. my-app.replit.app]
+                        </em>
+                      </div>
                     </div>
                   </li>
                   <li>Save the record.</li>
@@ -1024,23 +1335,53 @@ export default function AdminSettings() {
               </div>
 
               <div className="bg-blue-50 border border-blue-200 rounded p-4 text-sm text-blue-800 space-y-1">
-                <p><strong>Where to find your Replit deployment domain:</strong></p>
-                <p>After publishing this project in Replit, click <strong>Publish → View site</strong>. The domain shown (ending in <code className="text-xs bg-blue-100 px-1 py-0.5 rounded">.replit.app</code>) is what you enter in the <em>Points to</em> field above.</p>
+                <p>
+                  <strong>Where to find your Replit deployment domain:</strong>
+                </p>
+                <p>
+                  After publishing this project in Replit, click{" "}
+                  <strong>Publish → View site</strong>. The domain shown (ending in{" "}
+                  <code className="text-xs bg-blue-100 px-1 py-0.5 rounded">.replit.app</code>) is
+                  what you enter in the <em>Points to</em> field above.
+                </p>
               </div>
 
               <p className="text-xs text-muted-foreground">
-                DNS propagation typically takes a few minutes on Squarespace, but may take up to 24 hours in rare cases. Once propagated, the app will be live at <strong>https://register.hranalyticssummit.com</strong> with a valid SSL certificate provided automatically by Replit.
+                DNS propagation typically takes a few minutes on Squarespace, but may take up to 24
+                hours in rare cases. Once propagated, the app will be live at{" "}
+                <strong>https://register.hranalyticssummit.com</strong> with a valid SSL certificate
+                provided automatically by Replit.
               </p>
 
               <div className="bg-muted/40 border border-border rounded p-4 text-sm space-y-1">
-                <p className="font-semibold text-xs uppercase tracking-wide text-muted-foreground mb-2">Stripe Webhook — update after DNS is live</p>
-                <p className="text-muted-foreground text-xs">In the <a href="https://dashboard.stripe.com/webhooks" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">Stripe Dashboard → Webhooks</a>, update the endpoint URL to:</p>
-                <p className="font-mono text-xs bg-white border border-border rounded px-3 py-2 select-all">https://register.hranalyticssummit.com/api/stripe/webhook</p>
-                <p className="text-muted-foreground text-xs">Copy the new webhook signing secret and add it as the <code className="text-xs bg-muted px-1 py-0.5 rounded">STRIPE_WEBHOOK_SECRET</code> environment variable in Replit Secrets.</p>
+                <p className="font-semibold text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                  Stripe Webhook — update after DNS is live
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  In the{" "}
+                  <a
+                    href="https://dashboard.stripe.com/webhooks"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-foreground"
+                  >
+                    Stripe Dashboard → Webhooks
+                  </a>
+                  , update the endpoint URL to:
+                </p>
+                <p className="font-mono text-xs bg-white border border-border rounded px-3 py-2 select-all">
+                  https://register.hranalyticssummit.com/api/stripe/webhook
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  Copy the new webhook signing secret and add it as the{" "}
+                  <code className="text-xs bg-muted px-1 py-0.5 rounded">
+                    STRIPE_WEBHOOK_SECRET
+                  </code>{" "}
+                  environment variable in Replit Secrets.
+                </p>
               </div>
             </div>
           </div>
-
         </div>
       )}
     </AdminLayout>

@@ -1,10 +1,19 @@
 import { useState, useEffect, useRef } from "react";
 import { z } from "zod";
-import { useUpdateBooking, useCreateAttendee, useUpdateAttendee } from "@workspace/api-client-react";
+import {
+  useUpdateBooking,
+  useCreateAttendee,
+  useUpdateAttendee,
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Checkbox } from "@/components/ui/checkbox";
 import { User, Clock, Info } from "lucide-react";
 import type { BookingWithAttendees } from "@/types/booking";
@@ -16,7 +25,7 @@ const attendeeSchema = z.object({
   company: z.string().min(1, "Company is required"),
   workEmail: z.string().email("Valid email is required"),
   phone: z.string().optional(),
-  gdprConsent: z.boolean().refine(val => val === true, {
+  gdprConsent: z.boolean().refine((val) => val === true, {
     message: "You must agree to the terms",
   }),
 });
@@ -70,14 +79,18 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
       } else {
         const existing = additionalAttendees[i - 1];
         forms.push({
-          firstName: existing?.isTbc ? "" : (existing?.firstName || ""),
-          lastName: existing?.isTbc ? "" : (existing?.lastName || ""),
-          jobTitle: existing?.isTbc ? "" : (existing?.jobTitle || ""),
-          company: existing?.isTbc ? (leadAttendee?.company || "") : (existing?.company || leadAttendee?.company || ""),
-          workEmail: existing?.isTbc ? "" : (existing?.workEmail || ""),
-          phone: existing?.isTbc ? "" : (existing?.phone || ""),
-          dietaryAccessibility: existing?.isTbc ? "" : ((existing as any)?.dietaryAccessibility || ""),
-          gdprConsent: existing?.isTbc ? false : (existing?.gdprConsent || false),
+          firstName: existing?.isTbc ? "" : existing?.firstName || "",
+          lastName: existing?.isTbc ? "" : existing?.lastName || "",
+          jobTitle: existing?.isTbc ? "" : existing?.jobTitle || "",
+          company: existing?.isTbc
+            ? leadAttendee?.company || ""
+            : existing?.company || leadAttendee?.company || "",
+          workEmail: existing?.isTbc ? "" : existing?.workEmail || "",
+          phone: existing?.isTbc ? "" : existing?.phone || "",
+          dietaryAccessibility: existing?.isTbc
+            ? ""
+            : (existing as any)?.dietaryAccessibility || "",
+          gdprConsent: existing?.isTbc ? false : existing?.gdprConsent || false,
           id: existing?.id,
         });
       }
@@ -86,7 +99,7 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
   });
 
   const [forMeFlags, setForMeFlags] = useState<boolean[]>(() =>
-    Array.from({ length: totalSeats }, (_, i) => i === 0)
+    Array.from({ length: totalSeats }, (_, i) => i === 0),
   );
 
   const [tbcFlags, setTbcFlags] = useState<boolean[]>(() =>
@@ -94,14 +107,14 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
       if (i === 0) return false;
       const existing = additionalAttendees[i - 1];
       return existing?.isTbc ?? false;
-    })
+    }),
   );
 
   const [errors, setErrors] = useState<(Partial<Record<keyof AttendeeFormData, string>> | null)[]>(
-    Array(totalSeats).fill(null)
+    Array(totalSeats).fill(null),
   );
 
-  const autosaveIdsRef = useRef<(number | undefined)[]>(formsData.map(f => f.id));
+  const autosaveIdsRef = useRef<(number | undefined)[]>(formsData.map((f) => f.id));
 
   useEffect(() => {
     if (formsData.length === 0) return;
@@ -129,7 +142,9 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
                   gdprConsent: form.gdprConsent,
                 },
               });
-            } catch { /* silent */ }
+            } catch {
+              /* silent */
+            }
           }
         } else {
           const existingId = form.id ?? autosaveIdsRef.current[i];
@@ -179,7 +194,9 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
               });
               autosaveIdsRef.current[i] = created.id;
             }
-          } catch { /* silent */ }
+          } catch {
+            /* silent */
+          }
         }
       }
     }, 1500);
@@ -244,7 +261,11 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
     }
   };
 
-  const updateFormData = <K extends keyof AttendeeFormData>(index: number, field: K, value: AttendeeFormData[K]) => {
+  const updateFormData = <K extends keyof AttendeeFormData>(
+    index: number,
+    field: K,
+    value: AttendeeFormData[K],
+  ) => {
     const newFormsData = [...formsData];
     newFormsData[index] = { ...newFormsData[index], [field]: value };
     setFormsData(newFormsData);
@@ -257,7 +278,8 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
 
   const handleContinue = async () => {
     let allValid = true;
-    const newErrors: (Partial<Record<keyof AttendeeFormData, string>> | null)[] = Array(totalSeats).fill(null);
+    const newErrors: (Partial<Record<keyof AttendeeFormData, string>> | null)[] =
+      Array(totalSeats).fill(null);
 
     for (let i = 0; i < totalSeats; i++) {
       if (tbcFlags[i]) continue;
@@ -378,8 +400,9 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
         <div className="flex gap-3 bg-blue-50 border border-blue-200 rounded p-4 text-sm text-blue-800">
           <Info className="w-4 h-4 shrink-0 mt-0.5" />
           <p>
-            <span className="font-semibold">Not sure who's attending yet?</span>{" "}
-            Mark any additional ticket as <span className="font-semibold">TBC</span> to complete your booking now and confirm the attendee details later — just contact us after booking.
+            <span className="font-semibold">Not sure who's attending yet?</span> Mark any additional
+            ticket as <span className="font-semibold">TBC</span> to complete your booking now and
+            confirm the attendee details later — just contact us after booking.
           </p>
         </div>
       )}
@@ -392,15 +415,21 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
           const label = isTbc
             ? "TBC — details to be confirmed"
             : data.firstName && data.lastName
-            ? `${data.firstName} ${data.lastName}`
-            : "Pending details";
+              ? `${data.firstName} ${data.lastName}`
+              : "Pending details";
 
           return (
-            <AccordionItem key={index} value={`attendee-${index}`} className="bg-white border border-border px-6">
+            <AccordionItem
+              key={index}
+              value={`attendee-${index}`}
+              className="bg-white border border-border px-6"
+            >
               <AccordionTrigger className="hover:no-underline py-6">
                 <div className="flex flex-col text-left">
                   <span className="font-bold text-xl">Attendee {index + 1}</span>
-                  <span className={`text-sm font-normal ${isTbc ? "text-amber-600 font-medium" : "text-muted-foreground"}`}>
+                  <span
+                    className={`text-sm font-normal ${isTbc ? "text-amber-600 font-medium" : "text-muted-foreground"}`}
+                  >
                     {label}
                   </span>
                 </div>
@@ -448,7 +477,10 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
                 {isTbc ? (
                   <div className="bg-amber-50 border border-amber-200 rounded p-4 text-sm text-amber-800">
                     <p className="font-semibold mb-1">This ticket is marked as TBC</p>
-                    <p>You can confirm this attendee's details later — just contact us after booking and we'll update the registration for you.</p>
+                    <p>
+                      You can confirm this attendee's details later — just contact us after booking
+                      and we'll update the registration for you.
+                    </p>
                   </div>
                 ) : (
                   <>
@@ -460,7 +492,9 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
                           onChange={(e) => updateFormData(index, "firstName", e.target.value)}
                           className={`h-12 bg-white ${fieldErrors?.firstName ? "border-destructive" : ""}`}
                         />
-                        {fieldErrors?.firstName && <p className="text-xs text-destructive">{fieldErrors.firstName}</p>}
+                        {fieldErrors?.firstName && (
+                          <p className="text-xs text-destructive">{fieldErrors.firstName}</p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Last Name *</label>
@@ -469,7 +503,9 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
                           onChange={(e) => updateFormData(index, "lastName", e.target.value)}
                           className={`h-12 bg-white ${fieldErrors?.lastName ? "border-destructive" : ""}`}
                         />
-                        {fieldErrors?.lastName && <p className="text-xs text-destructive">{fieldErrors.lastName}</p>}
+                        {fieldErrors?.lastName && (
+                          <p className="text-xs text-destructive">{fieldErrors.lastName}</p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Work Email *</label>
@@ -479,7 +515,9 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
                           onChange={(e) => updateFormData(index, "workEmail", e.target.value)}
                           className={`h-12 bg-white ${fieldErrors?.workEmail ? "border-destructive" : ""}`}
                         />
-                        {fieldErrors?.workEmail && <p className="text-xs text-destructive">{fieldErrors.workEmail}</p>}
+                        {fieldErrors?.workEmail && (
+                          <p className="text-xs text-destructive">{fieldErrors.workEmail}</p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Phone (optional)</label>
@@ -496,7 +534,9 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
                           onChange={(e) => updateFormData(index, "jobTitle", e.target.value)}
                           className={`h-12 bg-white ${fieldErrors?.jobTitle ? "border-destructive" : ""}`}
                         />
-                        {fieldErrors?.jobTitle && <p className="text-xs text-destructive">{fieldErrors.jobTitle}</p>}
+                        {fieldErrors?.jobTitle && (
+                          <p className="text-xs text-destructive">{fieldErrors.jobTitle}</p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Company *</label>
@@ -505,15 +545,21 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
                           onChange={(e) => updateFormData(index, "company", e.target.value)}
                           className={`h-12 bg-white ${fieldErrors?.company ? "border-destructive" : ""}`}
                         />
-                        {fieldErrors?.company && <p className="text-xs text-destructive">{fieldErrors.company}</p>}
+                        {fieldErrors?.company && (
+                          <p className="text-xs text-destructive">{fieldErrors.company}</p>
+                        )}
                       </div>
                     </div>
 
                     <div className="mt-6 space-y-2">
-                      <label className="text-sm font-medium">Dietary requirements or accessibility needs (optional)</label>
+                      <label className="text-sm font-medium">
+                        Dietary requirements or accessibility needs (optional)
+                      </label>
                       <textarea
                         value={data.dietaryAccessibility}
-                        onChange={(e) => updateFormData(index, "dietaryAccessibility", e.target.value)}
+                        onChange={(e) =>
+                          updateFormData(index, "dietaryAccessibility", e.target.value)
+                        }
                         placeholder="e.g. vegetarian, gluten free, wheelchair access, hearing loop..."
                         rows={3}
                         className="w-full rounded-md border border-input bg-white px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
@@ -530,11 +576,27 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
                         <div className="space-y-1 leading-none">
                           <label className="font-normal text-base cursor-pointer">
                             I understand how my data will be processed in accordance with{" "}
-                            <a href="https://peoplestrategyhub.com/your-data-gdpr" target="_blank" rel="noreferrer" className="underline text-primary hover:text-primary/80">GDPR</a>
-                            {" "}and{" "}
-                            <a href="https://www.hranalyticssummit.com/terms-and-conditions" target="_blank" rel="noreferrer" className="underline text-primary hover:text-primary/80">Conference T&Cs</a>
+                            <a
+                              href="https://peoplestrategyhub.com/your-data-gdpr"
+                              target="_blank"
+                              rel="noreferrer"
+                              className="underline text-primary hover:text-primary/80"
+                            >
+                              GDPR
+                            </a>{" "}
+                            and{" "}
+                            <a
+                              href="https://www.hranalyticssummit.com/terms-and-conditions"
+                              target="_blank"
+                              rel="noreferrer"
+                              className="underline text-primary hover:text-primary/80"
+                            >
+                              Conference T&Cs
+                            </a>
                           </label>
-                          {fieldErrors?.gdprConsent && <p className="text-xs text-destructive">{fieldErrors.gdprConsent}</p>}
+                          {fieldErrors?.gdprConsent && (
+                            <p className="text-xs text-destructive">{fieldErrors.gdprConsent}</p>
+                          )}
                         </div>
                       </div>
                     </div>

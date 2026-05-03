@@ -1,11 +1,29 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useUpdateBooking, useCalculatePricing, useListDiscountTiers, customFetch, type PricingRequestPassType, type DiscountTier } from "@workspace/api-client-react";
+import {
+  useUpdateBooking,
+  useCalculatePricing,
+  useListDiscountTiers,
+  customFetch,
+  type PricingRequestPassType,
+  type DiscountTier,
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Check, Minus, Plus, Users, Flame, AlertCircle, TrendingUp, Star, Tag, X } from "lucide-react";
+import {
+  Check,
+  Minus,
+  Plus,
+  Users,
+  Flame,
+  AlertCircle,
+  TrendingUp,
+  Star,
+  Tag,
+  X,
+} from "lucide-react";
 import type { BookingWithAttendees } from "@/types/booking";
 
 interface Step2PassesProps {
@@ -52,7 +70,7 @@ const FALLBACK_HEAR_OPTIONS = [
 
 function getActiveTier(tiers: DiscountTier[], passType: string, qty: number): DiscountTier | null {
   const relevant = tiers
-    .filter(t => t.passType === passType)
+    .filter((t) => t.passType === passType)
     .sort((a, b) => a.minQuantity - b.minQuantity);
   let active: DiscountTier | null = null;
   for (const tier of relevant) {
@@ -63,9 +81,9 @@ function getActiveTier(tiers: DiscountTier[], passType: string, qty: number): Di
 
 function getNextTier(tiers: DiscountTier[], passType: string, qty: number): DiscountTier | null {
   const relevant = tiers
-    .filter(t => t.passType === passType)
+    .filter((t) => t.passType === passType)
     .sort((a, b) => a.minQuantity - b.minQuantity);
-  return relevant.find(t => t.minQuantity > qty) ?? null;
+  return relevant.find((t) => t.minQuantity > qty) ?? null;
 }
 
 interface TierRow {
@@ -78,13 +96,18 @@ interface TierRow {
 
 function buildHRTierRows(tiers: DiscountTier[], qty: number, pricePerTicket: number): TierRow[] {
   const relevant = tiers
-    .filter(t => t.passType === "single")
+    .filter((t) => t.passType === "single")
     .sort((a, b) => a.minQuantity - b.minQuantity);
 
   const rows: TierRow[] = [];
 
   if (relevant.length === 0) {
-    rows.push({ key: "all", label: "All quantities", note: `£${pricePerTicket}/ticket`, active: true });
+    rows.push({
+      key: "all",
+      label: "All quantities",
+      note: `£${pricePerTicket}/ticket`,
+      active: true,
+    });
     return rows;
   }
 
@@ -92,8 +115,19 @@ function buildHRTierRows(tiers: DiscountTier[], qty: number, pricePerTicket: num
   const noDiscountEnd = firstTierMin - 1;
 
   if (noDiscountEnd >= 3) {
-    rows.push({ key: "1-2", label: "1–2 tickets", note: `£${pricePerTicket}/ticket`, active: qty <= 2 });
-    rows.push({ key: "3", label: "3 tickets", note: "Most Popular", active: qty === 3, isSpecial: true });
+    rows.push({
+      key: "1-2",
+      label: "1–2 tickets",
+      note: `£${pricePerTicket}/ticket`,
+      active: qty <= 2,
+    });
+    rows.push({
+      key: "3",
+      label: "3 tickets",
+      note: "Most Popular",
+      active: qty === 3,
+      isSpecial: true,
+    });
     if (noDiscountEnd > 3) {
       rows.push({
         key: `4-${noDiscountEnd}`,
@@ -115,7 +149,7 @@ function buildHRTierRows(tiers: DiscountTier[], qty: number, pricePerTicket: num
     const tier = relevant[i];
     const nextTier = relevant[i + 1];
     const maxQty = nextTier ? nextTier.minQuantity - 1 : null;
-    const savingPerTicket = (pricePerTicket * tier.discountPercent / 100).toFixed(2);
+    const savingPerTicket = ((pricePerTicket * tier.discountPercent) / 100).toFixed(2);
     const rangeLabel = maxQty
       ? `${tier.minQuantity}–${maxQty} tickets`
       : `${tier.minQuantity}+ tickets`;
@@ -130,9 +164,13 @@ function buildHRTierRows(tiers: DiscountTier[], qty: number, pricePerTicket: num
   return rows;
 }
 
-function buildBusinessTierRows(tiers: DiscountTier[], qty: number, pricePerPass: number): TierRow[] {
+function buildBusinessTierRows(
+  tiers: DiscountTier[],
+  qty: number,
+  pricePerPass: number,
+): TierRow[] {
   const relevant = tiers
-    .filter(t => t.passType === "business")
+    .filter((t) => t.passType === "business")
     .sort((a, b) => a.minQuantity - b.minQuantity);
 
   const rows: TierRow[] = [];
@@ -158,7 +196,7 @@ function buildBusinessTierRows(tiers: DiscountTier[], qty: number, pricePerPass:
     const tier = relevant[i];
     const nextTier = relevant[i + 1];
     const maxQty = nextTier ? nextTier.minQuantity - 1 : null;
-    const savingPerPass = (pricePerPass * tier.discountPercent / 100).toFixed(2);
+    const savingPerPass = ((pricePerPass * tier.discountPercent) / 100).toFixed(2);
     const rangeLabel = maxQty
       ? `${tier.minQuantity}–${maxQty} pass${maxQty > 1 ? "es" : ""}`
       : `${tier.minQuantity}+ passes`;
@@ -173,12 +211,20 @@ function buildBusinessTierRows(tiers: DiscountTier[], qty: number, pricePerPass:
   return rows;
 }
 
-function InventoryBadge({ remaining, className = "" }: { remaining: number | null; className?: string }) {
+function InventoryBadge({
+  remaining,
+  className = "",
+}: {
+  remaining: number | null;
+  className?: string;
+}) {
   if (remaining === null) return null;
 
   if (remaining <= 5) {
     return (
-      <div className={`flex items-center gap-1.5 text-xs font-bold text-red-700 bg-red-50 border border-red-200 px-2.5 py-1 rounded-sm ${className}`}>
+      <div
+        className={`flex items-center gap-1.5 text-xs font-bold text-red-700 bg-red-50 border border-red-200 px-2.5 py-1 rounded-sm ${className}`}
+      >
         <Flame className="w-3.5 h-3.5" />
         Only {remaining} {remaining === 1 ? "spot" : "spots"} left!
       </div>
@@ -186,14 +232,18 @@ function InventoryBadge({ remaining, className = "" }: { remaining: number | nul
   }
   if (remaining <= 20) {
     return (
-      <div className={`flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-sm ${className}`}>
+      <div
+        className={`flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-sm ${className}`}
+      >
         <AlertCircle className="w-3.5 h-3.5" />
         {remaining} spots remaining — selling fast
       </div>
     );
   }
   return (
-    <div className={`flex items-center gap-1.5 text-xs font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-sm ${className}`}>
+    <div
+      className={`flex items-center gap-1.5 text-xs font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-sm ${className}`}
+    >
       <AlertCircle className="w-3.5 h-3.5" />
       {remaining} spots remaining
     </div>
@@ -218,8 +268,8 @@ function UpsellNudge({ tiers, passType, quantity, unitLabel }: UpsellNudgeProps)
   const currentDiscountPct = currentTier?.discountPercent ?? 0;
   const basePrice = passType === "business" ? 599 : 199;
   const upliftValue =
-    nextTier.minQuantity * basePrice * nextTier.discountPercent / 100 -
-    quantity * basePrice * currentDiscountPct / 100;
+    (nextTier.minQuantity * basePrice * nextTier.discountPercent) / 100 -
+    (quantity * basePrice * currentDiscountPct) / 100;
   const uplift = upliftValue.toFixed(2);
 
   return (
@@ -231,10 +281,17 @@ function UpsellNudge({ tiers, passType, quantity, unitLabel }: UpsellNudgeProps)
     >
       <TrendingUp className="w-3.5 h-3.5 shrink-0 mt-0.5 text-secondary" />
       <span>
-        <span className="font-bold">Add {needed} more {unitLabel}{needed > 1 ? "s" : ""}</span> to unlock{" "}
-        <span className="font-bold text-secondary">{nextTier.discountPercent}% off</span>
+        <span className="font-bold">
+          Add {needed} more {unitLabel}
+          {needed > 1 ? "s" : ""}
+        </span>{" "}
+        to unlock <span className="font-bold text-secondary">{nextTier.discountPercent}% off</span>
         {upliftValue > 0 && (
-          <span> — save an extra <span className="font-bold text-secondary">£{uplift}</span> on your order</span>
+          <span>
+            {" "}
+            — save an extra <span className="font-bold text-secondary">£{uplift}</span> on your
+            order
+          </span>
         )}
         !
       </span>
@@ -256,18 +313,28 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
 
   const [selectedPass] = useState<PricingRequestPassType>(resolveInitialPass);
   const [quantity, setQuantity] = useState<number>(() => booking.quantity || 1);
-  const [inventory, setInventory] = useState<Record<string, number | null>>({ single: null, business: null });
-  const [passConfig, setPassConfig] = useState<Record<string, PassConfig | null>>({ single: null, business: null });
+  const [inventory, setInventory] = useState<Record<string, number | null>>({
+    single: null,
+    business: null,
+  });
+  const [passConfig, setPassConfig] = useState<Record<string, PassConfig | null>>({
+    single: null,
+    business: null,
+  });
 
   const [promoInput, setPromoInput] = useState<string>("");
-  const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(booking.promoCode ?? null);
+  const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(
+    booking.promoCode ?? null,
+  );
   const [appliedViaLink, setAppliedViaLink] = useState<boolean>(false);
   const [promoError, setPromoError] = useState<string | null>(null);
   const [promoValidating, setPromoValidating] = useState(false);
 
   const leadEmail = booking.attendees?.find((a) => a.isLead)?.workEmail ?? null;
 
-  const [hearAboutUs, setHearAboutUs] = useState<string>((booking as unknown as Record<string, unknown>).hearAboutUs as string ?? "");
+  const [hearAboutUs, setHearAboutUs] = useState<string>(
+    ((booking as unknown as Record<string, unknown>).hearAboutUs as string) ?? "",
+  );
   const [hearOptions, setHearOptions] = useState<string[]>(FALLBACK_HEAR_OPTIONS);
   const hauFetched = useRef(false);
 
@@ -278,20 +345,20 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
 
   useEffect(() => {
     fetch("/api/passes/inventory")
-      .then(res => res.ok ? res.json() : {})
-      .then(data => setInventory(data))
+      .then((res) => (res.ok ? res.json() : {}))
+      .then((data) => setInventory(data))
       .catch(() => {});
     fetch("/api/passes/config")
-      .then(res => res.ok ? res.json() : {})
-      .then(data => setPassConfig(data))
+      .then((res) => (res.ok ? res.json() : {}))
+      .then((data) => setPassConfig(data))
       .catch(() => {});
     if (!hauFetched.current) {
       hauFetched.current = true;
       fetch("/api/hear-about-us-options")
-        .then(res => res.ok ? res.json() : null)
+        .then((res) => (res.ok ? res.json() : null))
         .then((data: { label: string }[] | null) => {
           if (Array.isArray(data) && data.length > 0) {
-            setHearOptions(data.map(o => o.label));
+            setHearOptions(data.map((o) => o.label));
           }
         })
         .catch(() => {});
@@ -312,15 +379,18 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
   // server returns the code as applied but does not zero out the price — the
   // user must either reduce their quantity or remove the code before they
   // can continue.
-  const compRemaining = currentPricing?.promoDiscountType === "complimentary"
-    ? currentPricing.promoRemainingSeats ?? null
-    : null;
+  const compRemaining =
+    currentPricing?.promoDiscountType === "complimentary"
+      ? (currentPricing.promoRemainingSeats ?? null)
+      : null;
   const compShortfall = compRemaining !== null && compRemaining < quantity;
   const handleReduceToCompCap = () => {
     if (compRemaining !== null && compRemaining > 0) setQuantity(compRemaining);
   };
 
-  const validatePromo = async (codeToValidate: string): Promise<{ ok: boolean; code?: string; error?: string }> => {
+  const validatePromo = async (
+    codeToValidate: string,
+  ): Promise<{ ok: boolean; code?: string; error?: string }> => {
     try {
       const res = await customFetch(`/api/promo-codes/validate`, {
         method: "POST",
@@ -331,14 +401,23 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
           leadEmail: leadEmail ?? undefined,
         }),
       });
-      const data = res as { valid?: boolean; error?: string; code?: string; remainingSeats?: number | null } | null;
+      const data = res as {
+        valid?: boolean;
+        error?: string;
+        code?: string;
+        remainingSeats?: number | null;
+      } | null;
       if (data?.valid && data?.code) return { ok: true, code: data.code };
-      return { ok: false, error: typeof data?.error === "string" ? data.error : "Invalid promo code" };
+      return {
+        ok: false,
+        error: typeof data?.error === "string" ? data.error : "Invalid promo code",
+      };
     } catch (e: unknown) {
       const err = e as Record<string, unknown> | null;
-      const apiMsg = err?.data && typeof (err.data as Record<string, unknown>)?.error === "string"
-        ? (err.data as Record<string, unknown>).error as string
-        : null;
+      const apiMsg =
+        err?.data && typeof (err.data as Record<string, unknown>)?.error === "string"
+          ? ((err.data as Record<string, unknown>).error as string)
+          : null;
       const fallbackMsg = typeof err?.message === "string" ? err.message : null;
       return { ok: false, error: apiMsg || fallbackMsg || "Invalid or expired promo code" };
     }
@@ -391,7 +470,9 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
         setPromoError(result.error ?? "Invalid promo code");
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPass, quantity, leadEmail]);
 
@@ -424,19 +505,26 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
   const singleCurrentPrice = singleCfg ? parseFloat(singleCfg.currentPrice) : 199;
   const singleOriginalPrice = singleCfg ? parseFloat(singleCfg.originalPrice) : 429;
   const singlePeriodName = singleCfg?.pricingPeriodName ?? "Early Bird";
-  const singleDiscountPct = singleOriginalPrice > singleCurrentPrice
-    ? Math.round(((singleOriginalPrice - singleCurrentPrice) / singleOriginalPrice) * 100)
-    : null;
-  const singleBenefits = singleCfg && singleCfg.benefits.length > 0 ? singleCfg.benefits : DEFAULT_SINGLE_BENEFITS;
+  const singleDiscountPct =
+    singleOriginalPrice > singleCurrentPrice
+      ? Math.round(((singleOriginalPrice - singleCurrentPrice) / singleOriginalPrice) * 100)
+      : null;
+  const singleBenefits =
+    singleCfg && singleCfg.benefits.length > 0 ? singleCfg.benefits : DEFAULT_SINGLE_BENEFITS;
 
   const businessCurrentPrice = businessCfg ? parseFloat(businessCfg.currentPrice) : 599;
   const businessOriginalPrice = businessCfg ? parseFloat(businessCfg.originalPrice) : 999;
   const businessPeriodName = businessCfg?.pricingPeriodName ?? "Early Bird";
-  const businessDiscountPct = businessOriginalPrice > businessCurrentPrice
-    ? Math.round(((businessOriginalPrice - businessCurrentPrice) / businessOriginalPrice) * 100)
-    : null;
-  const businessBenefits = businessCfg && businessCfg.benefits.length > 0 ? businessCfg.benefits : DEFAULT_SINGLE_BENEFITS;
-  const businessExtraBenefits = businessCfg && businessCfg.extraBenefits.length > 0 ? businessCfg.extraBenefits : DEFAULT_BUSINESS_EXTRA_BENEFITS;
+  const businessDiscountPct =
+    businessOriginalPrice > businessCurrentPrice
+      ? Math.round(((businessOriginalPrice - businessCurrentPrice) / businessOriginalPrice) * 100)
+      : null;
+  const businessBenefits =
+    businessCfg && businessCfg.benefits.length > 0 ? businessCfg.benefits : DEFAULT_SINGLE_BENEFITS;
+  const businessExtraBenefits =
+    businessCfg && businessCfg.extraBenefits.length > 0
+      ? businessCfg.extraBenefits
+      : DEFAULT_BUSINESS_EXTRA_BENEFITS;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -454,32 +542,45 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
           {/* ── Header band ── */}
           <div className="px-6 md:px-8 py-5 flex items-center justify-between gap-4 flex-wrap border-b border-border">
             <div>
-              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 font-semibold">HR Analytics Summit · 3 Sep 2026, London</p>
-              <h3 className="text-2xl font-bold text-primary font-display leading-tight">HR Professional Pass</h3>
+              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 font-semibold">
+                HR Analytics Summit · 3 Sep 2026, London
+              </p>
+              <h3 className="text-2xl font-bold text-primary font-display leading-tight">
+                HR Professional Pass
+              </h3>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
               <InventoryBadge remaining={inventory.single} />
               <div className="text-right">
                 <div className="flex items-baseline gap-2 justify-end flex-wrap">
-                  <span className="text-3xl font-bold text-foreground">£{singleCurrentPrice.toFixed(0)}</span>
+                  <span className="text-3xl font-bold text-foreground">
+                    £{singleCurrentPrice.toFixed(0)}
+                  </span>
                   {singleOriginalPrice > singleCurrentPrice && (
-                    <span className="text-sm text-muted-foreground line-through">£{singleOriginalPrice.toFixed(0)}</span>
+                    <span className="text-sm text-muted-foreground line-through">
+                      £{singleOriginalPrice.toFixed(0)}
+                    </span>
                   )}
                   {singleDiscountPct !== null && (
-                    <span className="badge-shine text-xs font-bold px-3 py-1 rounded-full inline-block">{singleDiscountPct}% off</span>
+                    <span className="badge-shine text-xs font-bold px-3 py-1 rounded-full inline-block">
+                      {singleDiscountPct}% off
+                    </span>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">Per ticket, ex VAT · {singlePeriodName}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Per ticket, ex VAT · {singlePeriodName}
+                </p>
               </div>
             </div>
           </div>
 
           <div className="flex flex-col md:flex-row md:items-start">
-
             {/* ── Left column: Benefits ── */}
             <div className="flex-1 p-6 md:p-8">
               {/* Benefits grid */}
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">What's included</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
+                What's included
+              </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4">
                 {singleBenefits.map((b) => (
                   <div key={b} className="flex items-start gap-2 text-sm">
@@ -510,15 +611,19 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                 }`}
                 style={
                   quantity !== 3
-                    ? { background: "linear-gradient(135deg, hsl(28,88%,62%) 0%, hsl(4,77%,57%) 100%)" }
+                    ? {
+                        background:
+                          "linear-gradient(135deg, hsl(28,88%,62%) 0%, hsl(4,77%,57%) 100%)",
+                      }
                     : undefined
                 }
               >
                 <span className="flex items-center gap-2">
-                  <Users className="w-4 h-4 shrink-0" />
-                  3 tickets — Most Popular
+                  <Users className="w-4 h-4 shrink-0" />3 tickets — Most Popular
                 </span>
-                <Check className={`w-4 h-4 shrink-0 transition-opacity ${quantity === 3 ? "opacity-100" : "opacity-0"}`} />
+                <Check
+                  className={`w-4 h-4 shrink-0 transition-opacity ${quantity === 3 ? "opacity-100" : "opacity-0"}`}
+                />
               </button>
 
               {/* Custom stepper */}
@@ -526,7 +631,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                 <button
                   type="button"
                   className="flex-none w-11 flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-30"
-                  onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                   disabled={quantity <= 1}
                 >
                   <Minus className="w-4 h-4" />
@@ -537,7 +642,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                 <button
                   type="button"
                   className="flex-none w-11 flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                  onClick={() => setQuantity(q => Math.min(20, q + 1))}
+                  onClick={() => setQuantity((q) => Math.min(20, q + 1))}
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -567,9 +672,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                     }`}
                   >
                     <span>{label}</span>
-                    <span className={active ? "text-primary font-bold" : ""}>
-                      {note}
-                    </span>
+                    <span className={active ? "text-primary font-bold" : ""}>{note}</span>
                   </div>
                 ))}
               </div>
@@ -591,32 +694,45 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
           {/* ── Header band ── */}
           <div className="px-6 md:px-8 py-5 flex items-center justify-between gap-4 flex-wrap border-b border-border">
             <div>
-              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 font-semibold">HR Analytics Summit · 3 Sep 2026 · Consultants &amp; Vendors</p>
-              <h3 className="text-2xl font-bold text-primary font-display leading-tight">Business Pass</h3>
+              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 font-semibold">
+                HR Analytics Summit · 3 Sep 2026 · Consultants &amp; Vendors
+              </p>
+              <h3 className="text-2xl font-bold text-primary font-display leading-tight">
+                Business Pass
+              </h3>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
               <InventoryBadge remaining={inventory.business} />
               <div className="text-right">
                 <div className="flex items-baseline gap-2 justify-end flex-wrap">
-                  <span className="text-3xl font-bold text-foreground">£{businessCurrentPrice.toFixed(0)}</span>
+                  <span className="text-3xl font-bold text-foreground">
+                    £{businessCurrentPrice.toFixed(0)}
+                  </span>
                   {businessOriginalPrice > businessCurrentPrice && (
-                    <span className="text-sm text-muted-foreground line-through">£{businessOriginalPrice.toFixed(0)}</span>
+                    <span className="text-sm text-muted-foreground line-through">
+                      £{businessOriginalPrice.toFixed(0)}
+                    </span>
                   )}
                   {businessDiscountPct !== null && (
-                    <span className="badge-shine text-xs font-bold px-3 py-1 rounded-full inline-block">{businessDiscountPct}% off</span>
+                    <span className="badge-shine text-xs font-bold px-3 py-1 rounded-full inline-block">
+                      {businessDiscountPct}% off
+                    </span>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">Per pass, ex VAT · {businessPeriodName}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Per pass, ex VAT · {businessPeriodName}
+                </p>
               </div>
             </div>
           </div>
 
           <div className="flex flex-col md:flex-row md:items-start">
-
             {/* ── Left column: Benefits ── */}
             <div className="flex-1 p-6 md:p-8">
               {/* Standard benefits */}
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">What's included</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
+                What's included
+              </p>
               <div className="space-y-2 mb-4">
                 {businessBenefits.map((b) => (
                   <div key={b} className="flex items-start gap-2 text-sm">
@@ -629,9 +745,14 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
               {/* Exclusive / premium benefits */}
               {businessExtraBenefits.length > 0 && (
                 <div className="border-t border-border pt-3 mt-3 space-y-2">
-                  <p className="text-xs font-bold uppercase tracking-widest text-gold mb-2">Exclusive to Business Pass</p>
+                  <p className="text-xs font-bold uppercase tracking-widest text-gold mb-2">
+                    Exclusive to Business Pass
+                  </p>
                   {businessExtraBenefits.map((b) => (
-                    <div key={b} className="flex items-start gap-2 text-sm font-semibold border-l-2 border-gold pl-2">
+                    <div
+                      key={b}
+                      className="flex items-start gap-2 text-sm font-semibold border-l-2 border-gold pl-2"
+                    >
                       <Star className="w-4 h-4 text-gold shrink-0 mt-0.5" />
                       <span>{b}</span>
                     </div>
@@ -654,7 +775,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                 <button
                   type="button"
                   className="flex-none w-11 flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-30"
-                  onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                   disabled={quantity <= 1}
                 >
                   <Minus className="w-4 h-4" />
@@ -665,7 +786,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                 <button
                   type="button"
                   className="flex-none w-11 flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-30"
-                  onClick={() => setQuantity(q => Math.min(10, q + 1))}
+                  onClick={() => setQuantity((q) => Math.min(10, q + 1))}
                   disabled={quantity >= 10}
                 >
                   <Plus className="w-4 h-4" />
@@ -714,14 +835,17 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
       )}
       {/* ── Order Summary ── */}
       <div className="bg-white border border-border flex flex-col md:flex-row md:items-start justify-between gap-0 md:gap-8 overflow-hidden">
-
         {/* Left: selection summary */}
         <div className="flex-1 p-6 md:p-8 space-y-1">
           <h2 className="text-xl font-bold">
-            {quantity} {isHR ? `ticket${quantity !== 1 ? "s" : ""}` : `pass${quantity !== 1 ? "es" : ""}`} selected
+            {quantity}{" "}
+            {isHR ? `ticket${quantity !== 1 ? "s" : ""}` : `pass${quantity !== 1 ? "es" : ""}`}{" "}
+            selected
           </h2>
           {discountLabel && !isMostPopular && (
-            <p className="text-sm font-semibold text-secondary">{discountLabel} group discount applied</p>
+            <p className="text-sm font-semibold text-secondary">
+              {discountLabel} group discount applied
+            </p>
           )}
           {isMostPopular && (
             <p className="text-sm font-semibold text-secondary">Most popular choice for teams</p>
@@ -740,15 +864,19 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
               .hau-card { animation: hau-glow 3.6s ease-in-out infinite; }
             `}</style>
             <div className="hau-card border rounded-none px-4 py-3 space-y-2 transition-colors">
-              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">How did you hear about the event?</p>
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                How did you hear about the event?
+              </p>
               <select
                 value={hearAboutUs}
-                onChange={e => setHearAboutUs(e.target.value)}
+                onChange={(e) => setHearAboutUs(e.target.value)}
                 className="w-full h-10 border border-input bg-white rounded-none px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="">Select an option…</option>
-                {hearOptions.map(opt => (
-                  <option key={opt} value={opt}>{opt}</option>
+                {hearOptions.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
                 ))}
               </select>
             </div>
@@ -780,9 +908,14 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                 {compShortfall && compRemaining !== null && (
                   <div className="bg-amber-50 border border-amber-300 px-3 py-2.5 text-sm text-amber-900 space-y-2">
                     <p className="font-semibold">
-                      Only {compRemaining} complimentary ticket{compRemaining === 1 ? "" : "s"} {compRemaining === 1 ? "remains" : "remain"} on this code, but you've selected {quantity}.
+                      Only {compRemaining} complimentary ticket{compRemaining === 1 ? "" : "s"}{" "}
+                      {compRemaining === 1 ? "remains" : "remain"} on this code, but you've selected{" "}
+                      {quantity}.
                     </p>
-                    <p className="text-xs">Reduce your quantity to use the code, or remove the code to keep all {quantity} tickets at the standard price.</p>
+                    <p className="text-xs">
+                      Reduce your quantity to use the code, or remove the code to keep all{" "}
+                      {quantity} tickets at the standard price.
+                    </p>
                     <div className="flex flex-wrap gap-2 pt-1">
                       {compRemaining > 0 && (
                         <Button
@@ -810,14 +943,19 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
               </>
             ) : (
               <div className="space-y-1.5">
-                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Promo Code</p>
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  Promo Code
+                </p>
                 <div className="flex gap-2">
                   <Input
                     className="h-10 uppercase bg-white text-sm font-mono"
                     placeholder="Enter code"
                     value={promoInput}
-                    onChange={e => { setPromoInput(e.target.value.toUpperCase()); setPromoError(null); }}
-                    onKeyDown={e => e.key === "Enter" && handleApplyPromo()}
+                    onChange={(e) => {
+                      setPromoInput(e.target.value.toUpperCase());
+                      setPromoError(null);
+                    }}
+                    onKeyDown={(e) => e.key === "Enter" && handleApplyPromo()}
                   />
                   <Button
                     type="button"
@@ -830,9 +968,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                     {promoValidating ? "Checking…" : "Apply"}
                   </Button>
                 </div>
-                {promoError && (
-                  <p className="text-xs text-red-600 font-medium">{promoError}</p>
-                )}
+                {promoError && <p className="text-xs text-red-600 font-medium">{promoError}</p>}
               </div>
             )}
           </div>

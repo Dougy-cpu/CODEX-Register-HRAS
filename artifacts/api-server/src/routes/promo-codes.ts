@@ -25,8 +25,8 @@ router.post("/promo-codes/validate", async (req, res): Promise<void> => {
         eq(promoCodesTable.code, (code as string).toUpperCase()),
         eq(promoCodesTable.isActive, true),
         or(isNull(promoCodesTable.validFrom), lte(promoCodesTable.validFrom, now)),
-        or(isNull(promoCodesTable.validUntil), gte(promoCodesTable.validUntil, now))
-      )
+        or(isNull(promoCodesTable.validUntil), gte(promoCodesTable.validUntil, now)),
+      ),
     );
 
   if (!promo) {
@@ -36,7 +36,9 @@ router.post("/promo-codes/validate", async (req, res): Promise<void> => {
 
   if (promo.maxUses !== null && promo.usedCount >= promo.maxUses) {
     if (promo.discountType === "complimentary") {
-      res.status(400).json({ error: "This complimentary code has been fully redeemed — no tickets remain" });
+      res
+        .status(400)
+        .json({ error: "This complimentary code has been fully redeemed — no tickets remain" });
     } else {
       res.status(400).json({ error: "This promo code has already been used up" });
     }
@@ -44,7 +46,9 @@ router.post("/promo-codes/validate", async (req, res): Promise<void> => {
   }
 
   if (promo.applicablePassTypes && !promo.applicablePassTypes.includes(passType as string)) {
-    const allowed = promo.applicablePassTypes.map((t: string) => t === "single" ? "Single Pass" : "Business Pass").join(" and ");
+    const allowed = promo.applicablePassTypes
+      .map((t: string) => (t === "single" ? "Single Pass" : "Business Pass"))
+      .join(" and ");
     res.status(400).json({ error: `This promo code is only valid for ${allowed}` });
     return;
   }
@@ -61,7 +65,9 @@ router.post("/promo-codes/validate", async (req, res): Promise<void> => {
     if (email) {
       const used = await isCodeUsedByEmail(promo.code, email);
       if (used) {
-        res.status(400).json({ error: "This promo code has already been used on a previous booking with this email" });
+        res.status(400).json({
+          error: "This promo code has already been used on a previous booking with this email",
+        });
         return;
       }
     }
@@ -78,7 +84,9 @@ router.post("/promo-codes/validate", async (req, res): Promise<void> => {
   let remainingSeats: number | null = null;
 
   if (promo.discountType === "percentage") {
-    discountAmount = parseFloat(((baseSubtotal * parseFloat(promo.discountValue.toString())) / 100).toFixed(2));
+    discountAmount = parseFloat(
+      ((baseSubtotal * parseFloat(promo.discountValue.toString())) / 100).toFixed(2),
+    );
     if (promo.maxDiscountAmount !== null) {
       const cap = parseFloat(promo.maxDiscountAmount.toString());
       if (discountAmount > cap) discountAmount = cap;
@@ -86,7 +94,7 @@ router.post("/promo-codes/validate", async (req, res): Promise<void> => {
   } else if (promo.discountType === "per_ticket") {
     discountAmount = Math.min(
       parseFloat((parseFloat(promo.discountValue.toString()) * qty).toFixed(2)),
-      baseSubtotal
+      baseSubtotal,
     );
   } else if (promo.discountType === "complimentary") {
     // For comp codes we surface remainingSeats but allow apply-with-shortfall
@@ -95,7 +103,9 @@ router.post("/promo-codes/validate", async (req, res): Promise<void> => {
     if (promo.maxUses !== null) {
       remainingSeats = Math.max(0, promo.maxUses - promo.usedCount);
       if (remainingSeats === 0) {
-        res.status(400).json({ error: "This complimentary code has been fully redeemed — no tickets remain" });
+        res
+          .status(400)
+          .json({ error: "This complimentary code has been fully redeemed — no tickets remain" });
         return;
       }
     }
@@ -117,7 +127,11 @@ router.post("/promo-codes/validate", async (req, res): Promise<void> => {
 
 // Returns true if the given normalised email is the lead attendee on any
 // paid/invoiced booking that already used this promo code.
-export async function isCodeUsedByEmail(code: string, normalisedEmail: string, excludeBookingId?: number): Promise<boolean> {
+export async function isCodeUsedByEmail(
+  code: string,
+  normalisedEmail: string,
+  excludeBookingId?: number,
+): Promise<boolean> {
   if (!normalisedEmail) return false;
   const matchingBookings = await db
     .select({ id: bookingsTable.id })
@@ -126,21 +140,14 @@ export async function isCodeUsedByEmail(code: string, normalisedEmail: string, e
       and(
         eq(bookingsTable.promoCode, code.toUpperCase()),
         inArray(bookingsTable.status, ["paid", "invoiced"]),
-      )
+      ),
     );
-  const bookingIds = matchingBookings
-    .map((b) => b.id)
-    .filter((id) => id !== excludeBookingId);
+  const bookingIds = matchingBookings.map((b) => b.id).filter((id) => id !== excludeBookingId);
   if (bookingIds.length === 0) return false;
   const leads = await db
     .select({ workEmail: attendeesTable.workEmail, bookingId: attendeesTable.bookingId })
     .from(attendeesTable)
-    .where(
-      and(
-        eq(attendeesTable.isLead, true),
-        inArray(attendeesTable.bookingId, bookingIds),
-      )
-    );
+    .where(and(eq(attendeesTable.isLead, true), inArray(attendeesTable.bookingId, bookingIds)));
   return leads.some((l) => (l.workEmail || "").trim().toLowerCase() === normalisedEmail);
 }
 

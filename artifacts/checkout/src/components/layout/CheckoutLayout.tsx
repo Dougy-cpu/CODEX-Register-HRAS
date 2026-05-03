@@ -7,12 +7,7 @@ interface CheckoutLayoutProps {
 }
 
 export default function CheckoutLayout({ children, currentStep = 1 }: CheckoutLayoutProps) {
-  const steps = [
-    "Your Details",
-    "Select Passes",
-    "Attendee Details",
-    "Payment"
-  ];
+  const steps = ["Your Details", "Select Passes", "Attendee Details", "Payment"];
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background selection:bg-primary/20 selection:text-primary">
@@ -21,15 +16,16 @@ export default function CheckoutLayout({ children, currentStep = 1 }: CheckoutLa
           <img src={logoUrl} alt="HR Analytics Summit" className="h-8 object-contain" />
           {currentStep < 5 && (
             <div className="text-sm font-medium text-muted-foreground hidden md:block">
-              Step {currentStep} of 4: <span className="text-foreground">{steps[currentStep - 1]}</span>
+              Step {currentStep} of 4:{" "}
+              <span className="text-foreground">{steps[currentStep - 1]}</span>
             </div>
           )}
         </div>
-        
+
         {/* Progress Bar */}
         {currentStep < 5 && (
           <div className="w-full bg-muted h-1">
-            <div 
+            <div
               className="bg-primary h-full transition-all duration-500 ease-out"
               style={{ width: `${(currentStep / 4) * 100}%` }}
             />
@@ -37,9 +33,7 @@ export default function CheckoutLayout({ children, currentStep = 1 }: CheckoutLa
         )}
       </header>
 
-      <main className="flex-1 w-full max-w-5xl mx-auto px-6 py-12 flex flex-col">
-        {children}
-      </main>
+      <main className="flex-1 w-full max-w-5xl mx-auto px-6 py-12 flex flex-col">{children}</main>
 
       <footer className="w-full border-t border-border mt-auto py-8">
         <div className="max-w-5xl mx-auto px-6 text-center text-sm text-muted-foreground font-medium">

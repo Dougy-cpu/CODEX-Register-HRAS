@@ -7,7 +7,10 @@ export const passConfigTable = pgTable("pass_config", {
   pricingPeriodName: text("pricing_period_name").notNull().default("Early Bird"),
   benefits: jsonb("benefits").$type<string[]>().notNull().default([]),
   extraBenefits: jsonb("extra_benefits").$type<string[]>().notNull().default([]),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
 });
 
 export type PassConfig = typeof passConfigTable.$inferSelect;

@@ -30,8 +30,12 @@ function formatBooking(b: typeof bookingsTable.$inferSelect) {
     subtotalAmount: parseFloat(b.subtotalAmount?.toString() || "0"),
     vatAmount: parseFloat(b.vatAmount?.toString() || "0"),
     totalAmount: parseFloat(b.totalAmount?.toString() || "0"),
-    promoDiscountAmount: b.promoDiscountAmount ? parseFloat(b.promoDiscountAmount.toString()) : null,
-    groupDiscountAmount: b.groupDiscountAmount ? parseFloat(b.groupDiscountAmount.toString()) : null,
+    promoDiscountAmount: b.promoDiscountAmount
+      ? parseFloat(b.promoDiscountAmount.toString())
+      : null,
+    groupDiscountAmount: b.groupDiscountAmount
+      ? parseFloat(b.groupDiscountAmount.toString())
+      : null,
     invoiceDueDate: b.invoiceDueDate ? b.invoiceDueDate.toISOString() : null,
     createdAt: b.createdAt.toISOString(),
     updatedAt: b.updatedAt.toISOString(),
@@ -51,7 +55,8 @@ function formatPromoCode(p: typeof promoCodesTable.$inferSelect) {
   return {
     ...p,
     discountValue: parseFloat(p.discountValue.toString()),
-    maxDiscountAmount: p.maxDiscountAmount !== null ? parseFloat(p.maxDiscountAmount.toString()) : null,
+    maxDiscountAmount:
+      p.maxDiscountAmount !== null ? parseFloat(p.maxDiscountAmount.toString()) : null,
     validFrom: p.validFrom ? p.validFrom.toISOString() : null,
     validUntil: p.validUntil ? p.validUntil.toISOString() : null,
     createdAt: p.createdAt.toISOString(),
@@ -70,7 +75,9 @@ router.post("/admin/login", async (req, res): Promise<void> => {
   const adminPassword = getAdminPassword();
 
   if (!adminPassword) {
-    res.status(503).json({ error: "Admin authentication not configured — set a secure ADMIN_PASSWORD" });
+    res
+      .status(503)
+      .json({ error: "Admin authentication not configured — set a secure ADMIN_PASSWORD" });
     return;
   }
 
@@ -93,11 +100,11 @@ router.get("/admin/stats", adminAuth, async (_req, res): Promise<void> => {
 
   const totalRevenue = completed.reduce(
     (sum, b) => sum + parseFloat(b.totalAmount?.toString() || "0"),
-    0
+    0,
   );
   const totalVat = completed.reduce(
     (sum, b) => sum + parseFloat(b.vatAmount?.toString() || "0"),
-    0
+    0,
   );
 
   const passCounts = {
@@ -150,8 +157,8 @@ router.get("/admin/stats", adminAuth, async (_req, res): Promise<void> => {
 });
 
 router.get("/admin/registrations", adminAuth, async (req, res): Promise<void> => {
-  const page = parseInt(req.query.page as string || "1", 10);
-  const limit = parseInt(req.query.limit as string || "25", 10);
+  const page = parseInt((req.query.page as string) || "1", 10);
+  const limit = parseInt((req.query.limit as string) || "25", 10);
   const offset = (page - 1) * limit;
   const statusFilter = req.query.status as string | undefined;
   const passTypeFilter = req.query.passType as string | undefined;
@@ -176,14 +183,14 @@ router.get("/admin/registrations", adminAuth, async (req, res): Promise<void> =>
           a.firstName.toLowerCase().includes(searchLower) ||
           a.lastName.toLowerCase().includes(searchLower) ||
           a.workEmail.toLowerCase().includes(searchLower) ||
-          a.company.toLowerCase().includes(searchLower)
+          a.company.toLowerCase().includes(searchLower),
       )
       .map((a) => a.bookingId);
 
     filtered = filtered.filter(
       (b) =>
         matchingAttendeeBookingIds.includes(b.id) ||
-        (b.orderReference && b.orderReference.toLowerCase().includes(searchLower))
+        (b.orderReference && b.orderReference.toLowerCase().includes(searchLower)),
     );
   }
 
@@ -266,7 +273,7 @@ router.get("/admin/registrations/export", adminAuth, async (req, res): Promise<v
         vat: parseFloat(booking.vatAmount?.toString() || "0"),
         total: parseFloat(booking.totalAmount?.toString() || "0"),
         paymentMethod: booking.paymentMethod || "",
-        invoiceRef: booking.paymentMethod === "invoice" ? (booking.orderReference || "") : "",
+        invoiceRef: booking.paymentMethod === "invoice" ? booking.orderReference || "" : "",
         billingName: booking.billingName || "",
         billingCompany: booking.billingCompany || "",
         billingEmail: booking.billingEmail || "",
@@ -294,19 +301,19 @@ router.get("/admin/registrations/export", adminAuth, async (req, res): Promise<v
         vat: parseFloat(booking.vatAmount?.toString() || "0"),
         total: parseFloat(booking.totalAmount?.toString() || "0"),
         paymentMethod: booking.paymentMethod || "",
-        invoiceRef: booking.paymentMethod === "invoice" ? (booking.orderReference || "") : "",
+        invoiceRef: booking.paymentMethod === "invoice" ? booking.orderReference || "" : "",
         billingName: booking.billingName || "",
         billingCompany: booking.billingCompany || "",
         billingEmail: booking.billingEmail || "",
         lead: a.isLead ? "★" : "",
-        firstName: a.isTbc ? "(TBC)" : (a.firstName || ""),
-        lastName: a.isTbc ? "" : (a.lastName || ""),
-        jobTitle: a.isTbc ? "" : (a.jobTitle || ""),
-        company: a.isTbc ? "" : (a.company || ""),
-        workEmail: a.isTbc ? "" : (a.workEmail || ""),
-        phone: a.isTbc ? "" : (a.phone || ""),
-        dietary: a.isTbc ? "" : (a.dietaryAccessibility || ""),
-        gdpr: a.isTbc ? "" : (a.gdprConsent ? "Yes" : "No"),
+        firstName: a.isTbc ? "(TBC)" : a.firstName || "",
+        lastName: a.isTbc ? "" : a.lastName || "",
+        jobTitle: a.isTbc ? "" : a.jobTitle || "",
+        company: a.isTbc ? "" : a.company || "",
+        workEmail: a.isTbc ? "" : a.workEmail || "",
+        phone: a.isTbc ? "" : a.phone || "",
+        dietary: a.isTbc ? "" : a.dietaryAccessibility || "",
+        gdpr: a.isTbc ? "" : a.gdprConsent ? "Yes" : "No",
         registeredAt: booking.createdAt.toISOString(),
       });
       if (a.isLead) {
@@ -333,7 +340,10 @@ router.get("/admin/registrations/export", adminAuth, async (req, res): Promise<v
   });
 
   const date = new Date().toISOString().split("T")[0];
-  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
   res.setHeader("Content-Disposition", `attachment; filename="hras26-registrations-${date}.xlsx"`);
   await workbook.xlsx.write(res);
   res.end();
@@ -349,10 +359,7 @@ router.get("/admin/registrations/:id", adminAuth, async (req, res): Promise<void
     return;
   }
 
-  const attendees = await db
-    .select()
-    .from(attendeesTable)
-    .where(eq(attendeesTable.bookingId, id));
+  const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, id));
 
   res.json({
     ...formatBooking(booking),
@@ -365,7 +372,15 @@ router.patch("/admin/registrations/:id/status", adminAuth, async (req, res): Pro
   const id = parseInt(raw, 10);
   const { status } = req.body as { status: string };
 
-  const allowed = ["paid", "invoiced", "partial", "pending_payment", "cancelled", "refunded", "disputed"];
+  const allowed = [
+    "paid",
+    "invoiced",
+    "partial",
+    "pending_payment",
+    "cancelled",
+    "refunded",
+    "disputed",
+  ];
   if (!status || !allowed.includes(status)) {
     res.status(400).json({ error: `status must be one of: ${allowed.join(", ")}` });
     return;
@@ -383,11 +398,17 @@ router.patch("/admin/registrations/:id/status", adminAuth, async (req, res): Pro
   if (status === "cancelled") {
     const stripe = getStripe();
     const needsInvoiceVoid = existing.status === "invoiced" && !!existing.stripeInvoiceId;
-    const needsCardRefund = existing.status === "paid" && existing.paymentMethod === "card" && !!existing.stripePaymentIntentId;
+    const needsCardRefund =
+      existing.status === "paid" &&
+      existing.paymentMethod === "card" &&
+      !!existing.stripePaymentIntentId;
 
     if (!stripe && (needsInvoiceVoid || needsCardRefund)) {
       stripeAction = "failed";
-      console.error({ bookingId: id }, "Stripe not configured — cannot void invoice or issue refund on cancellation");
+      console.error(
+        { bookingId: id },
+        "Stripe not configured — cannot void invoice or issue refund on cancellation",
+      );
     } else if (stripe && needsInvoiceVoid) {
       try {
         await stripe.invoices.voidInvoice(existing.stripeInvoiceId!);
@@ -433,7 +454,10 @@ router.delete("/admin/registrations", adminAuth, async (req, res): Promise<void>
 
   for (const bookingId of numericIds) {
     await db.delete(activityLogTable).where(eq(activityLogTable.bookingId, bookingId));
-    const attendees = await db.select({ id: attendeesTable.id }).from(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
+    const attendees = await db
+      .select({ id: attendeesTable.id })
+      .from(attendeesTable)
+      .where(eq(attendeesTable.bookingId, bookingId));
     for (const a of attendees) {
       await db.delete(activityLogTable).where(eq(activityLogTable.attendeeId, a.id));
     }
@@ -450,16 +474,31 @@ router.get("/admin/promo-codes", adminAuth, async (_req, res): Promise<void> => 
 });
 
 router.post("/admin/promo-codes", adminAuth, async (req, res): Promise<void> => {
-  const { code, discountType, discountValue, maxUses, validFrom, validUntil, isActive, description, applicablePassTypes, oncePerCustomer, minQuantity, maxDiscountAmount, internalNote } = req.body;
+  const {
+    code,
+    discountType,
+    discountValue,
+    maxUses,
+    validFrom,
+    validUntil,
+    isActive,
+    description,
+    applicablePassTypes,
+    oncePerCustomer,
+    minQuantity,
+    maxDiscountAmount,
+    internalNote,
+  } = req.body;
 
   if (!code || !discountType || discountValue === undefined) {
     res.status(400).json({ error: "code, discountType, and discountValue are required" });
     return;
   }
 
-  const passTypes: string[] = Array.isArray(applicablePassTypes) && applicablePassTypes.length > 0
-    ? applicablePassTypes
-    : ["single", "business"];
+  const passTypes: string[] =
+    Array.isArray(applicablePassTypes) && applicablePassTypes.length > 0
+      ? applicablePassTypes
+      : ["single", "business"];
 
   const [promo] = await db
     .insert(promoCodesTable)
@@ -475,9 +514,10 @@ router.post("/admin/promo-codes", adminAuth, async (req, res): Promise<void> => 
       description: description || null,
       oncePerCustomer: oncePerCustomer === true,
       minQuantity: minQuantity ?? null,
-      maxDiscountAmount: maxDiscountAmount !== undefined && maxDiscountAmount !== null
-        ? maxDiscountAmount.toString()
-        : null,
+      maxDiscountAmount:
+        maxDiscountAmount !== undefined && maxDiscountAmount !== null
+          ? maxDiscountAmount.toString()
+          : null,
       internalNote: internalNote || null,
     })
     .returning();
@@ -495,7 +535,21 @@ router.patch("/admin/promo-codes/:id", adminAuth, async (req, res): Promise<void
     return;
   }
 
-  const { code, discountType, discountValue, maxUses, validFrom, validUntil, isActive, description, applicablePassTypes, oncePerCustomer, minQuantity, maxDiscountAmount, internalNote } = req.body;
+  const {
+    code,
+    discountType,
+    discountValue,
+    maxUses,
+    validFrom,
+    validUntil,
+    isActive,
+    description,
+    applicablePassTypes,
+    oncePerCustomer,
+    minQuantity,
+    maxDiscountAmount,
+    internalNote,
+  } = req.body;
 
   const updateData: Partial<typeof promoCodesTable.$inferInsert> = {};
   if (code !== undefined) updateData.code = (code as string).toUpperCase();
@@ -557,7 +611,7 @@ router.put("/admin/discount-tiers", adminAuth, async (req, res): Promise<void> =
         minQuantity: tier.minQuantity,
         discountPercent: tier.discountPercent.toString(),
         label: tier.label || null,
-      }))
+      })),
     )
     .returning();
 
@@ -588,7 +642,10 @@ router.put("/admin/passes/inventory/:passType", adminAuth, async (req, res): Pro
       target: passInventoryTable.passType,
       set: { remaining: val, updatedAt: new Date() },
     });
-  const [row] = await db.select().from(passInventoryTable).where(eq(passInventoryTable.passType, passType));
+  const [row] = await db
+    .select()
+    .from(passInventoryTable)
+    .where(eq(passInventoryTable.passType, passType));
   res.json(row);
 });
 
@@ -597,10 +654,12 @@ router.get("/admin/notification-emails", adminAuth, async (_req, res): Promise<v
     .select()
     .from(notificationEmailsTable)
     .orderBy(notificationEmailsTable.createdAt);
-  res.json(emails.map(e => ({
-    ...e,
-    createdAt: e.createdAt.toISOString(),
-  })));
+  res.json(
+    emails.map((e) => ({
+      ...e,
+      createdAt: e.createdAt.toISOString(),
+    })),
+  );
 });
 
 router.post("/admin/notification-emails", adminAuth, async (req, res): Promise<void> => {
@@ -655,7 +714,7 @@ router.delete("/admin/notification-emails/:id", adminAuth, async (req, res): Pro
 
 router.get("/admin/passes/config", adminAuth, async (_req, res): Promise<void> => {
   const rows = await db.select().from(passConfigTable);
-  const result: Record<string, typeof rows[0] | null> = { single: null, business: null };
+  const result: Record<string, (typeof rows)[0] | null> = { single: null, business: null };
   for (const row of rows) {
     result[row.passType] = row;
   }
@@ -670,11 +729,17 @@ router.put("/admin/passes/config/:passType", adminAuth, async (req, res): Promis
   }
   const { currentPrice, originalPrice, pricingPeriodName, benefits, extraBenefits } = req.body;
 
-  if (currentPrice !== undefined && (isNaN(parseFloat(currentPrice)) || parseFloat(currentPrice) < 0)) {
+  if (
+    currentPrice !== undefined &&
+    (isNaN(parseFloat(currentPrice)) || parseFloat(currentPrice) < 0)
+  ) {
     res.status(400).json({ error: "Invalid current price" });
     return;
   }
-  if (originalPrice !== undefined && (isNaN(parseFloat(originalPrice)) || parseFloat(originalPrice) < 0)) {
+  if (
+    originalPrice !== undefined &&
+    (isNaN(parseFloat(originalPrice)) || parseFloat(originalPrice) < 0)
+  ) {
     res.status(400).json({ error: "Invalid original price" });
     return;
   }
@@ -684,7 +749,8 @@ router.put("/admin/passes/config/:passType", adminAuth, async (req, res): Promis
   if (originalPrice !== undefined) updates.originalPrice = parseFloat(originalPrice).toFixed(2);
   if (pricingPeriodName !== undefined) updates.pricingPeriodName = String(pricingPeriodName).trim();
   if (benefits !== undefined) updates.benefits = Array.isArray(benefits) ? benefits : [];
-  if (extraBenefits !== undefined) updates.extraBenefits = Array.isArray(extraBenefits) ? extraBenefits : [];
+  if (extraBenefits !== undefined)
+    updates.extraBenefits = Array.isArray(extraBenefits) ? extraBenefits : [];
 
   const [row] = await db
     .insert(passConfigTable)
@@ -716,12 +782,9 @@ router.get("/admin/activity", adminAuth, async (req, res): Promise<void> => {
     .from(bookingsTable)
     .where(
       and(
-        or(
-          eq(bookingsTable.status, "paid"),
-          eq(bookingsTable.status, "invoiced")
-        ),
-        sql`${bookingsTable.createdAt} >= ${ninetyDaysAgo}`
-      )
+        or(eq(bookingsTable.status, "paid"), eq(bookingsTable.status, "invoiced")),
+        sql`${bookingsTable.createdAt} >= ${ninetyDaysAgo}`,
+      ),
     )
     .orderBy(desc(bookingsTable.createdAt))
     .limit(100);
@@ -731,10 +794,7 @@ router.get("/admin/activity", adminAuth, async (req, res): Promise<void> => {
     .select()
     .from(bookingsTable)
     .where(
-      and(
-        eq(bookingsTable.status, "partial"),
-        sql`${bookingsTable.createdAt} >= ${ninetyDaysAgo}`
-      )
+      and(eq(bookingsTable.status, "partial"), sql`${bookingsTable.createdAt} >= ${ninetyDaysAgo}`),
     )
     .orderBy(desc(bookingsTable.createdAt))
     .limit(100);
@@ -769,10 +829,7 @@ router.get("/admin/activity", adminAuth, async (req, res): Promise<void> => {
     .select()
     .from(emailLogsTable)
     .where(
-      and(
-        eq(emailLogsTable.status, "failed"),
-        sql`${emailLogsTable.sentAt} >= ${thirtyDaysAgo}`
-      )
+      and(eq(emailLogsTable.status, "failed"), sql`${emailLogsTable.sentAt} >= ${thirtyDaysAgo}`),
     )
     .orderBy(desc(emailLogsTable.sentAt))
     .limit(50);
@@ -781,12 +838,7 @@ router.get("/admin/activity", adminAuth, async (req, res): Promise<void> => {
   const [unpaidResult] = await db
     .select({ count: count() })
     .from(bookingsTable)
-    .where(
-      and(
-        eq(bookingsTable.paymentMethod, "invoice"),
-        eq(bookingsTable.status, "invoiced")
-      )
-    );
+    .where(and(eq(bookingsTable.paymentMethod, "invoice"), eq(bookingsTable.status, "invoiced")));
 
   const [tbcResult] = await db
     .select({ count: count() })
@@ -803,8 +855,8 @@ router.get("/admin/activity", adminAuth, async (req, res): Promise<void> => {
     .where(
       and(
         or(eq(bookingsTable.status, "paid"), eq(bookingsTable.status, "invoiced")),
-        sql`${bookingsTable.createdAt} >= ${startOfMonth}`
-      )
+        sql`${bookingsTable.createdAt} >= ${startOfMonth}`,
+      ),
     );
 
   // Build combined feed
@@ -819,11 +871,7 @@ router.get("/admin/activity", adminAuth, async (req, res): Promise<void> => {
   for (const b of recentBookings) {
     const isInvoice = b.paymentMethod === "invoice";
     const isPaid = b.status === "paid";
-    const type = isInvoice
-      ? isPaid
-        ? "invoice_paid"
-        : "invoice_overdue"
-      : "new_booking_card";
+    const type = isInvoice ? (isPaid ? "invoice_paid" : "invoice_overdue") : "new_booking_card";
 
     const isNew = Date.now() - b.createdAt.getTime() < 7 * 24 * 60 * 60 * 1000;
     const resolvedType =
@@ -883,12 +931,7 @@ router.get("/admin/activity", adminAuth, async (req, res): Promise<void> => {
   const unpaidInvoiceList = await db
     .select()
     .from(bookingsTable)
-    .where(
-      and(
-        eq(bookingsTable.paymentMethod, "invoice"),
-        eq(bookingsTable.status, "invoiced")
-      )
-    )
+    .where(and(eq(bookingsTable.paymentMethod, "invoice"), eq(bookingsTable.status, "invoiced")))
     .orderBy(bookingsTable.invoiceDueDate);
 
   res.json({

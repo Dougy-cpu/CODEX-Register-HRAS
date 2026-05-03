@@ -13,12 +13,38 @@ import {
 } from "@workspace/api-client-react";
 import AdminLayout from "@/components/layout/AdminLayout";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -47,25 +73,28 @@ function CopyLinkButton({ code }: { code: string }) {
   );
 }
 
-const promoSchema = z.object({
-  code: z.string().min(1, "Code is required").toUpperCase(),
-  discountType: z.enum(["percentage", "fixed", "per_ticket", "complimentary"]),
-  discountValue: z.coerce.number().min(0, "Value must be 0 or greater"),
-  maxUses: z.coerce.number().int().positive().optional().nullable(),
-  isActive: z.boolean().default(true),
-  applySingle: z.boolean().default(true),
-  applyBusiness: z.boolean().default(true),
-  oncePerCustomer: z.boolean().default(false),
-  minQuantity: z.coerce.number().int().positive().optional().nullable(),
-  maxDiscountAmount: z.coerce.number().positive().optional().nullable(),
-  internalNote: z.string().optional().nullable(),
-}).refine((data) => data.applySingle || data.applyBusiness, {
-  message: "At least one pass type must be selected",
-  path: ["applySingle"],
-}).refine(
-  (data) => data.discountType === "complimentary" || data.discountValue > 0,
-  { message: "Value must be greater than 0 for this discount type", path: ["discountValue"] },
-);
+const promoSchema = z
+  .object({
+    code: z.string().min(1, "Code is required").toUpperCase(),
+    discountType: z.enum(["percentage", "fixed", "per_ticket", "complimentary"]),
+    discountValue: z.coerce.number().min(0, "Value must be 0 or greater"),
+    maxUses: z.coerce.number().int().positive().optional().nullable(),
+    isActive: z.boolean().default(true),
+    applySingle: z.boolean().default(true),
+    applyBusiness: z.boolean().default(true),
+    oncePerCustomer: z.boolean().default(false),
+    minQuantity: z.coerce.number().int().positive().optional().nullable(),
+    maxDiscountAmount: z.coerce.number().positive().optional().nullable(),
+    internalNote: z.string().optional().nullable(),
+  })
+  .refine((data) => data.applySingle || data.applyBusiness, {
+    message: "At least one pass type must be selected",
+    path: ["applySingle"],
+  })
+  .refine((data) => data.discountType === "complimentary" || data.discountValue > 0, {
+    message: "Value must be greater than 0 for this discount type",
+    path: ["discountValue"],
+  });
 
 type PromoFormValues = z.infer<typeof promoSchema>;
 
@@ -116,7 +145,14 @@ interface PromoFormDialogProps {
   trigger?: React.ReactNode;
 }
 
-function PromoFormDialog({ open, onOpenChange, initial, onSubmit, submitting, trigger }: PromoFormDialogProps) {
+function PromoFormDialog({
+  open,
+  onOpenChange,
+  initial,
+  onSubmit,
+  submitting,
+  trigger,
+}: PromoFormDialogProps) {
   const isEdit = !!initial;
   const form = useForm<PromoFormValues>({
     resolver: zodResolver(promoSchema),
@@ -219,7 +255,9 @@ function PromoFormDialog({ open, onOpenChange, initial, onSubmit, submitting, tr
                         type="number"
                         {...field}
                         value={field.value ?? ""}
-                        onChange={(e) => field.onChange(e.target.value === "" ? null : e.target.value)}
+                        onChange={(e) =>
+                          field.onChange(e.target.value === "" ? null : e.target.value)
+                        }
                       />
                     </FormControl>
                     <FormMessage />
@@ -238,7 +276,9 @@ function PromoFormDialog({ open, onOpenChange, initial, onSubmit, submitting, tr
                         placeholder="e.g. 3"
                         {...field}
                         value={field.value ?? ""}
-                        onChange={(e) => field.onChange(e.target.value === "" ? null : e.target.value)}
+                        onChange={(e) =>
+                          field.onChange(e.target.value === "" ? null : e.target.value)
+                        }
                       />
                     </FormControl>
                     <FormMessage />
@@ -261,7 +301,9 @@ function PromoFormDialog({ open, onOpenChange, initial, onSubmit, submitting, tr
                       disabled={discountType !== "percentage"}
                       {...field}
                       value={field.value ?? ""}
-                      onChange={(e) => field.onChange(e.target.value === "" ? null : e.target.value)}
+                      onChange={(e) =>
+                        field.onChange(e.target.value === "" ? null : e.target.value)
+                      }
                     />
                   </FormControl>
                   <p className="text-xs text-muted-foreground">
@@ -274,7 +316,9 @@ function PromoFormDialog({ open, onOpenChange, initial, onSubmit, submitting, tr
 
             <div className="border rounded-md p-4 space-y-3">
               <p className="text-sm font-medium leading-none">Applies To</p>
-              <p className="text-xs text-muted-foreground">Select which pass types this code can be used with.</p>
+              <p className="text-xs text-muted-foreground">
+                Select which pass types this code can be used with.
+              </p>
               <FormField
                 control={form.control}
                 name="applySingle"
@@ -314,7 +358,9 @@ function PromoFormDialog({ open, onOpenChange, initial, onSubmit, submitting, tr
                 )}
               />
               {form.formState.errors.applySingle && (
-                <p className="text-sm text-destructive">{form.formState.errors.applySingle.message}</p>
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.applySingle.message}
+                </p>
               )}
             </div>
 
@@ -325,7 +371,9 @@ function PromoFormDialog({ open, onOpenChange, initial, onSubmit, submitting, tr
                 <FormItem className="flex items-center justify-between p-4 border rounded-md">
                   <div className="space-y-0.5">
                     <FormLabel className="text-base">One use per customer (email)</FormLabel>
-                    <p className="text-xs text-muted-foreground">Each lead email may redeem this code only once across confirmed bookings.</p>
+                    <p className="text-xs text-muted-foreground">
+                      Each lead email may redeem this code only once across confirmed bookings.
+                    </p>
                   </div>
                   <FormControl>
                     <Switch checked={field.value} onCheckedChange={field.onChange} />
@@ -408,7 +456,8 @@ export default function AdminPromoCodes() {
       applicablePassTypes,
       oncePerCustomer: values.oncePerCustomer,
       minQuantity: values.minQuantity ?? null,
-      maxDiscountAmount: values.discountType === "percentage" ? (values.maxDiscountAmount ?? null) : null,
+      maxDiscountAmount:
+        values.discountType === "percentage" ? (values.maxDiscountAmount ?? null) : null,
       internalNote: values.internalNote?.trim() ? values.internalNote.trim() : null,
     };
   };
@@ -461,7 +510,9 @@ export default function AdminPromoCodes() {
         {editing && (
           <PromoFormDialog
             open={!!editing}
-            onOpenChange={(open) => { if (!open) setEditing(null); }}
+            onOpenChange={(open) => {
+              if (!open) setEditing(null);
+            }}
             initial={editing}
             onSubmit={onEdit}
             submitting={updatePromo.isPending}
@@ -497,13 +548,17 @@ export default function AdminPromoCodes() {
                       {restrictionBadges(promo)}
                     </TableCell>
                     <TableCell>
-                      {promo.discountType === "percentage"
-                        ? `${promo.discountValue}%`
-                        : promo.discountType === "per_ticket"
-                          ? `£${promo.discountValue}/ticket`
-                          : promo.discountType === "complimentary"
-                            ? <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Free ticket</Badge>
-                            : `£${promo.discountValue}`}
+                      {promo.discountType === "percentage" ? (
+                        `${promo.discountValue}%`
+                      ) : promo.discountType === "per_ticket" ? (
+                        `£${promo.discountValue}/ticket`
+                      ) : promo.discountType === "complimentary" ? (
+                        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+                          Free ticket
+                        </Badge>
+                      ) : (
+                        `£${promo.discountValue}`
+                      )}
                     </TableCell>
                     <TableCell>{passTypeBadges(promo.applicablePassTypes)}</TableCell>
                     <TableCell className="max-w-[200px]">

@@ -2,12 +2,9 @@ import { pgTable, serial, timestamp, integer, jsonb, varchar } from "drizzle-orm
 import { bookingsTable } from "./bookings";
 import { attendeesTable } from "./attendees";
 
-export const activityTypeEnum = [
-  "attendee_change",
-  "tbc_filled",
-] as const;
+export const activityTypeEnum = ["attendee_change", "tbc_filled"] as const;
 
-export type ActivityType = typeof activityTypeEnum[number];
+export type ActivityType = (typeof activityTypeEnum)[number];
 
 export const activityLogTable = pgTable("activity_log", {
   id: serial("id").primaryKey(),

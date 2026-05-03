@@ -46,7 +46,8 @@ export default function EditBilling() {
 
   const { data, isLoading, isError } = useQuery<BillingResponse>({
     queryKey: ["booking-billing", token],
-    queryFn: () => customFetch<BillingResponse>(`/api/bookings/by-management-token/${token}/billing`),
+    queryFn: () =>
+      customFetch<BillingResponse>(`/api/bookings/by-management-token/${token}/billing`),
     enabled: !!token,
     retry: false,
   });
@@ -104,7 +105,9 @@ export default function EditBilling() {
         <div className="text-center max-w-md">
           <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h1 className="text-2xl font-bold mb-2">Invalid Link</h1>
-          <p className="text-muted-foreground">This billing link is not valid. Please check your confirmation email.</p>
+          <p className="text-muted-foreground">
+            This billing link is not valid. Please check your confirmation email.
+          </p>
         </div>
       </div>
     );
@@ -124,7 +127,9 @@ export default function EditBilling() {
         <div className="text-center max-w-md">
           <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h1 className="text-2xl font-bold mb-2">Booking Not Found</h1>
-          <p className="text-muted-foreground">We couldn't find a booking for this link. Please check your confirmation email.</p>
+          <p className="text-muted-foreground">
+            We couldn't find a booking for this link. Please check your confirmation email.
+          </p>
         </div>
       </div>
     );
@@ -141,7 +146,9 @@ export default function EditBilling() {
           src="https://hranalyticssummit.com/wp-content/uploads/2024/11/HRAS_logo_web.svg"
           alt="HR Analytics Summit"
           className="h-8"
-          onError={(e) => { e.currentTarget.style.display = "none"; }}
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+          }}
         />
       </header>
 
@@ -149,11 +156,19 @@ export default function EditBilling() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">PO Number & Billing Details</h1>
           <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground mt-1 mb-3">
-            <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-primary" />3 September 2026</span>
-            <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4 text-primary" />155 Bishopsgate, London</span>
+            <span className="flex items-center gap-1.5">
+              <Calendar className="w-4 h-4 text-primary" />3 September 2026
+            </span>
+            <span className="flex items-center gap-1.5">
+              <MapPin className="w-4 h-4 text-primary" />
+              155 Bishopsgate, London
+            </span>
           </div>
           <p className="text-sm text-muted-foreground">
-            Order reference: <span className="font-mono font-semibold text-foreground">{data.orderReference || "PENDING"}</span>
+            Order reference:{" "}
+            <span className="font-mono font-semibold text-foreground">
+              {data.orderReference || "PENDING"}
+            </span>
           </p>
         </div>
 
@@ -163,7 +178,12 @@ export default function EditBilling() {
             <div>
               <p className="font-semibold mb-1">Not an invoice booking</p>
               <p className="text-sm text-muted-foreground">
-                This booking was paid by card, so there is no invoice to update. If you need a PO added to your receipt, please contact us at <a href="mailto:hello@hranalyticssummit.com" className="underline">hello@hranalyticssummit.com</a>.
+                This booking was paid by card, so there is no invoice to update. If you need a PO
+                added to your receipt, please contact us at{" "}
+                <a href="mailto:hello@hranalyticssummit.com" className="underline">
+                  hello@hranalyticssummit.com
+                </a>
+                .
               </p>
             </div>
           </div>
@@ -171,10 +191,17 @@ export default function EditBilling() {
           <div className="border border-amber-300 bg-amber-50 rounded-sm p-6 flex items-start gap-4">
             <Lock className="w-5 h-5 text-amber-700 mt-0.5 flex-shrink-0" />
             <div>
-              <p className="font-semibold text-amber-900 mb-1">Booking edits are currently locked</p>
+              <p className="font-semibold text-amber-900 mb-1">
+                Booking edits are currently locked
+              </p>
               <p className="text-sm text-amber-800">
-                {data.lockedMessage || "Online edits to PO and billing details are temporarily disabled as the event approaches."} If you need to update your PO number or billing details, please email us at{" "}
-                <a href="mailto:hello@hranalyticssummit.com" className="underline">hello@hranalyticssummit.com</a>.
+                {data.lockedMessage ||
+                  "Online edits to PO and billing details are temporarily disabled as the event approaches."}{" "}
+                If you need to update your PO number or billing details, please email us at{" "}
+                <a href="mailto:hello@hranalyticssummit.com" className="underline">
+                  hello@hranalyticssummit.com
+                </a>
+                .
               </p>
             </div>
           </div>
@@ -182,11 +209,16 @@ export default function EditBilling() {
           <div className="border border-green-300 bg-green-50 rounded-sm p-6 flex items-start gap-4">
             <Lock className="w-5 h-5 text-green-700 mt-0.5 flex-shrink-0" />
             <div>
-              <p className="font-semibold text-green-900 mb-1">This invoice has already been paid</p>
+              <p className="font-semibold text-green-900 mb-1">
+                This invoice has already been paid
+              </p>
               <p className="text-sm text-green-800">
-                Billing details and PO number can no longer be changed because the invoice is already settled.
-                If you need a PO recorded for your records, please email us at{" "}
-                <a href="mailto:hello@hranalyticssummit.com" className="underline">hello@hranalyticssummit.com</a>.
+                Billing details and PO number can no longer be changed because the invoice is
+                already settled. If you need a PO recorded for your records, please email us at{" "}
+                <a href="mailto:hello@hranalyticssummit.com" className="underline">
+                  hello@hranalyticssummit.com
+                </a>
+                .
               </p>
               {data.stripeInvoicePdfUrl && (
                 <a
@@ -202,18 +234,25 @@ export default function EditBilling() {
           </div>
         ) : (
           <form
-            onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}
+            onSubmit={(e) => {
+              e.preventDefault();
+              mutation.mutate();
+            }}
             className="bg-white border border-border rounded-sm p-6 space-y-5"
           >
             <div>
-              <label className="block text-sm font-semibold mb-1.5">PO Number <span className="text-muted-foreground font-normal">(optional)</span></label>
+              <label className="block text-sm font-semibold mb-1.5">
+                PO Number <span className="text-muted-foreground font-normal">(optional)</span>
+              </label>
               <Input
                 value={form.poNumber}
                 maxLength={30}
                 onChange={(e) => setForm((f) => ({ ...f, poNumber: e.target.value }))}
                 placeholder="Add to appear on the invoice"
               />
-              <p className="text-xs text-muted-foreground mt-1">Max 30 characters. Saving will re-issue your invoice with the new details.</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Max 30 characters. Saving will re-issue your invoice with the new details.
+              </p>
             </div>
 
             <div className="border-t border-border pt-5">
@@ -221,58 +260,101 @@ export default function EditBilling() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold mb-1.5">Billing Contact Name</label>
-                  <Input value={form.billingName} onChange={(e) => setForm((f) => ({ ...f, billingName: e.target.value }))} />
+                  <Input
+                    value={form.billingName}
+                    onChange={(e) => setForm((f) => ({ ...f, billingName: e.target.value }))}
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold mb-1.5">Company</label>
-                  <Input value={form.billingCompany} onChange={(e) => setForm((f) => ({ ...f, billingCompany: e.target.value }))} />
+                  <Input
+                    value={form.billingCompany}
+                    onChange={(e) => setForm((f) => ({ ...f, billingCompany: e.target.value }))}
+                  />
                 </div>
               </div>
 
               <div className="mt-4">
                 <label className="block text-sm font-semibold mb-1.5">Invoice Email</label>
-                <Input type="email" value={form.billingEmail} onChange={(e) => setForm((f) => ({ ...f, billingEmail: e.target.value }))} />
+                <Input
+                  type="email"
+                  value={form.billingEmail}
+                  onChange={(e) => setForm((f) => ({ ...f, billingEmail: e.target.value }))}
+                />
               </div>
 
               <div className="mt-4">
                 <label className="block text-sm font-semibold mb-1.5">Phone</label>
-                <Input type="tel" value={form.billingPhone} onChange={(e) => setForm((f) => ({ ...f, billingPhone: e.target.value }))} />
+                <Input
+                  type="tel"
+                  value={form.billingPhone}
+                  onChange={(e) => setForm((f) => ({ ...f, billingPhone: e.target.value }))}
+                />
               </div>
 
               <div className="mt-4">
                 <label className="block text-sm font-semibold mb-1.5">Address Line 1</label>
-                <Input value={form.billingAddressLine1} onChange={(e) => setForm((f) => ({ ...f, billingAddressLine1: e.target.value }))} />
+                <Input
+                  value={form.billingAddressLine1}
+                  onChange={(e) => setForm((f) => ({ ...f, billingAddressLine1: e.target.value }))}
+                />
               </div>
               <div className="mt-4">
-                <label className="block text-sm font-semibold mb-1.5">Address Line 2 <span className="text-muted-foreground font-normal">(optional)</span></label>
-                <Input value={form.billingAddressLine2} onChange={(e) => setForm((f) => ({ ...f, billingAddressLine2: e.target.value }))} />
+                <label className="block text-sm font-semibold mb-1.5">
+                  Address Line 2{" "}
+                  <span className="text-muted-foreground font-normal">(optional)</span>
+                </label>
+                <Input
+                  value={form.billingAddressLine2}
+                  onChange={(e) => setForm((f) => ({ ...f, billingAddressLine2: e.target.value }))}
+                />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                 <div>
                   <label className="block text-sm font-semibold mb-1.5">Town / City</label>
-                  <Input value={form.billingTown} onChange={(e) => setForm((f) => ({ ...f, billingTown: e.target.value }))} />
+                  <Input
+                    value={form.billingTown}
+                    onChange={(e) => setForm((f) => ({ ...f, billingTown: e.target.value }))}
+                  />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold mb-1.5">Region / County <span className="text-muted-foreground font-normal">(optional)</span></label>
-                  <Input value={form.billingRegion} onChange={(e) => setForm((f) => ({ ...f, billingRegion: e.target.value }))} />
+                  <label className="block text-sm font-semibold mb-1.5">
+                    Region / County{" "}
+                    <span className="text-muted-foreground font-normal">(optional)</span>
+                  </label>
+                  <Input
+                    value={form.billingRegion}
+                    onChange={(e) => setForm((f) => ({ ...f, billingRegion: e.target.value }))}
+                  />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                 <div>
                   <label className="block text-sm font-semibold mb-1.5">Postcode</label>
-                  <Input value={form.billingPostcode} onChange={(e) => setForm((f) => ({ ...f, billingPostcode: e.target.value }))} />
+                  <Input
+                    value={form.billingPostcode}
+                    onChange={(e) => setForm((f) => ({ ...f, billingPostcode: e.target.value }))}
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold mb-1.5">Country</label>
-                  <Input value={form.billingCountry} onChange={(e) => setForm((f) => ({ ...f, billingCountry: e.target.value }))} />
+                  <Input
+                    value={form.billingCountry}
+                    onChange={(e) => setForm((f) => ({ ...f, billingCountry: e.target.value }))}
+                  />
                 </div>
               </div>
 
               <div className="mt-4">
-                <label className="block text-sm font-semibold mb-1.5">VAT Number <span className="text-muted-foreground font-normal">(optional)</span></label>
-                <Input value={form.billingVatNumber} onChange={(e) => setForm((f) => ({ ...f, billingVatNumber: e.target.value }))} />
+                <label className="block text-sm font-semibold mb-1.5">
+                  VAT Number <span className="text-muted-foreground font-normal">(optional)</span>
+                </label>
+                <Input
+                  value={form.billingVatNumber}
+                  onChange={(e) => setForm((f) => ({ ...f, billingVatNumber: e.target.value }))}
+                />
               </div>
             </div>
 
@@ -280,7 +362,9 @@ export default function EditBilling() {
               <div className="flex items-start gap-2 text-red-600 bg-red-50 border border-red-200 rounded-sm p-3 text-sm">
                 <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <span>
-                  {mutation.error instanceof Error ? mutation.error.message : "Failed to save. Please try again."}
+                  {mutation.error instanceof Error
+                    ? mutation.error.message
+                    : "Failed to save. Please try again."}
                 </span>
               </div>
             )}
@@ -290,11 +374,19 @@ export default function EditBilling() {
                 <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <div>
                   {mutation.data.reissue.alreadyPaid ? (
-                    <span>The invoice has just been marked as paid in Stripe — no changes were applied.</span>
+                    <span>
+                      The invoice has just been marked as paid in Stripe — no changes were applied.
+                    </span>
                   ) : mutation.data.reissue.reissued ? (
-                    <span>Saved. A fresh invoice with your new details has been emailed to {form.billingEmail || "your billing email"}.</span>
+                    <span>
+                      Saved. A fresh invoice with your new details has been emailed to{" "}
+                      {form.billingEmail || "your billing email"}.
+                    </span>
                   ) : mutation.data.reissue.error ? (
-                    <span>Saved, but the invoice could not be re-issued: {mutation.data.reissue.error}. Please email us.</span>
+                    <span>
+                      Saved, but the invoice could not be re-issued: {mutation.data.reissue.error}.
+                      Please email us.
+                    </span>
                   ) : (
                     <span>Saved.</span>
                   )}
@@ -309,7 +401,10 @@ export default function EditBilling() {
                 className="bg-primary hover:bg-primary/90 text-white"
               >
                 {mutation.isPending ? (
-                  <><Loader2 className="w-4 h-4 animate-spin mr-2" />Saving & re-issuing invoice…</>
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    Saving & re-issuing invoice…
+                  </>
                 ) : (
                   "Save & Re-issue Invoice"
                 )}
@@ -354,8 +449,12 @@ export default function EditBilling() {
         )}
 
         <p className="text-xs text-muted-foreground mt-8 text-center">
-          HR Analytics Summit · 3 September 2026 · 155 Bishopsgate, London<br />
-          Questions? Email <a href="mailto:hello@hranalyticssummit.com" className="underline">hello@hranalyticssummit.com</a>
+          HR Analytics Summit · 3 September 2026 · 155 Bishopsgate, London
+          <br />
+          Questions? Email{" "}
+          <a href="mailto:hello@hranalyticssummit.com" className="underline">
+            hello@hranalyticssummit.com
+          </a>
         </p>
       </main>
     </div>

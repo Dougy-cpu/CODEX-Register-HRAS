@@ -28,7 +28,7 @@ router.get("/passes/inventory", async (_req, res): Promise<void> => {
 
 router.get("/passes/config", async (_req, res): Promise<void> => {
   const rows = await db.select().from(passConfigTable);
-  const result: Record<string, typeof rows[0] | null> = { single: null, business: null };
+  const result: Record<string, (typeof rows)[0] | null> = { single: null, business: null };
   for (const row of rows) {
     result[row.passType] = row;
   }

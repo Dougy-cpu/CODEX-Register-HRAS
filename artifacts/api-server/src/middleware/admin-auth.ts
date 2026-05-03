@@ -20,7 +20,9 @@ export function adminAuth(req: Request, res: Response, next: NextFunction): void
   const adminPassword = getAdminPassword();
 
   if (!adminPassword) {
-    res.status(503).json({ error: "Admin authentication not configured — set a secure ADMIN_PASSWORD" });
+    res
+      .status(503)
+      .json({ error: "Admin authentication not configured — set a secure ADMIN_PASSWORD" });
     return;
   }
 

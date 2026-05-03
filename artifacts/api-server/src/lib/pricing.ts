@@ -31,22 +31,25 @@ export async function incrementPromoUsage(code: string, quantity: number): Promi
         eq(promoCodesTable.code, normalised),
         or(
           isNull(promoCodesTable.maxUses),
-          sql`${promoCodesTable.usedCount} + ${inc} <= ${promoCodesTable.maxUses}`
-        )
-      )
+          sql`${promoCodesTable.usedCount} + ${inc} <= ${promoCodesTable.maxUses}`,
+        ),
+      ),
     );
   return (result.rowCount ?? 0) > 0;
 }
 
-export const PASS_PRICES: Record<string, { price: number; originalPrice: number; seats: number }> = {
-  single: { price: 199, originalPrice: 429, seats: 1 },
-  team: { price: 499, originalPrice: 1200, seats: 3 },
-  business: { price: 599, originalPrice: 999, seats: 1 },
-};
+export const PASS_PRICES: Record<string, { price: number; originalPrice: number; seats: number }> =
+  {
+    single: { price: 199, originalPrice: 429, seats: 1 },
+    team: { price: 499, originalPrice: 1200, seats: 3 },
+    business: { price: 599, originalPrice: 999, seats: 1 },
+  };
 
 const PASS_PRICE_DEFAULTS = PASS_PRICES;
 
-async function getPassPrices(): Promise<Record<string, { price: number; originalPrice: number; seats: number }>> {
+async function getPassPrices(): Promise<
+  Record<string, { price: number; originalPrice: number; seats: number }>
+> {
   const configs = await db.select().from(passConfigTable);
   const result = { ...PASS_PRICE_DEFAULTS };
   for (const config of configs) {
@@ -61,7 +64,7 @@ async function getPassPrices(): Promise<Record<string, { price: number; original
   return result;
 }
 
-export const VAT_RATE = 0.20;
+export const VAT_RATE = 0.2;
 
 export interface PricingResult {
   passType: string;
@@ -84,7 +87,7 @@ export interface PricingResult {
 export async function calculatePricing(
   passType: string,
   quantity: number,
-  promoCode?: string | null
+  promoCode?: string | null,
 ): Promise<PricingResult> {
   const PASS_PRICES = await getPassPrices();
   const passInfo = PASS_PRICES[passType];
@@ -112,9 +115,7 @@ export async function calculatePricing(
     }
   }
 
-  const groupDiscountAmount = parseFloat(
-    ((baseSubtotal * groupDiscountPercent) / 100).toFixed(2)
-  );
+  const groupDiscountAmount = parseFloat(((baseSubtotal * groupDiscountPercent) / 100).toFixed(2));
 
   let promoDiscountAmount = 0;
   let promoDiscountType: string | null = null;
@@ -129,8 +130,8 @@ export async function calculatePricing(
           eq(promoCodesTable.code, promoCode.toUpperCase()),
           eq(promoCodesTable.isActive, true),
           or(isNull(promoCodesTable.validFrom), lte(promoCodesTable.validFrom, now)),
-          or(isNull(promoCodesTable.validUntil), gte(promoCodesTable.validUntil, now))
-        )
+          or(isNull(promoCodesTable.validUntil), gte(promoCodesTable.validUntil, now)),
+        ),
       );
 
     if (promo) {
@@ -138,7 +139,7 @@ export async function calculatePricing(
       const afterGroupDiscount = baseSubtotal - groupDiscountAmount;
       if (promo.discountType === "percentage") {
         promoDiscountAmount = parseFloat(
-          ((afterGroupDiscount * parseFloat(promo.discountValue.toString())) / 100).toFixed(2)
+          ((afterGroupDiscount * parseFloat(promo.discountValue.toString())) / 100).toFixed(2),
         );
         if (promo.maxDiscountAmount !== null) {
           const cap = parseFloat(promo.maxDiscountAmount.toString());
@@ -147,7 +148,7 @@ export async function calculatePricing(
       } else if (promo.discountType === "per_ticket") {
         promoDiscountAmount = Math.min(
           parseFloat((parseFloat(promo.discountValue.toString()) * quantity).toFixed(2)),
-          afterGroupDiscount
+          afterGroupDiscount,
         );
       } else if (promo.discountType === "complimentary") {
         if (promo.maxUses !== null) {
@@ -163,19 +164,19 @@ export async function calculatePricing(
       } else {
         promoDiscountAmount = Math.min(
           parseFloat(promo.discountValue.toString()),
-          afterGroupDiscount
+          afterGroupDiscount,
         );
       }
     }
   }
 
   const subtotalAfterDiscounts = parseFloat(
-    (baseSubtotal - groupDiscountAmount - promoDiscountAmount).toFixed(2)
+    (baseSubtotal - groupDiscountAmount - promoDiscountAmount).toFixed(2),
   );
   const vatAmount = parseFloat((subtotalAfterDiscounts * VAT_RATE).toFixed(2));
   const total = parseFloat((subtotalAfterDiscounts + vatAmount).toFixed(2));
   const savedAmount = parseFloat(
-    (originalPrice - baseSubtotal + groupDiscountAmount + promoDiscountAmount).toFixed(2)
+    (originalPrice - baseSubtotal + groupDiscountAmount + promoDiscountAmount).toFixed(2),
   );
 
   return {

@@ -5,12 +5,39 @@ import Image from "@tiptap/extension-image";
 import { useListEmailLogs, useResendBookingEmails } from "@workspace/api-client-react";
 import AdminLayout from "@/components/layout/AdminLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCcw, Send, Bold, Italic, Heading2, List, ListOrdered, Link2, Code, RotateCcw, ImageIcon, Upload, X, Loader2, CheckCircle2, FileCode2, Eye, Smartphone, Monitor } from "lucide-react";
+import {
+  RefreshCcw,
+  Send,
+  Bold,
+  Italic,
+  Heading2,
+  List,
+  ListOrdered,
+  Link2,
+  Code,
+  RotateCcw,
+  ImageIcon,
+  Upload,
+  X,
+  Loader2,
+  CheckCircle2,
+  FileCode2,
+  Eye,
+  Smartphone,
+  Monitor,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const API_BASE = `${import.meta.env.BASE_URL}api`;
@@ -56,8 +83,8 @@ function TipTapToolbar({
         disabled
           ? "text-muted-foreground/30 cursor-not-allowed"
           : active
-          ? "bg-primary/10 text-primary"
-          : "hover:bg-muted text-muted-foreground hover:text-foreground"
+            ? "bg-primary/10 text-primary"
+            : "hover:bg-muted text-muted-foreground hover:text-foreground"
       }`}
     >
       {children}
@@ -68,26 +95,76 @@ function TipTapToolbar({
 
   return (
     <div className="flex flex-wrap items-center gap-0.5 p-2 border-b border-border bg-muted/30">
-      {btn(editor.isActive("bold"), () => editor.chain().focus().toggleBold().run(), "Bold", <Bold className="w-4 h-4" />, fmtDisabled)}
-      {btn(editor.isActive("italic"), () => editor.chain().focus().toggleItalic().run(), "Italic", <Italic className="w-4 h-4" />, fmtDisabled)}
+      {btn(
+        editor.isActive("bold"),
+        () => editor.chain().focus().toggleBold().run(),
+        "Bold",
+        <Bold className="w-4 h-4" />,
+        fmtDisabled,
+      )}
+      {btn(
+        editor.isActive("italic"),
+        () => editor.chain().focus().toggleItalic().run(),
+        "Italic",
+        <Italic className="w-4 h-4" />,
+        fmtDisabled,
+      )}
       <span className="w-px bg-border mx-1 self-stretch" />
-      {btn(editor.isActive("heading", { level: 2 }), () => editor.chain().focus().toggleHeading({ level: 2 }).run(), "Heading 2", <Heading2 className="w-4 h-4" />, fmtDisabled)}
+      {btn(
+        editor.isActive("heading", { level: 2 }),
+        () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
+        "Heading 2",
+        <Heading2 className="w-4 h-4" />,
+        fmtDisabled,
+      )}
       <span className="w-px bg-border mx-1 self-stretch" />
-      {btn(editor.isActive("bulletList"), () => editor.chain().focus().toggleBulletList().run(), "Bullet List", <List className="w-4 h-4" />, fmtDisabled)}
-      {btn(editor.isActive("orderedList"), () => editor.chain().focus().toggleOrderedList().run(), "Ordered List", <ListOrdered className="w-4 h-4" />, fmtDisabled)}
+      {btn(
+        editor.isActive("bulletList"),
+        () => editor.chain().focus().toggleBulletList().run(),
+        "Bullet List",
+        <List className="w-4 h-4" />,
+        fmtDisabled,
+      )}
+      {btn(
+        editor.isActive("orderedList"),
+        () => editor.chain().focus().toggleOrderedList().run(),
+        "Ordered List",
+        <ListOrdered className="w-4 h-4" />,
+        fmtDisabled,
+      )}
       <span className="w-px bg-border mx-1 self-stretch" />
-      {btn(editor.isActive("link"), handleSetLink, "Link", <Link2 className="w-4 h-4" />, fmtDisabled)}
-      {btn(editor.isActive("code"), () => editor.chain().focus().toggleCode().run(), "Inline Code", <Code className="w-4 h-4" />, fmtDisabled)}
+      {btn(
+        editor.isActive("link"),
+        handleSetLink,
+        "Link",
+        <Link2 className="w-4 h-4" />,
+        fmtDisabled,
+      )}
+      {btn(
+        editor.isActive("code"),
+        () => editor.chain().focus().toggleCode().run(),
+        "Inline Code",
+        <Code className="w-4 h-4" />,
+        fmtDisabled,
+      )}
       {btn(false, onImageUpload, "Insert Image", <ImageIcon className="w-4 h-4" />)}
       <span className="w-px bg-border mx-1 self-stretch" />
-      {btn(false, () => editor.chain().focus().undo().run(), "Undo", <RotateCcw className="w-4 h-4" />, fmtDisabled)}
+      {btn(
+        false,
+        () => editor.chain().focus().undo().run(),
+        "Undo",
+        <RotateCcw className="w-4 h-4" />,
+        fmtDisabled,
+      )}
       <span className="ml-auto" />
       <button
         type="button"
         title={htmlMode ? "Switch to Visual editor" : "Switch to HTML / Source editor"}
         onClick={onToggleHtmlMode}
         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-semibold transition-colors ${
-          htmlMode ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground hover:text-foreground"
+          htmlMode
+            ? "bg-primary text-primary-foreground"
+            : "hover:bg-muted text-muted-foreground hover:text-foreground"
         }`}
       >
         <FileCode2 className="w-4 h-4" />
@@ -116,53 +193,180 @@ type TemplateVariable = {
 const TEMPLATE_VARIABLES: Record<TemplateType, TemplateVariable[]> = {
   welcome: [
     { tag: "{{firstName}}", label: "First Name", description: "Recipient's first name" },
-    { tag: "{{managementLink}}", label: "Manage Attendees Button", description: "Secure self-service button to manage attendee details — auto-generates a unique link per booking" },
-    { tag: "{{eventCalendarLinks}}", label: "Main Event Calendar Block", description: "Branded block with Google / Outlook / .ics buttons for the main event. Renders only when start & end times are set in Settings." },
-    { tag: "{{socialCalendarLinks}}", label: "Social Calendar Block", description: "Branded block for the pre-event social. Shows 'details to follow' until the admin enables the social and saves its times." },
-    { tag: "{{calendarLinks}}", label: "Both Calendar Blocks", description: "Combined main event + social blocks. Use this if you want one placeholder for everything." },
-    { tag: "{{googleCalendarUrl}}", label: "Main Google URL", description: "Raw Google Calendar URL for the main event — drop into a custom button" },
-    { tag: "{{outlookCalendarUrl}}", label: "Main Outlook URL", description: "Raw Outlook web deeplink for the main event" },
-    { tag: "{{icsCalendarUrl}}", label: "Main .ics URL", description: "Public download URL for the main event .ics file" },
-    { tag: "{{socialGoogleCalendarUrl}}", label: "Social Google URL", description: "Raw Google Calendar URL for the social (empty until enabled)" },
-    { tag: "{{socialOutlookCalendarUrl}}", label: "Social Outlook URL", description: "Raw Outlook deeplink for the social (empty until enabled)" },
-    { tag: "{{socialIcsCalendarUrl}}", label: "Social .ics URL", description: "Public download URL for the social .ics file (empty until enabled)" },
+    {
+      tag: "{{managementLink}}",
+      label: "Manage Attendees Button",
+      description:
+        "Secure self-service button to manage attendee details — auto-generates a unique link per booking",
+    },
+    {
+      tag: "{{eventCalendarLinks}}",
+      label: "Main Event Calendar Block",
+      description:
+        "Branded block with Google / Outlook / .ics buttons for the main event. Renders only when start & end times are set in Settings.",
+    },
+    {
+      tag: "{{socialCalendarLinks}}",
+      label: "Social Calendar Block",
+      description:
+        "Branded block for the pre-event social. Shows 'details to follow' until the admin enables the social and saves its times.",
+    },
+    {
+      tag: "{{calendarLinks}}",
+      label: "Both Calendar Blocks",
+      description:
+        "Combined main event + social blocks. Use this if you want one placeholder for everything.",
+    },
+    {
+      tag: "{{googleCalendarUrl}}",
+      label: "Main Google URL",
+      description: "Raw Google Calendar URL for the main event — drop into a custom button",
+    },
+    {
+      tag: "{{outlookCalendarUrl}}",
+      label: "Main Outlook URL",
+      description: "Raw Outlook web deeplink for the main event",
+    },
+    {
+      tag: "{{icsCalendarUrl}}",
+      label: "Main .ics URL",
+      description: "Public download URL for the main event .ics file",
+    },
+    {
+      tag: "{{socialGoogleCalendarUrl}}",
+      label: "Social Google URL",
+      description: "Raw Google Calendar URL for the social (empty until enabled)",
+    },
+    {
+      tag: "{{socialOutlookCalendarUrl}}",
+      label: "Social Outlook URL",
+      description: "Raw Outlook deeplink for the social (empty until enabled)",
+    },
+    {
+      tag: "{{socialIcsCalendarUrl}}",
+      label: "Social .ics URL",
+      description: "Public download URL for the social .ics file (empty until enabled)",
+    },
   ],
   confirmation: [
     { tag: "{{firstName}}", label: "First Name", description: "Lead attendee's first name" },
-    { tag: "{{orderReference}}", label: "Order Reference", description: "Unique booking reference (e.g. HRAS26-6542)" },
-    { tag: "{{passLabel}}", label: "Pass Label", description: "Pass type name (e.g. HR Professional Pass)" },
+    {
+      tag: "{{orderReference}}",
+      label: "Order Reference",
+      description: "Unique booking reference (e.g. HRAS26-6542)",
+    },
+    {
+      tag: "{{passLabel}}",
+      label: "Pass Label",
+      description: "Pass type name (e.g. HR Professional Pass)",
+    },
     { tag: "{{quantity}}", label: "Quantity", description: "Number of passes booked" },
-    { tag: "{{quantityLabel}}", label: "Quantity Label", description: "\"pass\" or \"passes\" (singular/plural)" },
-    { tag: "{{attendeesTable}}", label: "Attendees Table", description: "HTML table listing all registered attendees on this booking" },
-    { tag: "{{priceSummary}}", label: "Price Summary", description: "Itemised price breakdown including subtotal, VAT, and any discounts" },
+    {
+      tag: "{{quantityLabel}}",
+      label: "Quantity Label",
+      description: '"pass" or "passes" (singular/plural)',
+    },
+    {
+      tag: "{{attendeesTable}}",
+      label: "Attendees Table",
+      description: "HTML table listing all registered attendees on this booking",
+    },
+    {
+      tag: "{{priceSummary}}",
+      label: "Price Summary",
+      description: "Itemised price breakdown including subtotal, VAT, and any discounts",
+    },
     { tag: "{{eventDate}}", label: "Event Date", description: "Date of the event (from Settings)" },
     { tag: "{{eventVenue}}", label: "Venue", description: "Venue name (from Settings)" },
-    { tag: "{{eventVenuePostcode}}", label: "Venue Postcode", description: "Venue postcode (from Settings)" },
-    { tag: "{{managementLink}}", label: "Manage Attendees Button", description: "Secure self-service button — lets the booking contact manage all attendee details" },
-    { tag: "{{invoicePaymentButton}}", label: "Invoice Pay Button", description: "Online payment button — only rendered for invoice bookings, empty for card payments" },
-    { tag: "{{eventCalendarLinks}}", label: "Main Event Calendar Block", description: "Branded block with Google / Outlook / .ics buttons for the main event. Renders only when start & end times are set in Settings." },
-    { tag: "{{socialCalendarLinks}}", label: "Social Calendar Block", description: "Branded block for the pre-event social. Shows 'details to follow' until the admin enables the social and saves its times." },
-    { tag: "{{calendarLinks}}", label: "Both Calendar Blocks", description: "Combined main event + social blocks. Use this if you want one placeholder for everything." },
-    { tag: "{{googleCalendarUrl}}", label: "Main Google URL", description: "Raw Google Calendar URL for the main event — drop into a custom button" },
-    { tag: "{{outlookCalendarUrl}}", label: "Main Outlook URL", description: "Raw Outlook web deeplink for the main event" },
-    { tag: "{{icsCalendarUrl}}", label: "Main .ics URL", description: "Public download URL for the main event .ics file" },
-    { tag: "{{socialGoogleCalendarUrl}}", label: "Social Google URL", description: "Raw Google Calendar URL for the social (empty until enabled)" },
-    { tag: "{{socialOutlookCalendarUrl}}", label: "Social Outlook URL", description: "Raw Outlook deeplink for the social (empty until enabled)" },
-    { tag: "{{socialIcsCalendarUrl}}", label: "Social .ics URL", description: "Public download URL for the social .ics file (empty until enabled)" },
+    {
+      tag: "{{eventVenuePostcode}}",
+      label: "Venue Postcode",
+      description: "Venue postcode (from Settings)",
+    },
+    {
+      tag: "{{managementLink}}",
+      label: "Manage Attendees Button",
+      description:
+        "Secure self-service button — lets the booking contact manage all attendee details",
+    },
+    {
+      tag: "{{invoicePaymentButton}}",
+      label: "Invoice Pay Button",
+      description:
+        "Online payment button — only rendered for invoice bookings, empty for card payments",
+    },
+    {
+      tag: "{{eventCalendarLinks}}",
+      label: "Main Event Calendar Block",
+      description:
+        "Branded block with Google / Outlook / .ics buttons for the main event. Renders only when start & end times are set in Settings.",
+    },
+    {
+      tag: "{{socialCalendarLinks}}",
+      label: "Social Calendar Block",
+      description:
+        "Branded block for the pre-event social. Shows 'details to follow' until the admin enables the social and saves its times.",
+    },
+    {
+      tag: "{{calendarLinks}}",
+      label: "Both Calendar Blocks",
+      description:
+        "Combined main event + social blocks. Use this if you want one placeholder for everything.",
+    },
+    {
+      tag: "{{googleCalendarUrl}}",
+      label: "Main Google URL",
+      description: "Raw Google Calendar URL for the main event — drop into a custom button",
+    },
+    {
+      tag: "{{outlookCalendarUrl}}",
+      label: "Main Outlook URL",
+      description: "Raw Outlook web deeplink for the main event",
+    },
+    {
+      tag: "{{icsCalendarUrl}}",
+      label: "Main .ics URL",
+      description: "Public download URL for the main event .ics file",
+    },
+    {
+      tag: "{{socialGoogleCalendarUrl}}",
+      label: "Social Google URL",
+      description: "Raw Google Calendar URL for the social (empty until enabled)",
+    },
+    {
+      tag: "{{socialOutlookCalendarUrl}}",
+      label: "Social Outlook URL",
+      description: "Raw Outlook deeplink for the social (empty until enabled)",
+    },
+    {
+      tag: "{{socialIcsCalendarUrl}}",
+      label: "Social .ics URL",
+      description: "Public download URL for the social .ics file (empty until enabled)",
+    },
   ],
   invoice_reminder: [
     { tag: "{{firstName}}", label: "First Name", description: "Recipient's first name" },
     { tag: "{{recipientName}}", label: "Full Name", description: "Recipient's full name" },
-    { tag: "{{orderReference}}", label: "Order Reference", description: "Unique booking reference" },
+    {
+      tag: "{{orderReference}}",
+      label: "Order Reference",
+      description: "Unique booking reference",
+    },
     { tag: "{{dueDate}}", label: "Due Date", description: "Invoice payment due date" },
-    { tag: "{{payOnlineButton}}", label: "Pay Online Button", description: "Button linking to the online payment page for this booking" },
+    {
+      tag: "{{payOnlineButton}}",
+      label: "Pay Online Button",
+      description: "Button linking to the online payment page for this booking",
+    },
   ],
 };
 
 const TEMPLATE_DESCRIPTIONS: Record<TemplateType, string> = {
   welcome: "Sent as a personal follow-up after registration. Use this for a warm welcome message.",
-  confirmation: "Sent automatically after every successful booking (card or invoice). Contains the attendee's order details.",
-  invoice_reminder: "Sent manually from the Registrations panel when clicking 'Send Reminder' on an invoiced booking. The order summary table, payment button, and bank transfer details are automatically appended — edit only the intro message here. The subject supports {{orderReference}}.",
+  confirmation:
+    "Sent automatically after every successful booking (card or invoice). Contains the attendee's order details.",
+  invoice_reminder:
+    "Sent manually from the Registrations panel when clicking 'Send Reminder' on an invoiced booking. The order summary table, payment button, and bank transfer details are automatically appended — edit only the intro message here. The subject supports {{orderReference}}.",
 };
 
 const TEMPLATE_ATTACHMENTS: Record<TemplateType, string[]> = {
@@ -196,7 +400,9 @@ function TemplateEditor({ type }: { type: TemplateType }) {
   // Admins can type a name freely or pick from the most recent bookings so the
   // preview reads like the real thing instead of "Test User".
   const [previewName, setPreviewName] = useState<string>("");
-  const [recentBookings, setRecentBookings] = useState<{ id: number; leadName: string | null; orderReference: string | null }[]>([]);
+  const [recentBookings, setRecentBookings] = useState<
+    { id: number; leadName: string | null; orderReference: string | null }[]
+  >([]);
 
   const editor = useEditor({
     extensions: [
@@ -229,7 +435,9 @@ function TemplateEditor({ type }: { type: TemplateType }) {
           // Seed rawHtml so toggling to Source mode before any edit shows real content.
           setRawHtml(data.htmlBody || "");
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       setIsLoading(false);
     }
     if (editor) loadTemplate();
@@ -255,10 +463,14 @@ function TemplateEditor({ type }: { type: TemplateType }) {
           }))
           .filter((r: { leadName: string | null }) => r.leadName && r.leadName.trim());
         setRecentBookings(items);
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
     loadRecent();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Toggle between Visual (TipTap) and Source (HTML textarea) modes.
@@ -279,26 +491,31 @@ function TemplateEditor({ type }: { type: TemplateType }) {
 
   // Fetch the live preview from the server, which uses the same render path
   // as the real send so what admins see matches what recipients receive.
-  const fetchPreview = useCallback(async (bodyOverride?: string, subjectOverride?: string) => {
-    setIsPreviewLoading(true);
-    try {
-      const resp = await fetch(`${API_BASE}/email-templates/${type}/preview`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-admin-token": getAdminToken() },
-        body: JSON.stringify({
-          subject: subjectOverride ?? subject,
-          htmlBody: bodyOverride ?? getCurrentBody(),
-          toName: previewName || undefined,
-        }),
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        setPreviewHtml(data.html || "");
-        setPreviewSubject(data.subject || "");
+  const fetchPreview = useCallback(
+    async (bodyOverride?: string, subjectOverride?: string) => {
+      setIsPreviewLoading(true);
+      try {
+        const resp = await fetch(`${API_BASE}/email-templates/${type}/preview`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-admin-token": getAdminToken() },
+          body: JSON.stringify({
+            subject: subjectOverride ?? subject,
+            htmlBody: bodyOverride ?? getCurrentBody(),
+            toName: previewName || undefined,
+          }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          setPreviewHtml(data.html || "");
+          setPreviewSubject(data.subject || "");
+        }
+      } catch {
+        /* ignore */
       }
-    } catch { /* ignore */ }
-    setIsPreviewLoading(false);
-  }, [type, subject, getCurrentBody, previewName]);
+      setIsPreviewLoading(false);
+    },
+    [type, subject, getCurrentBody, previewName],
+  );
 
   // Debounce-refresh the preview whenever the body or subject changes.
   // We poll the editor body (TipTap doesn't expose a stable change ref here).
@@ -343,16 +560,27 @@ function TemplateEditor({ type }: { type: TemplateType }) {
       } else {
         setRawHtml(body);
       }
-      toast({ title: "Template Saved", description: `${TEMPLATE_LABELS[type]} template updated successfully.` });
+      toast({
+        title: "Template Saved",
+        description: `${TEMPLATE_LABELS[type]} template updated successfully.`,
+      });
     } catch {
-      toast({ title: "Save Failed", description: "Could not save the template.", variant: "destructive" });
+      toast({
+        title: "Save Failed",
+        description: "Could not save the template.",
+        variant: "destructive",
+      });
     }
     setIsSaving(false);
   };
 
   const handleTestSend = async () => {
     if (!testEmail) {
-      toast({ title: "Email required", description: "Enter a recipient email address.", variant: "destructive" });
+      toast({
+        title: "Email required",
+        description: "Enter a recipient email address.",
+        variant: "destructive",
+      });
       return;
     }
     setIsSendingTest(true);
@@ -365,7 +593,11 @@ function TemplateEditor({ type }: { type: TemplateType }) {
       if (!resp.ok) throw new Error("Failed to send");
       toast({ title: "Test Email Sent", description: `Test sent to ${testEmail}.` });
     } catch {
-      toast({ title: "Send Failed", description: "Could not send test email.", variant: "destructive" });
+      toast({
+        title: "Send Failed",
+        description: "Could not send test email.",
+        variant: "destructive",
+      });
     }
     setIsSendingTest(false);
   };
@@ -404,9 +636,11 @@ function TemplateEditor({ type }: { type: TemplateType }) {
             <div className="flex items-start gap-2 text-sm bg-amber-50 border border-amber-200 rounded px-3 py-2">
               <span className="text-amber-600 mt-0.5">📎</span>
               <div>
-                <span className="font-semibold text-amber-800">Attachments sent with this email:</span>
+                <span className="font-semibold text-amber-800">
+                  Attachments sent with this email:
+                </span>
                 <ul className="mt-0.5 space-y-0.5 text-amber-700 list-disc list-inside">
-                  {TEMPLATE_ATTACHMENTS[type].map(a => (
+                  {TEMPLATE_ATTACHMENTS[type].map((a) => (
                     <li key={a}>{a}</li>
                   ))}
                 </ul>
@@ -418,7 +652,7 @@ function TemplateEditor({ type }: { type: TemplateType }) {
         <div className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-bold uppercase tracking-wider">Subject Line</label>
-            <Input value={subject} onChange={e => setSubject(e.target.value)} className="h-12" />
+            <Input value={subject} onChange={(e) => setSubject(e.target.value)} className="h-12" />
           </div>
 
           <div className="space-y-2">
@@ -428,21 +662,23 @@ function TemplateEditor({ type }: { type: TemplateType }) {
                 Available Variables — click to insert at cursor
               </p>
               <div className="flex flex-wrap gap-2">
-                {TEMPLATE_VARIABLES[type].map(v => (
+                {TEMPLATE_VARIABLES[type].map((v) => (
                   <button
                     key={v.tag}
                     type="button"
                     title={v.description}
                     onClick={() => {
                       if (htmlMode) {
-                        setRawHtml(prev => prev + v.tag);
+                        setRawHtml((prev) => prev + v.tag);
                       } else if (editor) {
                         editor.chain().focus().insertContent(v.tag).run();
                       }
                     }}
                     className="group relative inline-flex flex-col items-start gap-0.5 px-2.5 py-1.5 rounded border border-slate-300 bg-white hover:border-primary hover:bg-primary/5 transition-colors text-left cursor-pointer"
                   >
-                    <span className="font-mono text-xs font-semibold text-primary leading-tight">{v.tag}</span>
+                    <span className="font-mono text-xs font-semibold text-primary leading-tight">
+                      {v.tag}
+                    </span>
                     <span className="text-[10px] text-slate-500 leading-tight">{v.label}</span>
                     <span className="pointer-events-none absolute bottom-full left-0 mb-1.5 w-56 rounded bg-slate-900 text-white text-xs px-2.5 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-lg leading-snug">
                       {v.description}
@@ -451,7 +687,13 @@ function TemplateEditor({ type }: { type: TemplateType }) {
                 ))}
               </div>
             </div>
-            <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageFileChange} />
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleImageFileChange}
+            />
 
             {/* Editor + Live Preview side-by-side on lg+, stacked below */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -467,13 +709,15 @@ function TemplateEditor({ type }: { type: TemplateType }) {
                   <>
                     <Textarea
                       value={rawHtml}
-                      onChange={e => setRawHtml(e.target.value)}
+                      onChange={(e) => setRawHtml(e.target.value)}
                       className="font-mono text-xs leading-relaxed min-h-[400px] border-0 rounded-none focus-visible:ring-0 resize-y"
                       spellCheck={false}
                       placeholder="Raw HTML — full control over markup. Switch back to Visual to use rich-text editing."
                     />
                     <p className="text-[11px] text-amber-700 bg-amber-50 border-t border-amber-200 px-3 py-1.5 leading-snug">
-                      Heads up: switching back to Visual may simplify advanced HTML (TipTap can strip unknown tags or attributes). Save first if you want to keep the raw version exactly as written.
+                      Heads up: switching back to Visual may simplify advanced HTML (TipTap can
+                      strip unknown tags or attributes). Save first if you want to keep the raw
+                      version exactly as written.
                     </p>
                   </>
                 ) : (
@@ -523,18 +767,20 @@ function TemplateEditor({ type }: { type: TemplateType }) {
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 px-3 py-2 text-xs border-b border-border bg-white">
-                  <span className="font-bold uppercase tracking-wider text-slate-500">Preview as:</span>
+                  <span className="font-bold uppercase tracking-wider text-slate-500">
+                    Preview as:
+                  </span>
                   <Input
                     type="text"
                     value={previewName}
-                    onChange={e => setPreviewName(e.target.value)}
+                    onChange={(e) => setPreviewName(e.target.value)}
                     placeholder="Test User"
                     className="h-7 text-xs w-44"
                   />
                   {recentBookings.length > 0 && (
                     <select
                       value=""
-                      onChange={e => {
+                      onChange={(e) => {
                         const name = e.target.value;
                         if (name) setPreviewName(name);
                       }}
@@ -542,9 +788,10 @@ function TemplateEditor({ type }: { type: TemplateType }) {
                       title="Pick a recent booking's lead name"
                     >
                       <option value="">Recent bookings…</option>
-                      {recentBookings.map(b => (
+                      {recentBookings.map((b) => (
                         <option key={b.id} value={b.leadName || ""}>
-                          {b.leadName}{b.orderReference ? ` — ${b.orderReference}` : ""}
+                          {b.leadName}
+                          {b.orderReference ? ` — ${b.orderReference}` : ""}
                         </option>
                       ))}
                     </select>
@@ -561,7 +808,9 @@ function TemplateEditor({ type }: { type: TemplateType }) {
                 </div>
                 {previewSubject && (
                   <div className="px-3 py-2 text-xs border-b border-border bg-white">
-                    <span className="font-bold uppercase tracking-wider text-slate-500 mr-2">Subject:</span>
+                    <span className="font-bold uppercase tracking-wider text-slate-500 mr-2">
+                      Subject:
+                    </span>
                     <span className="text-slate-700">{previewSubject}</span>
                   </div>
                 )}
@@ -594,11 +843,25 @@ function TemplateEditor({ type }: { type: TemplateType }) {
       <div className="bg-white p-6 border border-border shadow-sm space-y-4">
         <div>
           <h3 className="text-base font-bold mb-1">Send Test Email</h3>
-          <p className="text-sm text-muted-foreground">Verify the current saved template before going live.</p>
+          <p className="text-sm text-muted-foreground">
+            Verify the current saved template before going live.
+          </p>
         </div>
         <div className="flex gap-3 flex-wrap">
-          <Input type="text" placeholder="Recipient name (optional)" value={testName} onChange={e => setTestName(e.target.value)} className="h-10 w-56" />
-          <Input type="email" placeholder="test@example.com" value={testEmail} onChange={e => setTestEmail(e.target.value)} className="h-10 w-64" />
+          <Input
+            type="text"
+            placeholder="Recipient name (optional)"
+            value={testName}
+            onChange={(e) => setTestName(e.target.value)}
+            className="h-10 w-56"
+          />
+          <Input
+            type="email"
+            placeholder="test@example.com"
+            value={testEmail}
+            onChange={(e) => setTestEmail(e.target.value)}
+            className="h-10 w-64"
+          />
           <Button onClick={handleTestSend} disabled={isSendingTest} className="h-10 px-6">
             <Send className="w-4 h-4 mr-2" />
             {isSendingTest ? "Sending..." : "Send Test"}
@@ -640,7 +903,9 @@ function BrandingSettings() {
           headers: { "x-admin-token": getAdminToken() },
         });
         if (resp.ok) setSettings(await resp.json());
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       setIsLoading(false);
     }
     load();
@@ -658,9 +923,17 @@ function BrandingSettings() {
       if (!resp.ok) throw new Error("Failed to save");
       const updated = await resp.json();
       setSettings(updated);
-      toast({ title: "Settings Saved", description: "Branding and event settings have been updated. All future emails will use the new settings." });
+      toast({
+        title: "Settings Saved",
+        description:
+          "Branding and event settings have been updated. All future emails will use the new settings.",
+      });
     } catch {
-      toast({ title: "Save Failed", description: "Could not save settings.", variant: "destructive" });
+      toast({
+        title: "Save Failed",
+        description: "Could not save settings.",
+        variant: "destructive",
+      });
     }
     setIsSaving(false);
   };
@@ -671,14 +944,14 @@ function BrandingSettings() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const src = ev.target?.result as string;
-      if (src) setSettings(s => s ? { ...s, logoDataUrl: src } : s);
+      if (src) setSettings((s) => (s ? { ...s, logoDataUrl: src } : s));
     };
     reader.readAsDataURL(file);
     e.target.value = "";
   };
 
   const set = (key: keyof EventSettingsData, value: string | null) => {
-    setSettings(s => s ? { ...s, [key]: value } : s);
+    setSettings((s) => (s ? { ...s, [key]: value } : s));
   };
 
   if (isLoading || !settings) {
@@ -689,12 +962,19 @@ function BrandingSettings() {
     );
   }
 
-  const field = (label: string, key: keyof EventSettingsData, placeholder?: string, hint?: string) => (
+  const field = (
+    label: string,
+    key: keyof EventSettingsData,
+    placeholder?: string,
+    hint?: string,
+  ) => (
     <div className="space-y-1">
-      <label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">{label}</label>
+      <label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </label>
       <Input
         value={(settings[key] as string) || ""}
-        onChange={e => set(key, e.target.value)}
+        onChange={(e) => set(key, e.target.value)}
         placeholder={placeholder}
         className="h-11"
       />
@@ -708,12 +988,19 @@ function BrandingSettings() {
       <div className="bg-white p-6 border border-border shadow-sm space-y-4">
         <div>
           <h3 className="text-lg font-bold mb-1">Logo</h3>
-          <p className="text-sm text-muted-foreground">Upload your logo — it will appear at the top of all outgoing emails in place of the text header.</p>
+          <p className="text-sm text-muted-foreground">
+            Upload your logo — it will appear at the top of all outgoing emails in place of the text
+            header.
+          </p>
         </div>
         <div className="flex items-center gap-6">
           {settings.logoDataUrl ? (
             <div className="relative border border-border rounded p-3 bg-muted/20">
-              <img src={settings.logoDataUrl} alt="Logo preview" className="max-h-16 max-w-48 object-contain" />
+              <img
+                src={settings.logoDataUrl}
+                alt="Logo preview"
+                className="max-h-16 max-w-48 object-contain"
+              />
               <button
                 type="button"
                 onClick={() => set("logoDataUrl", null)}
@@ -729,12 +1016,24 @@ function BrandingSettings() {
             </div>
           )}
           <div>
-            <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
-            <Button variant="outline" onClick={() => logoInputRef.current?.click()} className="gap-2">
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleLogoUpload}
+            />
+            <Button
+              variant="outline"
+              onClick={() => logoInputRef.current?.click()}
+              className="gap-2"
+            >
               <Upload className="w-4 h-4" />
               {settings.logoDataUrl ? "Replace Logo" : "Upload Logo"}
             </Button>
-            <p className="text-xs text-muted-foreground mt-2">PNG, JPG or SVG recommended. Max 2MB.</p>
+            <p className="text-xs text-muted-foreground mt-2">
+              PNG, JPG or SVG recommended. Max 2MB.
+            </p>
           </div>
         </div>
       </div>
@@ -743,7 +1042,12 @@ function BrandingSettings() {
       <div className="bg-white p-6 border border-border shadow-sm space-y-4">
         <h3 className="text-lg font-bold">Event Details</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {field("Event Name", "eventName", "HR Analytics Summit", "Appears in email subject lines and body text.")}
+          {field(
+            "Event Name",
+            "eventName",
+            "HR Analytics Summit",
+            "Appears in email subject lines and body text.",
+          )}
           {field("Event Date", "eventDate", "3 September 2026")}
           {field("Venue", "eventVenue", "155 Bishopsgate, London")}
           {field("Venue Postcode", "eventVenuePostcode", "EC2M 3TQ")}
@@ -754,7 +1058,12 @@ function BrandingSettings() {
       <div className="bg-white p-6 border border-border shadow-sm space-y-4">
         <h3 className="text-lg font-bold">Organisation</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {field("Organisation Name", "orgName", "People Strategy Hub Ltd", "Shown in email footers.")}
+          {field(
+            "Organisation Name",
+            "orgName",
+            "People Strategy Hub Ltd",
+            "Shown in email footers.",
+          )}
           {field("Organisation Address", "orgAddress", "London, UK")}
           {field("Website URL", "orgWebsite", "https://www.hranalyticssummit.com")}
         </div>
@@ -764,11 +1073,24 @@ function BrandingSettings() {
       <div className="bg-white p-6 border border-border shadow-sm space-y-4">
         <div>
           <h3 className="text-lg font-bold mb-1">Sender Details</h3>
-          <p className="text-sm text-muted-foreground">The display name and address that appears in recipients' inboxes. Note: the SMTP server must be configured to allow this sender address.</p>
+          <p className="text-sm text-muted-foreground">
+            The display name and address that appears in recipients' inboxes. Note: the SMTP server
+            must be configured to allow this sender address.
+          </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {field("Sender Name", "fromName", "HR Analytics Summit", 'Shown as the "From" name in email clients.')}
-          {field("Sender Email", "fromEmail", "noreply@hranalyticssummit.com", "Must match your SMTP authentication.")}
+          {field(
+            "Sender Name",
+            "fromName",
+            "HR Analytics Summit",
+            'Shown as the "From" name in email clients.',
+          )}
+          {field(
+            "Sender Email",
+            "fromEmail",
+            "noreply@hranalyticssummit.com",
+            "Must match your SMTP authentication.",
+          )}
         </div>
       </div>
 
@@ -791,7 +1113,7 @@ export default function AdminEmails() {
 
   const { data: logsData, isLoading: logsLoading } = useListEmailLogs(
     { page, limit: 20 },
-    { query: { queryKey: ["emailLogs", page] } }
+    { query: { queryKey: ["emailLogs", page] } },
   );
 
   const resendEmails = useResendBookingEmails();
@@ -800,17 +1122,40 @@ export default function AdminEmails() {
 
   const handleResend = async (logId: number, bookingId: number) => {
     if (sendingLogIds.has(logId)) return;
-    setSendingLogIds(prev => new Set(prev).add(logId));
-    setSentLogIds(prev => { const s = new Set(prev); s.delete(logId); return s; });
+    setSendingLogIds((prev) => new Set(prev).add(logId));
+    setSentLogIds((prev) => {
+      const s = new Set(prev);
+      s.delete(logId);
+      return s;
+    });
     try {
       await resendEmails.mutateAsync({ bookingId });
-      setSentLogIds(prev => new Set(prev).add(logId));
-      toast({ title: "Emails resent", description: `Confirmation emails for booking #${bookingId} have been resent.` });
-      setTimeout(() => setSentLogIds(prev => { const s = new Set(prev); s.delete(logId); return s; }), 3000);
+      setSentLogIds((prev) => new Set(prev).add(logId));
+      toast({
+        title: "Emails resent",
+        description: `Confirmation emails for booking #${bookingId} have been resent.`,
+      });
+      setTimeout(
+        () =>
+          setSentLogIds((prev) => {
+            const s = new Set(prev);
+            s.delete(logId);
+            return s;
+          }),
+        3000,
+      );
     } catch {
-      toast({ title: "Failed to resend", description: "Something went wrong. Please try again.", variant: "destructive" });
+      toast({
+        title: "Failed to resend",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
     } finally {
-      setSendingLogIds(prev => { const s = new Set(prev); s.delete(logId); return s; });
+      setSendingLogIds((prev) => {
+        const s = new Set(prev);
+        s.delete(logId);
+        return s;
+      });
     }
   };
 
@@ -818,11 +1163,36 @@ export default function AdminEmails() {
     <AdminLayout title="Email Communications">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="bg-white border border-border h-12 w-full justify-start rounded-none mb-6 overflow-x-auto">
-          <TabsTrigger value="branding" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-6 rounded-none whitespace-nowrap">Branding & Settings</TabsTrigger>
-          <TabsTrigger value="welcome" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-6 rounded-none whitespace-nowrap">Welcome Email</TabsTrigger>
-          <TabsTrigger value="confirmation" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-6 rounded-none whitespace-nowrap">Booking Confirmation</TabsTrigger>
-          <TabsTrigger value="invoice_reminder" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-6 rounded-none whitespace-nowrap">Invoice Reminder</TabsTrigger>
-          <TabsTrigger value="logs" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-6 rounded-none whitespace-nowrap">Email Logs</TabsTrigger>
+          <TabsTrigger
+            value="branding"
+            className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-6 rounded-none whitespace-nowrap"
+          >
+            Branding & Settings
+          </TabsTrigger>
+          <TabsTrigger
+            value="welcome"
+            className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-6 rounded-none whitespace-nowrap"
+          >
+            Welcome Email
+          </TabsTrigger>
+          <TabsTrigger
+            value="confirmation"
+            className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-6 rounded-none whitespace-nowrap"
+          >
+            Booking Confirmation
+          </TabsTrigger>
+          <TabsTrigger
+            value="invoice_reminder"
+            className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-6 rounded-none whitespace-nowrap"
+          >
+            Invoice Reminder
+          </TabsTrigger>
+          <TabsTrigger
+            value="logs"
+            className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-6 rounded-none whitespace-nowrap"
+          >
+            Email Logs
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="branding">
@@ -863,13 +1233,21 @@ export default function AdminEmails() {
                   <TableBody>
                     {logsData?.logs.map((log) => (
                       <TableRow key={log.id}>
-                        <TableCell className="text-sm">{new Date(log.sentAt).toLocaleString()}</TableCell>
+                        <TableCell className="text-sm">
+                          {new Date(log.sentAt).toLocaleString()}
+                        </TableCell>
                         <TableCell className="capitalize">{log.type}</TableCell>
                         <TableCell>{log.recipient}</TableCell>
                         <TableCell>{log.bookingId || "-"}</TableCell>
                         <TableCell>
                           <Badge
-                            variant={log.status === "sent" ? "default" : log.status === "failed" ? "destructive" : "secondary"}
+                            variant={
+                              log.status === "sent"
+                                ? "default"
+                                : log.status === "failed"
+                                  ? "destructive"
+                                  : "secondary"
+                            }
                             className="uppercase text-[10px]"
                           >
                             {log.status}
@@ -885,11 +1263,17 @@ export default function AdminEmails() {
                               className={`h-8 px-3 min-w-[100px] transition-all ${sentLogIds.has(log.id) ? "bg-green-600 hover:bg-green-700 text-white border-green-600" : ""}`}
                             >
                               {sendingLogIds.has(log.id) ? (
-                                <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Sending…</>
+                                <>
+                                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Sending…
+                                </>
                               ) : sentLogIds.has(log.id) ? (
-                                <><CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Sent</>
+                                <>
+                                  <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Sent
+                                </>
                               ) : (
-                                <><RefreshCcw className="w-3.5 h-3.5 mr-1.5" /> Resend</>
+                                <>
+                                  <RefreshCcw className="w-3.5 h-3.5 mr-1.5" /> Resend
+                                </>
                               )}
                             </Button>
                           )}
@@ -909,11 +1293,24 @@ export default function AdminEmails() {
                 {logsData && logsData.total > 0 && (
                   <div className="p-4 border-t border-border flex justify-between items-center bg-muted/20">
                     <p className="text-sm text-muted-foreground">
-                      Showing {(page - 1) * logsData.limit + 1}–{Math.min(page * logsData.limit, logsData.total)} of {logsData.total}
+                      Showing {(page - 1) * logsData.limit + 1}–
+                      {Math.min(page * logsData.limit, logsData.total)} of {logsData.total}
                     </p>
                     <div className="flex gap-2">
-                      <Button variant="outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Previous</Button>
-                      <Button variant="outline" disabled={page * logsData.limit >= logsData.total} onClick={() => setPage(p => p + 1)}>Next</Button>
+                      <Button
+                        variant="outline"
+                        disabled={page === 1}
+                        onClick={() => setPage((p) => p - 1)}
+                      >
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        disabled={page * logsData.limit >= logsData.total}
+                        onClick={() => setPage((p) => p + 1)}
+                      >
+                        Next
+                      </Button>
                     </div>
                   </div>
                 )}

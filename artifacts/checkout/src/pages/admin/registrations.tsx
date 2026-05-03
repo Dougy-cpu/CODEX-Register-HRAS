@@ -2,13 +2,50 @@ import { useState, Fragment } from "react";
 import { useListRegistrations, useGetRegistration } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import AdminLayout from "@/components/layout/AdminLayout";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ChevronDown, ChevronRight, Search, Download, Trash2, AlertTriangle, Send, Check, Clock, Pencil, X, Loader2, Copy, Link } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  ChevronDown,
+  ChevronRight,
+  Search,
+  Download,
+  Trash2,
+  AlertTriangle,
+  Send,
+  Check,
+  Clock,
+  Pencil,
+  X,
+  Loader2,
+  Copy,
+  Link,
+} from "lucide-react";
 
 const STATUS_OPTIONS = [
   { value: "paid", label: "Paid" },
@@ -22,15 +59,20 @@ const STATUS_OPTIONS = [
 
 const statusBadge = (status: string) => {
   const cls =
-    status === "paid" ? "bg-green-100 text-green-800" :
-    status === "invoiced" ? "bg-blue-100 text-blue-800" :
-    status === "cancelled" ? "bg-red-100 text-red-800" :
-    status === "refunded" ? "bg-purple-100 text-purple-800" :
-    status === "disputed" ? "bg-amber-100 text-amber-800" :
-    "bg-yellow-100 text-yellow-800";
+    status === "paid"
+      ? "bg-green-100 text-green-800"
+      : status === "invoiced"
+        ? "bg-blue-100 text-blue-800"
+        : status === "cancelled"
+          ? "bg-red-100 text-red-800"
+          : status === "refunded"
+            ? "bg-purple-100 text-purple-800"
+            : status === "disputed"
+              ? "bg-amber-100 text-amber-800"
+              : "bg-yellow-100 text-yellow-800";
   return (
     <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${cls}`}>
-      {STATUS_OPTIONS.find(s => s.value === status)?.label ?? status}
+      {STATUS_OPTIONS.find((s) => s.value === status)?.label ?? status}
     </span>
   );
 };
@@ -45,17 +87,33 @@ interface AttendeeEditForm {
   dietaryAccessibility: string;
 }
 
-function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onStatusChanged: () => void }) {
+function ExpandedRegistrationDetail({
+  id,
+  onStatusChanged,
+}: {
+  id: number;
+  onStatusChanged: () => void;
+}) {
   const { data, isLoading, refetch } = useGetRegistration(id, {
-    query: { queryKey: ["registration", id] }
+    query: { queryKey: ["registration", id] },
   });
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<string | null>(null);
   const [stripeActionResult, setStripeActionResult] = useState<string | null>(null);
-  const [reminderState, setReminderState] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [reminderState, setReminderState] = useState<"idle" | "loading" | "success" | "error">(
+    "idle",
+  );
   const [reminderError, setReminderError] = useState<string | null>(null);
   const [editingAttendeeId, setEditingAttendeeId] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState<AttendeeEditForm>({ firstName: "", lastName: "", jobTitle: "", company: "", workEmail: "", phone: "", dietaryAccessibility: "" });
+  const [editForm, setEditForm] = useState<AttendeeEditForm>({
+    firstName: "",
+    lastName: "",
+    jobTitle: "",
+    company: "",
+    workEmail: "",
+    phone: "",
+    dietaryAccessibility: "",
+  });
   const [saveState, setSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
@@ -74,7 +132,9 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
     billingPhone: "",
     billingVatNumber: "",
   });
-  const [billingSaveState, setBillingSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
+  const [billingSaveState, setBillingSaveState] = useState<"idle" | "saving" | "success" | "error">(
+    "idle",
+  );
   const [billingSaveError, setBillingSaveError] = useState<string | null>(null);
   const [billingReissueInfo, setBillingReissueInfo] = useState<string | null>(null);
 
@@ -117,12 +177,18 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
       }
       const body = await res.json().catch(() => ({}));
       const r = body?.reissue || {};
-      if (r.alreadyPaid) setBillingReissueInfo("Invoice already paid in Stripe — details saved but invoice was not re-issued.");
+      if (r.alreadyPaid)
+        setBillingReissueInfo(
+          "Invoice already paid in Stripe — details saved but invoice was not re-issued.",
+        );
       else if (r.reissued) setBillingReissueInfo("Invoice re-issued and emailed to the customer.");
       else if (r.error) setBillingReissueInfo(`Saved, but invoice re-issue failed: ${r.error}`);
       setBillingSaveState("success");
       await refetch();
-      setTimeout(() => { setEditingBilling(false); setBillingSaveState("idle"); }, 2500);
+      setTimeout(() => {
+        setEditingBilling(false);
+        setBillingSaveState("idle");
+      }, 2500);
     } catch (err: any) {
       setBillingSaveError(err?.message || "Failed to save");
       setBillingSaveState("error");
@@ -151,7 +217,13 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
   };
 
   const handleSaveAttendee = async (attendeeId: number) => {
-    if (!editForm.firstName || !editForm.lastName || !editForm.jobTitle || !editForm.company || !editForm.workEmail) {
+    if (
+      !editForm.firstName ||
+      !editForm.lastName ||
+      !editForm.jobTitle ||
+      !editForm.company ||
+      !editForm.workEmail
+    ) {
       setSaveError("First name, last name, job title, company, and email are required.");
       return;
     }
@@ -190,7 +262,8 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
   };
 
   const invoiceDueDate = data?.invoiceDueDate ? new Date(data.invoiceDueDate) : null;
-  const isInvoiceOverdue = data?.status === "invoiced" && !!invoiceDueDate && invoiceDueDate < new Date();
+  const isInvoiceOverdue =
+    data?.status === "invoiced" && !!invoiceDueDate && invoiceDueDate < new Date();
   const invoiceDueDateStr = invoiceDueDate
     ? invoiceDueDate.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
     : null;
@@ -213,7 +286,10 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
     } catch (err: any) {
       setReminderError(err?.message || "Failed to send reminder");
       setReminderState("error");
-      setTimeout(() => { setReminderState("idle"); setReminderError(null); }, 4000);
+      setTimeout(() => {
+        setReminderState("idle");
+        setReminderError(null);
+      }, 4000);
     }
   };
 
@@ -268,25 +344,39 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
       {/* Booking meta strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
         <div className="bg-white border border-border p-3">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">Booking Ref</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">
+            Booking Ref
+          </p>
           <p className="font-mono font-medium">{data?.orderReference || "—"}</p>
         </div>
         <div className="bg-white border border-border p-3">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">Payment</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">
+            Payment
+          </p>
           <p className="font-medium capitalize">{data?.paymentMethod || "—"}</p>
         </div>
         <div className="bg-white border border-border p-3">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">Billing Email</p>
-          <p className="font-medium truncate">{data?.billingEmail || data?.attendees?.find(a => a.isLead)?.workEmail || "—"}</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">
+            Billing Email
+          </p>
+          <p className="font-medium truncate">
+            {data?.billingEmail || data?.attendees?.find((a) => a.isLead)?.workEmail || "—"}
+          </p>
         </div>
         <div className="bg-white border border-border p-3">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">Promo Code</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">
+            Promo Code
+          </p>
           <p className="font-medium">{data?.promoCode || "—"}</p>
         </div>
         {Boolean((data as unknown as Record<string, unknown> | undefined)?.hearAboutUs) && (
           <div className="bg-white border border-border p-3 col-span-2 md:col-span-4">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">How they heard about us</p>
-            <p className="font-medium">{(data as unknown as Record<string, unknown>).hearAboutUs as string}</p>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">
+              How they heard about us
+            </p>
+            <p className="font-medium">
+              {(data as unknown as Record<string, unknown>).hearAboutUs as string}
+            </p>
           </div>
         )}
       </div>
@@ -305,13 +395,16 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
             <button
               type="button"
               onClick={() => {
-                navigator.clipboard.writeText(manageUrl).then(() => {
-                  setCopyState("copied");
-                  setTimeout(() => setCopyState("idle"), 2000);
-                }).catch(() => {
-                  setCopyState("copied");
-                  setTimeout(() => setCopyState("idle"), 2000);
-                });
+                navigator.clipboard
+                  .writeText(manageUrl)
+                  .then(() => {
+                    setCopyState("copied");
+                    setTimeout(() => setCopyState("idle"), 2000);
+                  })
+                  .catch(() => {
+                    setCopyState("copied");
+                    setTimeout(() => setCopyState("idle"), 2000);
+                  });
               }}
               className="flex-none flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-border bg-slate-50 hover:bg-slate-100 transition-colors whitespace-nowrap"
             >
@@ -329,13 +422,19 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
             </button>
           </div>
           <p className="text-xs text-muted-foreground mt-1.5">
-            Send this link to the registrant — anyone with it can update attendee details for this booking.
+            Send this link to the registrant — anyone with it can update attendee details for this
+            booking.
           </p>
         </div>
       )}
 
       {/* Confirmation dialog for irreversible status changes */}
-      <AlertDialog open={!!pendingStatus} onOpenChange={(open) => { if (!open) setPendingStatus(null); }}>
+      <AlertDialog
+        open={!!pendingStatus}
+        onOpenChange={(open) => {
+          if (!open) setPendingStatus(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
@@ -344,14 +443,30 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2 text-sm text-foreground">
-                {pendingStatus === "cancelled" && data?.paymentMethod === "card" && data?.status === "paid" ? (
-                  <p>A <strong>full refund</strong> will be issued to the customer's card. This cannot be reversed.</p>
-                ) : pendingStatus === "cancelled" && data?.paymentMethod === "invoice" && data?.status === "invoiced" ? (
-                  <p>The outstanding <strong>Stripe invoice will be voided</strong>. This cannot be reversed.</p>
+                {pendingStatus === "cancelled" &&
+                data?.paymentMethod === "card" &&
+                data?.status === "paid" ? (
+                  <p>
+                    A <strong>full refund</strong> will be issued to the customer's card. This
+                    cannot be reversed.
+                  </p>
+                ) : pendingStatus === "cancelled" &&
+                  data?.paymentMethod === "invoice" &&
+                  data?.status === "invoiced" ? (
+                  <p>
+                    The outstanding <strong>Stripe invoice will be voided</strong>. This cannot be
+                    reversed.
+                  </p>
                 ) : pendingStatus === "refunded" ? (
-                  <p>The booking will be marked as <strong>refunded</strong>. Ensure any payment has already been returned to the customer.</p>
+                  <p>
+                    The booking will be marked as <strong>refunded</strong>. Ensure any payment has
+                    already been returned to the customer.
+                  </p>
                 ) : (
-                  <p>This will mark the booking as <strong>{pendingStatus}</strong>. This action cannot be reversed.</p>
+                  <p>
+                    This will mark the booking as <strong>{pendingStatus}</strong>. This action
+                    cannot be reversed.
+                  </p>
                 )}
               </div>
             </AlertDialogDescription>
@@ -366,11 +481,15 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
                 void confirmStatusChange(s);
               }}
             >
-              {pendingStatus === "cancelled" && data?.paymentMethod === "card" && data?.status === "paid"
+              {pendingStatus === "cancelled" &&
+              data?.paymentMethod === "card" &&
+              data?.status === "paid"
                 ? "Yes, issue refund"
-                : pendingStatus === "cancelled" && data?.paymentMethod === "invoice" && data?.status === "invoiced"
-                ? "Yes, void invoice"
-                : "Yes, confirm"}
+                : pendingStatus === "cancelled" &&
+                    data?.paymentMethod === "invoice" &&
+                    data?.status === "invoiced"
+                  ? "Yes, void invoice"
+                  : "Yes, confirm"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -378,15 +497,33 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
 
       {/* Stripe action result banner */}
       {stripeActionResult && (
-        <div className={`flex items-start gap-2 px-4 py-2 text-sm border-b ${stripeActionResult === "failed" ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-green-50 border-green-200 text-green-800"}`}>
+        <div
+          className={`flex items-start gap-2 px-4 py-2 text-sm border-b ${stripeActionResult === "failed" ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-green-50 border-green-200 text-green-800"}`}
+        >
           {stripeActionResult === "failed" ? (
-            <><AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" /><span>Status updated but the Stripe action failed — please check the Stripe dashboard.</span></>
+            <>
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>
+                Status updated but the Stripe action failed — please check the Stripe dashboard.
+              </span>
+            </>
           ) : stripeActionResult === "refund_issued" ? (
-            <><Check className="h-4 w-4 mt-0.5 shrink-0" /><span>Refund issued · Status set to Refunded</span></>
+            <>
+              <Check className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>Refund issued · Status set to Refunded</span>
+            </>
           ) : stripeActionResult === "invoice_voided" ? (
-            <><Check className="h-4 w-4 mt-0.5 shrink-0" /><span>Booking cancelled · Stripe invoice voided</span></>
+            <>
+              <Check className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>Booking cancelled · Stripe invoice voided</span>
+            </>
           ) : null}
-          <button className="ml-auto text-xs opacity-60 hover:opacity-100" onClick={() => setStripeActionResult(null)}><X className="h-3 w-3" /></button>
+          <button
+            className="ml-auto text-xs opacity-60 hover:opacity-100"
+            onClick={() => setStripeActionResult(null)}
+          >
+            <X className="h-3 w-3" />
+          </button>
         </div>
       )}
 
@@ -395,13 +532,19 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
         <span className="text-sm font-bold uppercase tracking-wider text-muted-foreground shrink-0">
           Override Status
         </span>
-        <Select value={data?.status ?? ""} onValueChange={handleStatusChange} disabled={updatingStatus}>
+        <Select
+          value={data?.status ?? ""}
+          onValueChange={handleStatusChange}
+          disabled={updatingStatus}
+        >
           <SelectTrigger className="w-52 h-9 bg-white text-sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {STATUS_OPTIONS.map(opt => (
-              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+            {STATUS_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -415,9 +558,13 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
 
       {/* Invoice details — shown when payment method is invoice */}
       {data?.paymentMethod === "invoice" && (
-        <div className={`${isInvoiceOverdue ? "bg-red-50 border-red-300" : "bg-blue-50 border-blue-200"} border p-4`}>
+        <div
+          className={`${isInvoiceOverdue ? "bg-red-50 border-red-300" : "bg-blue-50 border-blue-200"} border p-4`}
+        >
           <div className="flex items-center justify-between mb-3">
-            <h4 className={`font-bold uppercase text-xs tracking-wider ${isInvoiceOverdue ? "text-red-700" : "text-blue-700"}`}>
+            <h4
+              className={`font-bold uppercase text-xs tracking-wider ${isInvoiceOverdue ? "text-red-700" : "text-blue-700"}`}
+            >
               Invoice Details
               {isInvoiceOverdue && (
                 <span className="ml-2 inline-flex items-center gap-1 bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs font-bold uppercase">
@@ -430,26 +577,32 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
               disabled={reminderState === "loading" || reminderState === "success"}
               className={`
                 inline-flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded transition-all
-                ${reminderState === "success"
-                  ? "bg-green-100 text-green-700 cursor-not-allowed"
-                  : reminderState === "error"
-                  ? "bg-red-100 text-red-700 hover:bg-red-200"
-                  : reminderState === "loading"
-                  ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-                  : isInvoiceOverdue
-                  ? "bg-red-600 text-white hover:bg-red-700"
-                  : "bg-blue-600 text-white hover:bg-blue-700"
+                ${
+                  reminderState === "success"
+                    ? "bg-green-100 text-green-700 cursor-not-allowed"
+                    : reminderState === "error"
+                      ? "bg-red-100 text-red-700 hover:bg-red-200"
+                      : reminderState === "loading"
+                        ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                        : isInvoiceOverdue
+                          ? "bg-red-600 text-white hover:bg-red-700"
+                          : "bg-blue-600 text-white hover:bg-blue-700"
                 }
               `}
             >
-              {reminderState === "loading" && <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-current" />}
+              {reminderState === "loading" && (
+                <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-current" />
+              )}
               {reminderState === "success" && <Check className="w-3 h-3" />}
               {reminderState === "error" && <AlertTriangle className="w-3 h-3" />}
               {reminderState === "idle" && <Send className="w-3 h-3" />}
-              {reminderState === "loading" ? "Sending…"
-                : reminderState === "success" ? "Sent!"
-                : reminderState === "error" ? (reminderError || "Failed")
-                : "Send Reminder"}
+              {reminderState === "loading"
+                ? "Sending…"
+                : reminderState === "success"
+                  ? "Sent!"
+                  : reminderState === "error"
+                    ? reminderError || "Failed"
+                    : "Send Reminder"}
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
@@ -458,12 +611,17 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
               <span className="font-mono font-semibold">{data?.orderReference || "—"}</span>
             </div>
             <div className="flex gap-2">
-              <span className={`w-36 shrink-0 ${isInvoiceOverdue ? "text-red-600 font-semibold" : "text-muted-foreground"}`}>
+              <span
+                className={`w-36 shrink-0 ${isInvoiceOverdue ? "text-red-600 font-semibold" : "text-muted-foreground"}`}
+              >
                 {isInvoiceOverdue ? "⚠️ Due Date" : "Due Date"}
               </span>
               <span className={`font-medium ${isInvoiceOverdue ? "text-red-700 font-bold" : ""}`}>
                 {invoiceDueDateStr ? (
-                  <>{invoiceDueDateStr}{isInvoiceOverdue ? " — OVERDUE" : ""}</>
+                  <>
+                    {invoiceDueDateStr}
+                    {isInvoiceOverdue ? " — OVERDUE" : ""}
+                  </>
                 ) : (
                   <span className="text-muted-foreground italic">Not recorded</span>
                 )}
@@ -493,19 +651,28 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
                 <span className="font-medium">
                   {data.billingAddressLine1 ? (
                     <>
-                      {data.billingAddressLine1}{data.billingAddressLine2 ? `, ${data.billingAddressLine2}` : ""}
-                      {(data.billingTown || data.billingRegion) ? `, ${[data.billingTown, data.billingRegion].filter(Boolean).join(", ")}` : ""}
+                      {data.billingAddressLine1}
+                      {data.billingAddressLine2 ? `, ${data.billingAddressLine2}` : ""}
+                      {data.billingTown || data.billingRegion
+                        ? `, ${[data.billingTown, data.billingRegion].filter(Boolean).join(", ")}`
+                        : ""}
                       {data.billingPostcode ? `, ${data.billingPostcode}` : ""}
                       {data.billingCountry ? `, ${data.billingCountry}` : ""}
                     </>
-                  ) : data.billingAddress}
+                  ) : (
+                    data.billingAddress
+                  )}
                 </span>
               </div>
             )}
             <div className="flex gap-2 sm:col-span-2">
               <span className="text-muted-foreground w-36 shrink-0">PO Number</span>
               <span className="font-mono font-semibold">
-                {data?.poNumber || <span className="text-muted-foreground italic font-sans font-normal">Not provided</span>}
+                {data?.poNumber || (
+                  <span className="text-muted-foreground italic font-sans font-normal">
+                    Not provided
+                  </span>
+                )}
               </span>
             </div>
           </div>
@@ -518,82 +685,200 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary underline underline-offset-2 hover:text-primary/80"
               >
                 <Pencil className="w-3 h-3" /> Edit PO / billing details
-                {data?.stripeInvoiceId ? <span className="text-muted-foreground font-normal italic">— will re-issue invoice</span> : null}
+                {data?.stripeInvoiceId ? (
+                  <span className="text-muted-foreground font-normal italic">
+                    — will re-issue invoice
+                  </span>
+                ) : null}
               </button>
             ) : (
               <div className="bg-white border border-primary/30 rounded-sm p-4 space-y-3">
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Editing billing details {data?.stripeInvoiceId ? "(saving will re-issue invoice)" : ""}
+                  Editing billing details{" "}
+                  {data?.stripeInvoiceId ? "(saving will re-issue invoice)" : ""}
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1">PO Number</label>
-                    <Input value={billingForm.poNumber} maxLength={30} onChange={(e) => setBillingForm(f => ({ ...f, poNumber: e.target.value }))} className="h-8 text-sm" />
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                      PO Number
+                    </label>
+                    <Input
+                      value={billingForm.poNumber}
+                      maxLength={30}
+                      onChange={(e) => setBillingForm((f) => ({ ...f, poNumber: e.target.value }))}
+                      className="h-8 text-sm"
+                    />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Billing Contact</label>
-                    <Input value={billingForm.billingName} onChange={(e) => setBillingForm(f => ({ ...f, billingName: e.target.value }))} className="h-8 text-sm" />
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                      Billing Contact
+                    </label>
+                    <Input
+                      value={billingForm.billingName}
+                      onChange={(e) =>
+                        setBillingForm((f) => ({ ...f, billingName: e.target.value }))
+                      }
+                      className="h-8 text-sm"
+                    />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Company</label>
-                    <Input value={billingForm.billingCompany} onChange={(e) => setBillingForm(f => ({ ...f, billingCompany: e.target.value }))} className="h-8 text-sm" />
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                      Company
+                    </label>
+                    <Input
+                      value={billingForm.billingCompany}
+                      onChange={(e) =>
+                        setBillingForm((f) => ({ ...f, billingCompany: e.target.value }))
+                      }
+                      className="h-8 text-sm"
+                    />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Invoice Email</label>
-                    <Input type="email" value={billingForm.billingEmail} onChange={(e) => setBillingForm(f => ({ ...f, billingEmail: e.target.value }))} className="h-8 text-sm" />
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                      Invoice Email
+                    </label>
+                    <Input
+                      type="email"
+                      value={billingForm.billingEmail}
+                      onChange={(e) =>
+                        setBillingForm((f) => ({ ...f, billingEmail: e.target.value }))
+                      }
+                      className="h-8 text-sm"
+                    />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Phone</label>
-                    <Input type="tel" value={billingForm.billingPhone} onChange={(e) => setBillingForm(f => ({ ...f, billingPhone: e.target.value }))} className="h-8 text-sm" />
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                      Phone
+                    </label>
+                    <Input
+                      type="tel"
+                      value={billingForm.billingPhone}
+                      onChange={(e) =>
+                        setBillingForm((f) => ({ ...f, billingPhone: e.target.value }))
+                      }
+                      className="h-8 text-sm"
+                    />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1">VAT Number</label>
-                    <Input value={billingForm.billingVatNumber} onChange={(e) => setBillingForm(f => ({ ...f, billingVatNumber: e.target.value }))} className="h-8 text-sm" />
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                      VAT Number
+                    </label>
+                    <Input
+                      value={billingForm.billingVatNumber}
+                      onChange={(e) =>
+                        setBillingForm((f) => ({ ...f, billingVatNumber: e.target.value }))
+                      }
+                      className="h-8 text-sm"
+                    />
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Address Line 1</label>
-                    <Input value={billingForm.billingAddressLine1} onChange={(e) => setBillingForm(f => ({ ...f, billingAddressLine1: e.target.value }))} className="h-8 text-sm" />
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                      Address Line 1
+                    </label>
+                    <Input
+                      value={billingForm.billingAddressLine1}
+                      onChange={(e) =>
+                        setBillingForm((f) => ({ ...f, billingAddressLine1: e.target.value }))
+                      }
+                      className="h-8 text-sm"
+                    />
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Address Line 2</label>
-                    <Input value={billingForm.billingAddressLine2} onChange={(e) => setBillingForm(f => ({ ...f, billingAddressLine2: e.target.value }))} className="h-8 text-sm" />
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                      Address Line 2
+                    </label>
+                    <Input
+                      value={billingForm.billingAddressLine2}
+                      onChange={(e) =>
+                        setBillingForm((f) => ({ ...f, billingAddressLine2: e.target.value }))
+                      }
+                      className="h-8 text-sm"
+                    />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Town</label>
-                    <Input value={billingForm.billingTown} onChange={(e) => setBillingForm(f => ({ ...f, billingTown: e.target.value }))} className="h-8 text-sm" />
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                      Town
+                    </label>
+                    <Input
+                      value={billingForm.billingTown}
+                      onChange={(e) =>
+                        setBillingForm((f) => ({ ...f, billingTown: e.target.value }))
+                      }
+                      className="h-8 text-sm"
+                    />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Region</label>
-                    <Input value={billingForm.billingRegion} onChange={(e) => setBillingForm(f => ({ ...f, billingRegion: e.target.value }))} className="h-8 text-sm" />
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                      Region
+                    </label>
+                    <Input
+                      value={billingForm.billingRegion}
+                      onChange={(e) =>
+                        setBillingForm((f) => ({ ...f, billingRegion: e.target.value }))
+                      }
+                      className="h-8 text-sm"
+                    />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Postcode</label>
-                    <Input value={billingForm.billingPostcode} onChange={(e) => setBillingForm(f => ({ ...f, billingPostcode: e.target.value }))} className="h-8 text-sm" />
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                      Postcode
+                    </label>
+                    <Input
+                      value={billingForm.billingPostcode}
+                      onChange={(e) =>
+                        setBillingForm((f) => ({ ...f, billingPostcode: e.target.value }))
+                      }
+                      className="h-8 text-sm"
+                    />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Country</label>
-                    <Input value={billingForm.billingCountry} onChange={(e) => setBillingForm(f => ({ ...f, billingCountry: e.target.value }))} className="h-8 text-sm" />
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                      Country
+                    </label>
+                    <Input
+                      value={billingForm.billingCountry}
+                      onChange={(e) =>
+                        setBillingForm((f) => ({ ...f, billingCountry: e.target.value }))
+                      }
+                      className="h-8 text-sm"
+                    />
                   </div>
                 </div>
                 {billingSaveError && <p className="text-xs text-red-600">{billingSaveError}</p>}
                 {billingReissueInfo && billingSaveState === "success" && (
-                  <p className="text-xs text-green-700 flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />{billingReissueInfo}</p>
+                  <p className="text-xs text-green-700 flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5" />
+                    {billingReissueInfo}
+                  </p>
                 )}
                 <div className="flex items-center gap-3 pt-1">
                   <button
                     onClick={handleSaveBilling}
                     disabled={billingSaveState === "saving"}
                     className={`inline-flex items-center gap-2 text-sm font-semibold px-4 py-1.5 rounded ${
-                      billingSaveState === "success" ? "bg-green-100 text-green-700"
-                      : billingSaveState === "saving" ? "bg-primary/60 text-white"
-                      : "bg-primary text-white hover:bg-primary/90"
+                      billingSaveState === "success"
+                        ? "bg-green-100 text-green-700"
+                        : billingSaveState === "saving"
+                          ? "bg-primary/60 text-white"
+                          : "bg-primary text-white hover:bg-primary/90"
                     }`}
                   >
-                    {billingSaveState === "saving" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    {billingSaveState === "saving" && (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    )}
                     {billingSaveState === "success" && <Check className="w-3.5 h-3.5" />}
-                    {billingSaveState === "saving" ? "Saving & re-issuing…" : billingSaveState === "success" ? "Saved" : "Save & Re-issue"}
+                    {billingSaveState === "saving"
+                      ? "Saving & re-issuing…"
+                      : billingSaveState === "success"
+                        ? "Saved"
+                        : "Save & Re-issue"}
                   </button>
-                  <button onClick={() => setEditingBilling(false)} className="text-sm text-muted-foreground hover:text-foreground">Cancel</button>
+                  <button
+                    onClick={() => setEditingBilling(false)}
+                    className="text-sm text-muted-foreground hover:text-foreground"
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
             )}
@@ -602,14 +887,22 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
           {(data?.stripeInvoicePaymentUrl || data?.stripeInvoicePdfUrl) && (
             <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-blue-200">
               {data?.stripeInvoicePaymentUrl && (
-                <a href={data.stripeInvoicePaymentUrl} target="_blank" rel="noreferrer"
-                  className="text-sm font-semibold text-primary underline underline-offset-2 hover:text-primary/80">
+                <a
+                  href={data.stripeInvoicePaymentUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sm font-semibold text-primary underline underline-offset-2 hover:text-primary/80"
+                >
                   View Invoice →
                 </a>
               )}
               {data?.stripeInvoicePdfUrl && (
-                <a href={data.stripeInvoicePdfUrl} target="_blank" rel="noreferrer"
-                  className="text-sm font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900">
+                <a
+                  href={data.stripeInvoicePdfUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sm font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900"
+                >
                   Download PDF →
                 </a>
               )}
@@ -619,22 +912,31 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
       )}
 
       {/* Card payment invoice links (non-invoice method) */}
-      {data?.paymentMethod !== "invoice" && (data?.stripeInvoicePaymentUrl || data?.stripeInvoicePdfUrl) && (
-        <div className="flex flex-wrap gap-3 text-sm">
-          {data?.stripeInvoicePaymentUrl && (
-            <a href={data.stripeInvoicePaymentUrl} target="_blank" rel="noreferrer"
-              className="inline-flex items-center gap-1.5 font-semibold text-primary underline underline-offset-2 hover:text-primary/80">
-              View Stripe Invoice →
-            </a>
-          )}
-          {data?.stripeInvoicePdfUrl && (
-            <a href={data.stripeInvoicePdfUrl} target="_blank" rel="noreferrer"
-              className="inline-flex items-center gap-1.5 font-semibold text-blue-600 underline underline-offset-2 hover:text-blue-800">
-              Download Invoice PDF →
-            </a>
-          )}
-        </div>
-      )}
+      {data?.paymentMethod !== "invoice" &&
+        (data?.stripeInvoicePaymentUrl || data?.stripeInvoicePdfUrl) && (
+          <div className="flex flex-wrap gap-3 text-sm">
+            {data?.stripeInvoicePaymentUrl && (
+              <a
+                href={data.stripeInvoicePaymentUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 font-semibold text-primary underline underline-offset-2 hover:text-primary/80"
+              >
+                View Stripe Invoice →
+              </a>
+            )}
+            {data?.stripeInvoicePdfUrl && (
+              <a
+                href={data.stripeInvoicePdfUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 font-semibold text-blue-600 underline underline-offset-2 hover:text-blue-800"
+              >
+                Download Invoice PDF →
+              </a>
+            )}
+          </div>
+        )}
 
       {/* Attendee table */}
       <div>
@@ -645,14 +947,30 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
           <table className="w-full text-sm">
             <thead className="bg-muted/50">
               <tr>
-                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground w-8">#</th>
-                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">Name</th>
-                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">Job Title</th>
-                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">Company</th>
-                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">Email</th>
-                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">Phone</th>
-                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">Dietary / Access</th>
-                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">GDPR</th>
+                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground w-8">
+                  #
+                </th>
+                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">
+                  Name
+                </th>
+                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">
+                  Job Title
+                </th>
+                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">
+                  Company
+                </th>
+                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">
+                  Email
+                </th>
+                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">
+                  Phone
+                </th>
+                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">
+                  Dietary / Access
+                </th>
+                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">
+                  GDPR
+                </th>
                 <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground w-16"></th>
               </tr>
             </thead>
@@ -663,7 +981,9 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
                 .map((a) => (
                   <Fragment key={a.id}>
                     {/* Display row */}
-                    <tr className={`${a.isLead ? "bg-primary/5" : "bg-white"} ${editingAttendeeId === a.id ? "border-b-0" : ""}`}>
+                    <tr
+                      className={`${a.isLead ? "bg-primary/5" : "bg-white"} ${editingAttendeeId === a.id ? "border-b-0" : ""}`}
+                    >
                       <td className="p-3 text-muted-foreground">{(a.seatIndex ?? 0) + 1}</td>
                       <td className="p-3">
                         {a.isTbc && editingAttendeeId !== a.id ? (
@@ -673,29 +993,50 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
                         ) : (
                           <div className="flex items-center gap-1.5">
                             {a.isLead && isGroup && (
-                              <span className="text-primary font-bold text-base leading-none" title="Lead attendee">★</span>
+                              <span
+                                className="text-primary font-bold text-base leading-none"
+                                title="Lead attendee"
+                              >
+                                ★
+                              </span>
                             )}
-                            <span className="font-medium">{a.firstName} {a.lastName}</span>
+                            <span className="font-medium">
+                              {a.firstName} {a.lastName}
+                            </span>
                             {a.isLead && !isGroup && (
-                              <span className="text-[10px] font-bold bg-primary text-white px-1.5 py-0.5 uppercase tracking-wider">Lead</span>
+                              <span className="text-[10px] font-bold bg-primary text-white px-1.5 py-0.5 uppercase tracking-wider">
+                                Lead
+                              </span>
                             )}
                           </div>
                         )}
                       </td>
-                      <td className="p-3 text-muted-foreground">{a.isTbc ? "—" : (a.jobTitle || "—")}</td>
-                      <td className="p-3 text-muted-foreground">{a.isTbc ? "—" : (a.company || "—")}</td>
-                      <td className="p-3 text-muted-foreground">{a.isTbc ? "—" : (a.workEmail || "—")}</td>
-                      <td className="p-3 text-muted-foreground">{a.isTbc ? "—" : (a.phone || "—")}</td>
+                      <td className="p-3 text-muted-foreground">
+                        {a.isTbc ? "—" : a.jobTitle || "—"}
+                      </td>
+                      <td className="p-3 text-muted-foreground">
+                        {a.isTbc ? "—" : a.company || "—"}
+                      </td>
+                      <td className="p-3 text-muted-foreground">
+                        {a.isTbc ? "—" : a.workEmail || "—"}
+                      </td>
+                      <td className="p-3 text-muted-foreground">
+                        {a.isTbc ? "—" : a.phone || "—"}
+                      </td>
                       <td className="p-3 text-muted-foreground max-w-[180px] truncate">
-                        {a.isTbc ? "—" : (a.dietaryAccessibility || "—")}
+                        {a.isTbc ? "—" : a.dietaryAccessibility || "—"}
                       </td>
                       <td className="p-3">
                         {a.isTbc ? (
                           <span className="text-muted-foreground">—</span>
                         ) : a.gdprConsent ? (
-                          <span className="text-[10px] font-bold bg-green-100 text-green-800 px-1.5 py-0.5 uppercase">✓ Yes</span>
+                          <span className="text-[10px] font-bold bg-green-100 text-green-800 px-1.5 py-0.5 uppercase">
+                            ✓ Yes
+                          </span>
                         ) : (
-                          <span className="text-[10px] font-bold bg-red-100 text-red-800 px-1.5 py-0.5 uppercase">No</span>
+                          <span className="text-[10px] font-bold bg-red-100 text-red-800 px-1.5 py-0.5 uppercase">
+                            No
+                          </span>
                         )}
                       </td>
                       <td className="p-3">
@@ -725,70 +1066,102 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
                         <td colSpan={9} className="px-4 pb-4 pt-0">
                           <div className="border border-primary/20 bg-white rounded-sm p-4 space-y-3">
                             <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
-                              Editing: Attendee {(a.seatIndex ?? 0) + 1}{a.isLead ? " (Lead)" : ""}
+                              Editing: Attendee {(a.seatIndex ?? 0) + 1}
+                              {a.isLead ? " (Lead)" : ""}
                             </p>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                               <div>
-                                <label className="block text-xs font-semibold text-muted-foreground mb-1">First Name *</label>
+                                <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                                  First Name *
+                                </label>
                                 <Input
                                   value={editForm.firstName}
-                                  onChange={e => setEditForm(f => ({ ...f, firstName: e.target.value }))}
+                                  onChange={(e) =>
+                                    setEditForm((f) => ({ ...f, firstName: e.target.value }))
+                                  }
                                   placeholder="Jane"
                                   className="h-8 text-sm"
                                 />
                               </div>
                               <div>
-                                <label className="block text-xs font-semibold text-muted-foreground mb-1">Last Name *</label>
+                                <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                                  Last Name *
+                                </label>
                                 <Input
                                   value={editForm.lastName}
-                                  onChange={e => setEditForm(f => ({ ...f, lastName: e.target.value }))}
+                                  onChange={(e) =>
+                                    setEditForm((f) => ({ ...f, lastName: e.target.value }))
+                                  }
                                   placeholder="Smith"
                                   className="h-8 text-sm"
                                 />
                               </div>
                               <div>
-                                <label className="block text-xs font-semibold text-muted-foreground mb-1">Job Title *</label>
+                                <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                                  Job Title *
+                                </label>
                                 <Input
                                   value={editForm.jobTitle}
-                                  onChange={e => setEditForm(f => ({ ...f, jobTitle: e.target.value }))}
+                                  onChange={(e) =>
+                                    setEditForm((f) => ({ ...f, jobTitle: e.target.value }))
+                                  }
                                   placeholder="Chief People Officer"
                                   className="h-8 text-sm"
                                 />
                               </div>
                               <div>
-                                <label className="block text-xs font-semibold text-muted-foreground mb-1">Company *</label>
+                                <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                                  Company *
+                                </label>
                                 <Input
                                   value={editForm.company}
-                                  onChange={e => setEditForm(f => ({ ...f, company: e.target.value }))}
+                                  onChange={(e) =>
+                                    setEditForm((f) => ({ ...f, company: e.target.value }))
+                                  }
                                   placeholder="Acme Ltd"
                                   className="h-8 text-sm"
                                 />
                               </div>
                               <div>
-                                <label className="block text-xs font-semibold text-muted-foreground mb-1">Work Email *</label>
+                                <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                                  Work Email *
+                                </label>
                                 <Input
                                   type="email"
                                   value={editForm.workEmail}
-                                  onChange={e => setEditForm(f => ({ ...f, workEmail: e.target.value }))}
+                                  onChange={(e) =>
+                                    setEditForm((f) => ({ ...f, workEmail: e.target.value }))
+                                  }
                                   placeholder="jane@acme.com"
                                   className="h-8 text-sm"
                                 />
                               </div>
                               <div>
-                                <label className="block text-xs font-semibold text-muted-foreground mb-1">Phone</label>
+                                <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                                  Phone
+                                </label>
                                 <Input
                                   type="tel"
                                   value={editForm.phone}
-                                  onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))}
+                                  onChange={(e) =>
+                                    setEditForm((f) => ({ ...f, phone: e.target.value }))
+                                  }
                                   placeholder="+44 7700 900 000"
                                   className="h-8 text-sm"
                                 />
                               </div>
                               <div className="sm:col-span-2 lg:col-span-3">
-                                <label className="block text-xs font-semibold text-muted-foreground mb-1">Dietary / Accessibility</label>
+                                <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                                  Dietary / Accessibility
+                                </label>
                                 <Input
                                   value={editForm.dietaryAccessibility}
-                                  onChange={e => setEditForm(f => ({ ...f, dietaryAccessibility: e.target.value }))}
+                                  onChange={(e) =>
+                                    setEditForm((f) => ({
+                                      ...f,
+                                      dietaryAccessibility: e.target.value,
+                                    }))
+                                  }
                                   placeholder="e.g. vegetarian, wheelchair access"
                                   className="h-8 text-sm"
                                 />
@@ -808,13 +1181,19 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
                                   saveState === "success"
                                     ? "bg-green-100 text-green-700 cursor-not-allowed"
                                     : saveState === "saving"
-                                    ? "bg-primary/60 text-white cursor-not-allowed"
-                                    : "bg-primary text-white hover:bg-primary/90"
+                                      ? "bg-primary/60 text-white cursor-not-allowed"
+                                      : "bg-primary text-white hover:bg-primary/90"
                                 }`}
                               >
-                                {saveState === "saving" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                                {saveState === "saving" && (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                )}
                                 {saveState === "success" && <Check className="w-3.5 h-3.5" />}
-                                {saveState === "saving" ? "Saving…" : saveState === "success" ? "Saved!" : "Save Changes"}
+                                {saveState === "saving"
+                                  ? "Saving…"
+                                  : saveState === "success"
+                                    ? "Saved!"
+                                    : "Save Changes"}
                               </button>
                               <button
                                 onClick={cancelEditing}
@@ -831,7 +1210,9 @@ function ExpandedRegistrationDetail({ id, onStatusChanged }: { id: number; onSta
                 ))}
               {(!data?.attendees || data.attendees.length === 0) && (
                 <tr>
-                  <td colSpan={9} className="p-6 text-center text-muted-foreground">No attendees recorded yet.</td>
+                  <td colSpan={9} className="p-6 text-center text-muted-foreground">
+                    No attendees recorded yet.
+                  </td>
                 </tr>
               )}
             </tbody>
@@ -866,23 +1247,23 @@ export default function AdminRegistrations() {
       limit: 20,
     },
     {
-      query: { queryKey }
-    }
+      query: { queryKey },
+    },
   );
 
   const registrations = data?.registrations ?? [];
-  const pageIds = registrations.map(r => r.id);
-  const allPageSelected = pageIds.length > 0 && pageIds.every(id => selected.has(id));
-  const somePageSelected = pageIds.some(id => selected.has(id));
+  const pageIds = registrations.map((r) => r.id);
+  const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
+  const somePageSelected = pageIds.some((id) => selected.has(id));
 
   const toggleAll = () => {
     if (allPageSelected) {
       const next = new Set(selected);
-      pageIds.forEach(id => next.delete(id));
+      pageIds.forEach((id) => next.delete(id));
       setSelected(next);
     } else {
       const next = new Set(selected);
-      pageIds.forEach(id => next.add(id));
+      pageIds.forEach((id) => next.add(id));
       setSelected(next);
     }
   };
@@ -943,17 +1324,19 @@ export default function AdminRegistrations() {
 
   return (
     <AdminLayout title="Registrations">
-
       {/* Confirm delete modal */}
       {confirmDelete && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-border shadow-xl max-w-md w-full p-6 space-y-4">
             <div className="flex items-center gap-3">
               <AlertTriangle className="w-6 h-6 text-red-600 shrink-0" />
-              <h2 className="text-lg font-bold">Delete {selected.size} registration{selected.size !== 1 ? "s" : ""}?</h2>
+              <h2 className="text-lg font-bold">
+                Delete {selected.size} registration{selected.size !== 1 ? "s" : ""}?
+              </h2>
             </div>
             <p className="text-sm text-muted-foreground">
-              This will permanently delete the selected booking{selected.size !== 1 ? "s" : ""} and all associated attendee records. This action cannot be undone.
+              This will permanently delete the selected booking{selected.size !== 1 ? "s" : ""} and
+              all associated attendee records. This action cannot be undone.
             </p>
             <div className="flex gap-3 pt-2 justify-end">
               <Button variant="outline" onClick={() => setConfirmDelete(false)} disabled={deleting}>
@@ -964,7 +1347,9 @@ export default function AdminRegistrations() {
                 onClick={handleBulkDelete}
                 disabled={deleting}
               >
-                {deleting ? "Deleting…" : `Delete ${selected.size} record${selected.size !== 1 ? "s" : ""}`}
+                {deleting
+                  ? "Deleting…"
+                  : `Delete ${selected.size} record${selected.size !== 1 ? "s" : ""}`}
               </Button>
             </div>
           </div>
@@ -974,20 +1359,35 @@ export default function AdminRegistrations() {
       {/* Filters bar */}
       <div className="bg-white p-6 border border-border shadow-sm mb-4 flex flex-col md:flex-row gap-4 items-end">
         <div className="flex-1 w-full">
-          <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">Search</label>
+          <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">
+            Search
+          </label>
           <div className="relative">
             <Search className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
             <Input
               placeholder="Search by name, email or reference..."
               value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); setSelected(new Set()); }}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+                setSelected(new Set());
+              }}
               className="pl-10 h-12"
             />
           </div>
         </div>
         <div className="w-full md:w-44">
-          <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">Status</label>
-          <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); setSelected(new Set()); }}>
+          <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">
+            Status
+          </label>
+          <Select
+            value={status}
+            onValueChange={(v) => {
+              setStatus(v);
+              setPage(1);
+              setSelected(new Set());
+            }}
+          >
             <SelectTrigger className="h-12 bg-white">
               <SelectValue placeholder="All Statuses" />
             </SelectTrigger>
@@ -1003,8 +1403,17 @@ export default function AdminRegistrations() {
           </Select>
         </div>
         <div className="w-full md:w-44">
-          <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">Pass Type</label>
-          <Select value={passType} onValueChange={(v) => { setPassType(v); setPage(1); setSelected(new Set()); }}>
+          <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">
+            Pass Type
+          </label>
+          <Select
+            value={passType}
+            onValueChange={(v) => {
+              setPassType(v);
+              setPage(1);
+              setSelected(new Set());
+            }}
+          >
             <SelectTrigger className="h-12 bg-white">
               <SelectValue placeholder="All Passes" />
             </SelectTrigger>
@@ -1090,7 +1499,11 @@ export default function AdminRegistrations() {
                       />
                     </TableCell>
                     <TableCell>
-                      {expandedId === reg.id ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                      {expandedId === reg.id ? (
+                        <ChevronDown className="w-4 h-4" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4" />
+                      )}
                     </TableCell>
                     <TableCell className="font-mono text-sm">{reg.orderReference || "-"}</TableCell>
                     <TableCell>
@@ -1098,7 +1511,9 @@ export default function AdminRegistrations() {
                       <p className="text-xs text-muted-foreground">{reg.leadEmail}</p>
                     </TableCell>
                     <TableCell>
-                      <span className={`text-xs font-bold px-2 py-0.5 uppercase rounded ${reg.passType === "business" ? "bg-violet-100 text-violet-800" : "bg-slate-100 text-slate-700"}`}>
+                      <span
+                        className={`text-xs font-bold px-2 py-0.5 uppercase rounded ${reg.passType === "business" ? "bg-violet-100 text-violet-800" : "bg-slate-100 text-slate-700"}`}
+                      >
                         {reg.passType === "business" ? "Business" : "Standard"}
                       </span>
                     </TableCell>
@@ -1107,17 +1522,21 @@ export default function AdminRegistrations() {
                     <TableCell>
                       <div className="flex flex-col gap-1">
                         {statusBadge(reg.status)}
-                        {reg.status === "invoiced" && reg.invoiceDueDate && new Date(reg.invoiceDueDate) < new Date() && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-red-700 bg-red-100 px-1.5 py-0.5 rounded">
-                            <Clock className="w-2.5 h-2.5" /> Overdue
-                          </span>
-                        )}
+                        {reg.status === "invoiced" &&
+                          reg.invoiceDueDate &&
+                          new Date(reg.invoiceDueDate) < new Date() && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-red-700 bg-red-100 px-1.5 py-0.5 rounded">
+                              <Clock className="w-2.5 h-2.5" /> Overdue
+                            </span>
+                          )}
                       </div>
                     </TableCell>
                     <TableCell className="text-sm">
                       <div>{new Date(reg.createdAt).toLocaleDateString()}</div>
                       {reg.status === "invoiced" && reg.invoiceDueDate && (
-                        <div className={`text-xs mt-0.5 ${new Date(reg.invoiceDueDate) < new Date() ? "text-red-600 font-semibold" : "text-muted-foreground"}`}>
+                        <div
+                          className={`text-xs mt-0.5 ${new Date(reg.invoiceDueDate) < new Date() ? "text-red-600 font-semibold" : "text-muted-foreground"}`}
+                        >
                           Due: {new Date(reg.invoiceDueDate).toLocaleDateString()}
                         </div>
                       )}
@@ -1140,7 +1559,9 @@ export default function AdminRegistrations() {
                       <TableCell colSpan={10} className="p-6">
                         <ExpandedRegistrationDetail
                           id={reg.id}
-                          onStatusChanged={() => queryClient.invalidateQueries({ queryKey: ["registrations"] })}
+                          onStatusChanged={() =>
+                            queryClient.invalidateQueries({ queryKey: ["registrations"] })
+                          }
                         />
                       </TableCell>
                     </TableRow>
@@ -1162,20 +1583,17 @@ export default function AdminRegistrations() {
       {data && data.total > 0 && (
         <div className="flex justify-between items-center mt-6">
           <p className="text-sm text-muted-foreground">
-            Showing {(page - 1) * data.limit + 1} to {Math.min(page * data.limit, data.total)} of {data.total}
+            Showing {(page - 1) * data.limit + 1} to {Math.min(page * data.limit, data.total)} of{" "}
+            {data.total}
           </p>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              disabled={page === 1}
-              onClick={() => setPage(p => p - 1)}
-            >
+            <Button variant="outline" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
               Previous
             </Button>
             <Button
               variant="outline"
               disabled={page * data.limit >= data.total}
-              onClick={() => setPage(p => p + 1)}
+              onClick={() => setPage((p) => p + 1)}
             >
               Next
             </Button>

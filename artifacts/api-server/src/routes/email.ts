@@ -33,14 +33,33 @@ router.get("/admin/event-settings", adminAuth, async (_req, res): Promise<void> 
 
 router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> => {
   const {
-    eventName, eventDate, eventVenue, eventVenuePostcode,
-    orgName, orgAddress, orgWebsite, logoDataUrl,
-    fromName, fromEmail,
-    attendeeChangesLocked, attendeeChangesLockedMessage,
-    refPrefix, refOffset,
-    notifyCompleteSubject, notifyIncompleteSubject, notifyAttendeeSubject,
-    eventStartAt, eventEndAt, eventTimezone, eventDescription,
-    socialEnabled, socialName, socialStartAt, socialEndAt, socialVenue, socialDescription,
+    eventName,
+    eventDate,
+    eventVenue,
+    eventVenuePostcode,
+    orgName,
+    orgAddress,
+    orgWebsite,
+    logoDataUrl,
+    fromName,
+    fromEmail,
+    attendeeChangesLocked,
+    attendeeChangesLockedMessage,
+    refPrefix,
+    refOffset,
+    notifyCompleteSubject,
+    notifyIncompleteSubject,
+    notifyAttendeeSubject,
+    eventStartAt,
+    eventEndAt,
+    eventTimezone,
+    eventDescription,
+    socialEnabled,
+    socialName,
+    socialStartAt,
+    socialEndAt,
+    socialVenue,
+    socialDescription,
   } = req.body;
 
   function parseTs(v: unknown): Date | null | undefined {
@@ -51,9 +70,15 @@ router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> =
   }
 
   // Validate timezone identifier (IANA) if supplied.
-  if (eventTimezone !== undefined && eventTimezone !== null && String(eventTimezone).trim() !== "") {
+  if (
+    eventTimezone !== undefined &&
+    eventTimezone !== null &&
+    String(eventTimezone).trim() !== ""
+  ) {
     try {
-      new Intl.DateTimeFormat("en-GB", { timeZone: String(eventTimezone).trim() }).format(new Date());
+      new Intl.DateTimeFormat("en-GB", { timeZone: String(eventTimezone).trim() }).format(
+        new Date(),
+      );
     } catch {
       res.status(400).json({ error: `Invalid timezone identifier: ${eventTimezone}` });
       return;
@@ -64,23 +89,34 @@ router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> =
 
   // Validate start < end for event and social once we know the merged values.
   const current = existing[0];
-  const mergedEventStart = eventStartAt !== undefined ? parseTs(eventStartAt) : current?.eventStartAt ?? null;
-  const mergedEventEnd = eventEndAt !== undefined ? parseTs(eventEndAt) : current?.eventEndAt ?? null;
-  if (mergedEventStart && mergedEventEnd && mergedEventEnd.getTime() <= mergedEventStart.getTime()) {
+  const mergedEventStart =
+    eventStartAt !== undefined ? parseTs(eventStartAt) : (current?.eventStartAt ?? null);
+  const mergedEventEnd =
+    eventEndAt !== undefined ? parseTs(eventEndAt) : (current?.eventEndAt ?? null);
+  if (
+    mergedEventStart &&
+    mergedEventEnd &&
+    mergedEventEnd.getTime() <= mergedEventStart.getTime()
+  ) {
     res.status(400).json({ error: "eventEndAt must be after eventStartAt" });
     return;
   }
-  const mergedSocialStart = socialStartAt !== undefined ? parseTs(socialStartAt) : current?.socialStartAt ?? null;
-  const mergedSocialEnd = socialEndAt !== undefined ? parseTs(socialEndAt) : current?.socialEndAt ?? null;
-  if (mergedSocialStart && mergedSocialEnd && mergedSocialEnd.getTime() <= mergedSocialStart.getTime()) {
+  const mergedSocialStart =
+    socialStartAt !== undefined ? parseTs(socialStartAt) : (current?.socialStartAt ?? null);
+  const mergedSocialEnd =
+    socialEndAt !== undefined ? parseTs(socialEndAt) : (current?.socialEndAt ?? null);
+  if (
+    mergedSocialStart &&
+    mergedSocialEnd &&
+    mergedSocialEnd.getTime() <= mergedSocialStart.getTime()
+  ) {
     res.status(400).json({ error: "socialEndAt must be after socialStartAt" });
     return;
   }
 
-
   let updated;
   if (existing.length > 0) {
-    ([updated] = await db
+    [updated] = await db
       .update(eventSettingsTable)
       .set({
         ...(eventName !== undefined && { eventName }),
@@ -93,16 +129,28 @@ router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> =
         ...(logoDataUrl !== undefined && { logoDataUrl }),
         ...(fromName !== undefined && { fromName }),
         ...(fromEmail !== undefined && { fromEmail }),
-        ...(attendeeChangesLocked !== undefined && { attendeeChangesLocked: attendeeChangesLocked === true }),
-        ...(attendeeChangesLockedMessage !== undefined && { attendeeChangesLockedMessage: attendeeChangesLockedMessage || null }),
+        ...(attendeeChangesLocked !== undefined && {
+          attendeeChangesLocked: attendeeChangesLocked === true,
+        }),
+        ...(attendeeChangesLockedMessage !== undefined && {
+          attendeeChangesLockedMessage: attendeeChangesLockedMessage || null,
+        }),
         ...(refPrefix !== undefined && { refPrefix: String(refPrefix).trim() || "HRAS26" }),
         ...(refOffset !== undefined && { refOffset: parseInt(String(refOffset), 10) || 6541 }),
-        ...(notifyCompleteSubject !== undefined && { notifyCompleteSubject: notifyCompleteSubject || null }),
-        ...(notifyIncompleteSubject !== undefined && { notifyIncompleteSubject: notifyIncompleteSubject || null }),
-        ...(notifyAttendeeSubject !== undefined && { notifyAttendeeSubject: notifyAttendeeSubject || null }),
+        ...(notifyCompleteSubject !== undefined && {
+          notifyCompleteSubject: notifyCompleteSubject || null,
+        }),
+        ...(notifyIncompleteSubject !== undefined && {
+          notifyIncompleteSubject: notifyIncompleteSubject || null,
+        }),
+        ...(notifyAttendeeSubject !== undefined && {
+          notifyAttendeeSubject: notifyAttendeeSubject || null,
+        }),
         ...(eventStartAt !== undefined && { eventStartAt: parseTs(eventStartAt) }),
         ...(eventEndAt !== undefined && { eventEndAt: parseTs(eventEndAt) }),
-        ...(eventTimezone !== undefined && { eventTimezone: String(eventTimezone).trim() || "Europe/London" }),
+        ...(eventTimezone !== undefined && {
+          eventTimezone: String(eventTimezone).trim() || "Europe/London",
+        }),
         ...(eventDescription !== undefined && { eventDescription: eventDescription || null }),
         ...(socialEnabled !== undefined && { socialEnabled: socialEnabled === true }),
         ...(socialName !== undefined && { socialName: socialName || null }),
@@ -112,9 +160,9 @@ router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> =
         ...(socialDescription !== undefined && { socialDescription: socialDescription || null }),
       })
       .where(eq(eventSettingsTable.id, existing[0].id))
-      .returning());
+      .returning();
   } else {
-    ([updated] = await db
+    [updated] = await db
       .insert(eventSettingsTable)
       .values({
         eventName: eventName || "HR Analytics Summit",
@@ -131,7 +179,8 @@ router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> =
         attendeeChangesLockedMessage: attendeeChangesLockedMessage || null,
         eventStartAt: parseTs(eventStartAt) ?? null,
         eventEndAt: parseTs(eventEndAt) ?? null,
-        eventTimezone: (typeof eventTimezone === "string" && eventTimezone.trim()) || "Europe/London",
+        eventTimezone:
+          (typeof eventTimezone === "string" && eventTimezone.trim()) || "Europe/London",
         eventDescription: eventDescription || null,
         socialEnabled: socialEnabled === true,
         socialName: socialName || null,
@@ -140,7 +189,7 @@ router.put("/admin/event-settings", adminAuth, async (req, res): Promise<void> =
         socialVenue: socialVenue || null,
         socialDescription: socialDescription || null,
       })
-      .returning());
+      .returning();
   }
 
   res.json({
@@ -167,15 +216,18 @@ router.get("/email-templates/:type", async (req, res): Promise<void> => {
     const defaults: Record<string, { subject: string; htmlBody: string }> = {
       welcome: {
         subject: "Welcome to HR Analytics Summit 2026!",
-        htmlBody: "<h2>Welcome, {{firstName}}!</h2><p>We're thrilled to have you join us at the HR Analytics Summit 2026. Your booking is confirmed and we can't wait to see you there.</p><p>If you have any questions in the meantime, don't hesitate to reach out.</p><p>See you on 3 September!</p>",
+        htmlBody:
+          "<h2>Welcome, {{firstName}}!</h2><p>We're thrilled to have you join us at the HR Analytics Summit 2026. Your booking is confirmed and we can't wait to see you there.</p><p>If you have any questions in the meantime, don't hesitate to reach out.</p><p>See you on 3 September!</p>",
       },
       confirmation: {
         subject: "Booking Confirmed — HR Analytics Summit 2026",
-        htmlBody: "<h2>Booking Confirmed, {{firstName}}!</h2><p>Thank you for registering. Your order reference is <strong>{{orderReference}}</strong>.</p><p>You have booked <strong>{{quantity}}</strong> {{passType}} pass(es). A full VAT receipt is attached to this email.</p><p>We look forward to seeing you at the HR Analytics Summit!</p>",
+        htmlBody:
+          "<h2>Booking Confirmed, {{firstName}}!</h2><p>Thank you for registering. Your order reference is <strong>{{orderReference}}</strong>.</p><p>You have booked <strong>{{quantity}}</strong> {{passType}} pass(es). A full VAT receipt is attached to this email.</p><p>We look forward to seeing you at the HR Analytics Summit!</p>",
       },
       invoice_reminder: {
         subject: "Invoice Reminder — {{orderReference}} — HR Analytics Summit 2026",
-        htmlBody: "<p>Dear {{recipientName}},</p><p>This is a friendly reminder that invoice <strong>{{orderReference}}</strong> for your registration to the <strong>HR Analytics Summit 2026</strong> is due on <strong>{{dueDate}}</strong>.</p><p>Please arrange payment at your earliest convenience using the bank transfer details below. A copy of the invoice PDF is attached for your reference.</p>{{payOnlineButton}}<p>If you have already arranged payment, please disregard this email. For any queries, please contact <a href=\"mailto:douglas@dynamicbusinessleaders.co.uk\">douglas@dynamicbusinessleaders.co.uk</a>.</p>",
+        htmlBody:
+          '<p>Dear {{recipientName}},</p><p>This is a friendly reminder that invoice <strong>{{orderReference}}</strong> for your registration to the <strong>HR Analytics Summit 2026</strong> is due on <strong>{{dueDate}}</strong>.</p><p>Please arrange payment at your earliest convenience using the bank transfer details below. A copy of the invoice PDF is attached for your reference.</p>{{payOnlineButton}}<p>If you have already arranged payment, please disregard this email. For any queries, please contact <a href="mailto:douglas@dynamicbusinessleaders.co.uk">douglas@dynamicbusinessleaders.co.uk</a>.</p>',
       },
     };
     const def = defaults[type];
@@ -213,16 +265,16 @@ router.put("/email-templates/:type", adminAuth, async (req, res): Promise<void> 
 
   let updated;
   if (existing.length > 0) {
-    ([updated] = await db
+    [updated] = await db
       .update(emailTemplatesTable)
       .set({ subject, htmlBody })
       .where(eq(emailTemplatesTable.type, type))
-      .returning());
+      .returning();
   } else {
-    ([updated] = await db
+    [updated] = await db
       .insert(emailTemplatesTable)
       .values({ type, subject, htmlBody })
-      .returning());
+      .returning();
   }
 
   res.json(formatTemplate(updated));
@@ -275,30 +327,33 @@ async function buildSampleVars(
       <p style="margin:0 0 12px;text-align:center;"><a href="#" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;border-radius:4px;">[SAMPLE LINK — not active in preview]</a></p>
     </div>`;
 
-  const vars: Record<string, string> = type === "invoice_reminder" ? {
-    "{{firstName}}": toName?.split(" ")[0] || "Test",
-    "{{recipientName}}": toName || "Test User",
-    "{{orderReference}}": "HRAS26-TEST-001",
-    "{{dueDate}}": "30 April 2026",
-    "{{payOnlineButton}}": `<p style="margin:24px 0;text-align:center;"><a href="#" style="display:inline-block;background:#E74F3E;color:#fff;padding:14px 32px;text-decoration:none;font-weight:bold;font-size:15px;border-radius:4px;">Pay Invoice Online →</a></p>`,
-    "{{payOnlineUrl}}": "#",
-  } : {
-    "{{firstName}}": toName?.split(" ")[0] || toName || "Test",
-    "{{name}}": toName || "Test User",
-    "{{orderReference}}": "HRAS26-TEST-001",
-    "{{passLabel}}": "HR Professional Pass",
-    "{{passType}}": "HR Professional Pass",
-    "{{quantity}}": "1",
-    "{{quantityLabel}}": "pass",
-    "{{attendeesTable}}": sampleAttendeesTable,
-    "{{priceSummary}}": samplePriceSummary,
-    "{{eventDate}}": settings.eventDate || "Thursday, 3 September 2026",
-    "{{eventVenue}}": settings.eventVenue || "155 Bishopsgate, London",
-    "{{eventVenuePostcode}}": settings.eventVenuePostcode || "EC2M 3TQ",
-    "{{managementLink}}": sampleManagementLink,
-    "{{invoicePaymentButton}}": "",
-    "{{total}}": "£238.80",
-  };
+  const vars: Record<string, string> =
+    type === "invoice_reminder"
+      ? {
+          "{{firstName}}": toName?.split(" ")[0] || "Test",
+          "{{recipientName}}": toName || "Test User",
+          "{{orderReference}}": "HRAS26-TEST-001",
+          "{{dueDate}}": "30 April 2026",
+          "{{payOnlineButton}}": `<p style="margin:24px 0;text-align:center;"><a href="#" style="display:inline-block;background:#E74F3E;color:#fff;padding:14px 32px;text-decoration:none;font-weight:bold;font-size:15px;border-radius:4px;">Pay Invoice Online →</a></p>`,
+          "{{payOnlineUrl}}": "#",
+        }
+      : {
+          "{{firstName}}": toName?.split(" ")[0] || toName || "Test",
+          "{{name}}": toName || "Test User",
+          "{{orderReference}}": "HRAS26-TEST-001",
+          "{{passLabel}}": "HR Professional Pass",
+          "{{passType}}": "HR Professional Pass",
+          "{{quantity}}": "1",
+          "{{quantityLabel}}": "pass",
+          "{{attendeesTable}}": sampleAttendeesTable,
+          "{{priceSummary}}": samplePriceSummary,
+          "{{eventDate}}": settings.eventDate || "Thursday, 3 September 2026",
+          "{{eventVenue}}": settings.eventVenue || "155 Bishopsgate, London",
+          "{{eventVenuePostcode}}": settings.eventVenuePostcode || "EC2M 3TQ",
+          "{{managementLink}}": sampleManagementLink,
+          "{{invoicePaymentButton}}": "",
+          "{{total}}": "£238.80",
+        };
 
   const calPh = getCalendarPlaceholders(settings);
   vars["{{eventCalendarLinks}}"] = calPh.eventCalendarLinks;
@@ -386,7 +441,9 @@ router.post("/email-templates/:type/preview", adminAuth, async (req, res): Promi
   // For welcome previews, also substitute the welcome-specific manage link
   // sample so the section is visible to admins.
   if (type === "welcome") {
-    vars["{{managementLink}}"] = vars["{{managementLink}}"] || `<div style="background:#fff8f7;border:2px solid #E74F3E;border-radius:6px;padding:20px;margin:24px 0;"><p style="margin:0;text-align:center;color:#E74F3E;font-weight:700;">[SAMPLE — Manage Attendees button appears here in real emails]</p></div>`;
+    vars["{{managementLink}}"] =
+      vars["{{managementLink}}"] ||
+      `<div style="background:#fff8f7;border:2px solid #E74F3E;border-radius:6px;padding:20px;margin:24px 0;"><p style="margin:0;text-align:center;color:#E74F3E;font-weight:700;">[SAMPLE — Manage Attendees button appears here in real emails]</p></div>`;
   }
 
   let personalised = String(htmlBody);
@@ -406,8 +463,8 @@ router.post("/email-templates/:type/preview", adminAuth, async (req, res): Promi
 // ─── Email Logs ───────────────────────────────────────────────────────────────
 
 router.get("/admin/email-logs", adminAuth, async (req, res): Promise<void> => {
-  const page = parseInt(req.query.page as string || "1", 10);
-  const limit = parseInt(req.query.limit as string || "50", 10);
+  const page = parseInt((req.query.page as string) || "1", 10);
+  const limit = parseInt((req.query.limit as string) || "50", 10);
   const offset = (page - 1) * limit;
 
   const allLogs = await db
@@ -437,46 +494,70 @@ router.post("/admin/email-logs/:bookingId/resend", adminAuth, async (req, res): 
   res.json({ success: true, message: "Confirmation and PDF receipt resent successfully" });
 });
 
-router.post("/admin/bookings/:bookingId/send-invoice-reminder", adminAuth, async (req, res): Promise<void> => {
-  const raw = Array.isArray(req.params.bookingId) ? req.params.bookingId[0] : req.params.bookingId;
-  const bookingId = parseInt(raw, 10);
-  if (isNaN(bookingId)) {
-    res.status(400).json({ error: "Invalid booking ID" });
-    return;
-  }
-  try {
-    const { sendInvoiceReminder } = await import("../lib/email");
-    await sendInvoiceReminder(bookingId);
-    res.json({ success: true, message: "Invoice reminder sent successfully" });
-  } catch (err: any) {
-    res.status(500).json({ error: err?.message || "Failed to send invoice reminder" });
-  }
-});
+router.post(
+  "/admin/bookings/:bookingId/send-invoice-reminder",
+  adminAuth,
+  async (req, res): Promise<void> => {
+    const raw = Array.isArray(req.params.bookingId)
+      ? req.params.bookingId[0]
+      : req.params.bookingId;
+    const bookingId = parseInt(raw, 10);
+    if (isNaN(bookingId)) {
+      res.status(400).json({ error: "Invalid booking ID" });
+      return;
+    }
+    try {
+      const { sendInvoiceReminder } = await import("../lib/email");
+      await sendInvoiceReminder(bookingId);
+      res.json({ success: true, message: "Invoice reminder sent successfully" });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "Failed to send invoice reminder" });
+    }
+  },
+);
 
 // Debug: download the receipt PDF directly for a booking (to verify it's valid)
-router.get("/admin/email-logs/:bookingId/receipt-pdf", adminAuth, async (req, res): Promise<void> => {
-  const raw = Array.isArray(req.params.bookingId) ? req.params.bookingId[0] : req.params.bookingId;
-  const bookingId = parseInt(raw, 10);
+router.get(
+  "/admin/email-logs/:bookingId/receipt-pdf",
+  adminAuth,
+  async (req, res): Promise<void> => {
+    const raw = Array.isArray(req.params.bookingId)
+      ? req.params.bookingId[0]
+      : req.params.bookingId;
+    const bookingId = parseInt(raw, 10);
 
-  try {
-    const { db } = await import("@workspace/db");
-    const { bookingsTable, attendeesTable } = await import("@workspace/db");
-    const { eq } = await import("drizzle-orm");
-    const { generatePdfReceipt } = await import("../lib/pdf");
+    try {
+      const { db } = await import("@workspace/db");
+      const { bookingsTable, attendeesTable } = await import("@workspace/db");
+      const { eq } = await import("drizzle-orm");
+      const { generatePdfReceipt } = await import("../lib/pdf");
 
-    const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
-    if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
+      const [booking] = await db
+        .select()
+        .from(bookingsTable)
+        .where(eq(bookingsTable.id, bookingId));
+      if (!booking) {
+        res.status(404).json({ error: "Booking not found" });
+        return;
+      }
 
-    const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
-    const pdfBuffer = await generatePdfReceipt(booking, attendees);
+      const attendees = await db
+        .select()
+        .from(attendeesTable)
+        .where(eq(attendeesTable.bookingId, bookingId));
+      const pdfBuffer = await generatePdfReceipt(booking, attendees);
 
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="receipt-${booking.orderReference || bookingId}.pdf"`);
-    res.setHeader("Content-Length", pdfBuffer.length);
-    res.end(pdfBuffer);
-  } catch (err) {
-    res.status(500).json({ error: String(err) });
-  }
-});
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="receipt-${booking.orderReference || bookingId}.pdf"`,
+      );
+      res.setHeader("Content-Length", pdfBuffer.length);
+      res.end(pdfBuffer);
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  },
+);
 
 export default router;

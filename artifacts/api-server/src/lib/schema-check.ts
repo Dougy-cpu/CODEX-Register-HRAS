@@ -136,43 +136,11 @@ const EXPECTED_COLUMNS: Record<string, string[]> = {
     "created_at",
     "updated_at",
   ],
-  activity_log: [
-    "id",
-    "type",
-    "booking_id",
-    "attendee_id",
-    "data",
-    "created_at",
-  ],
-  email_templates: [
-    "id",
-    "type",
-    "subject",
-    "html_body",
-    "updated_at",
-  ],
-  discount_tiers: [
-    "id",
-    "pass_type",
-    "min_quantity",
-    "discount_percent",
-    "label",
-  ],
-  email_logs: [
-    "id",
-    "booking_id",
-    "recipient",
-    "type",
-    "status",
-    "error_message",
-    "sent_at",
-  ],
-  pass_inventory: [
-    "id",
-    "pass_type",
-    "remaining",
-    "updated_at",
-  ],
+  activity_log: ["id", "type", "booking_id", "attendee_id", "data", "created_at"],
+  email_templates: ["id", "type", "subject", "html_body", "updated_at"],
+  discount_tiers: ["id", "pass_type", "min_quantity", "discount_percent", "label"],
+  email_logs: ["id", "booking_id", "recipient", "type", "status", "error_message", "sent_at"],
+  pass_inventory: ["id", "pass_type", "remaining", "updated_at"],
 };
 
 export async function checkSchemaConsistency(): Promise<boolean> {

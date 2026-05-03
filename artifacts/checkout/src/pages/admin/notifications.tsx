@@ -2,7 +2,18 @@ import { useState, useEffect } from "react";
 import AdminLayout from "@/components/layout/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Bell, Trash2, Plus, Mail, Info, CheckCircle2, XCircle, MessageSquare, Check, Loader2 } from "lucide-react";
+import {
+  Bell,
+  Trash2,
+  Plus,
+  Mail,
+  Info,
+  CheckCircle2,
+  XCircle,
+  MessageSquare,
+  Check,
+  Loader2,
+} from "lucide-react";
 
 interface NotificationEmail {
   id: number;
@@ -91,12 +102,12 @@ function SubjectField({
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
       <Input
         value={value}
-        onChange={e => onChange(e.target.value)}
+        onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         className="h-11 font-mono text-sm"
       />
       <div className="flex flex-wrap gap-1.5 pt-0.5">
-        {SUBJECT_VARS.map(v => (
+        {SUBJECT_VARS.map((v) => (
           <button
             key={v.token}
             type="button"
@@ -139,13 +150,13 @@ export default function AdminNotifications() {
   useEffect(() => {
     setLoading(true);
     adminFetch("/api/admin/notification-emails")
-      .then(res => res.ok ? res.json() : [])
-      .then(data => setEmails(data))
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setEmails(data))
       .finally(() => setLoading(false));
 
     setSubjectsLoading(true);
     adminFetch("/api/admin/event-settings")
-      .then(res => res.ok ? res.json() : null)
+      .then((res) => (res.ok ? res.json() : null))
       .then((data: NotifySubjects | null) => {
         if (data) {
           setNotifyCompleteSubject(data.notifyCompleteSubject || "");
@@ -179,7 +190,7 @@ export default function AdminNotifications() {
       });
       if (res.ok) {
         const added = await res.json();
-        setEmails(prev => [...(prev || []), added]);
+        setEmails((prev) => [...(prev || []), added]);
         setNewEmail("");
         setNewLabel("");
         setNewNotifyComplete(true);
@@ -193,7 +204,11 @@ export default function AdminNotifications() {
     }
   };
 
-  const handleToggle = async (id: number, field: "notifyComplete" | "notifyIncomplete", val: boolean) => {
+  const handleToggle = async (
+    id: number,
+    field: "notifyComplete" | "notifyIncomplete",
+    val: boolean,
+  ) => {
     setTogglingId(id);
     try {
       const res = await adminFetch(`/api/admin/notification-emails/${id}`, {
@@ -202,7 +217,7 @@ export default function AdminNotifications() {
       });
       if (res.ok) {
         const updated = await res.json();
-        setEmails(prev => (prev || []).map(e => e.id === id ? updated : e));
+        setEmails((prev) => (prev || []).map((e) => (e.id === id ? updated : e)));
       }
     } finally {
       setTogglingId(null);
@@ -214,7 +229,7 @@ export default function AdminNotifications() {
     try {
       const res = await adminFetch(`/api/admin/notification-emails/${id}`, { method: "DELETE" });
       if (res.ok || res.status === 204) {
-        setEmails(prev => (prev || []).filter(e => e.id !== id));
+        setEmails((prev) => (prev || []).filter((e) => e.id !== id));
       }
     } finally {
       setDeletingId(null);
@@ -248,8 +263,8 @@ export default function AdminNotifications() {
     }
   };
 
-  const completeCount = (emails || []).filter(e => e.notifyComplete).length;
-  const incompleteCount = (emails || []).filter(e => e.notifyIncomplete).length;
+  const completeCount = (emails || []).filter((e) => e.notifyComplete).length;
+  const incompleteCount = (emails || []).filter((e) => e.notifyIncomplete).length;
 
   return (
     <AdminLayout title="Order Notifications">
@@ -265,7 +280,9 @@ export default function AdminNotifications() {
                 : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            <span className="flex items-center gap-2"><Bell className="w-4 h-4" /> Recipients</span>
+            <span className="flex items-center gap-2">
+              <Bell className="w-4 h-4" /> Recipients
+            </span>
           </button>
           <button
             type="button"
@@ -276,7 +293,9 @@ export default function AdminNotifications() {
                 : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            <span className="flex items-center gap-2"><MessageSquare className="w-4 h-4" /> Notification Subjects</span>
+            <span className="flex items-center gap-2">
+              <MessageSquare className="w-4 h-4" /> Notification Subjects
+            </span>
           </button>
         </div>
 
@@ -285,8 +304,9 @@ export default function AdminNotifications() {
           <>
             <div className="mb-8">
               <p className="text-muted-foreground">
-                Add staff email addresses to receive notifications when someone registers or starts the checkout process.
-                Use the toggles to control which type of notification each address receives.
+                Add staff email addresses to receive notifications when someone registers or starts
+                the checkout process. Use the toggles to control which type of notification each
+                address receives.
               </p>
             </div>
 
@@ -294,12 +314,14 @@ export default function AdminNotifications() {
               <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
               <div className="text-sm text-blue-800 space-y-1.5">
                 <p>
-                  <strong>Complete bookings</strong> — Sent when a card payment is confirmed or an invoice request is submitted.
-                  Includes full attendee details, pricing, and payment method.
+                  <strong>Complete bookings</strong> — Sent when a card payment is confirmed or an
+                  invoice request is submitted. Includes full attendee details, pricing, and payment
+                  method.
                 </p>
                 <p>
-                  <strong>Incomplete forms</strong> — Sent when someone fills in attendee details but has not yet completed payment.
-                  Sent once per checkout session so you can follow up.
+                  <strong>Incomplete forms</strong> — Sent when someone fills in attendee details
+                  but has not yet completed payment. Sent once per checkout session so you can
+                  follow up.
                 </p>
               </div>
             </div>
@@ -317,18 +339,23 @@ export default function AdminNotifications() {
                       type="email"
                       placeholder="e.g. sarah@company.com"
                       value={newEmail}
-                      onChange={e => { setNewEmail(e.target.value); setError(""); }}
-                      onKeyDown={e => e.key === "Enter" && handleAdd()}
+                      onChange={(e) => {
+                        setNewEmail(e.target.value);
+                        setError("");
+                      }}
+                      onKeyDown={(e) => e.key === "Enter" && handleAdd()}
                       className="h-11"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Label <span className="text-muted-foreground font-normal">(optional)</span></label>
+                    <label className="text-sm font-medium">
+                      Label <span className="text-muted-foreground font-normal">(optional)</span>
+                    </label>
                     <Input
                       placeholder="e.g. Events Team"
                       value={newLabel}
-                      onChange={e => setNewLabel(e.target.value)}
-                      onKeyDown={e => e.key === "Enter" && handleAdd()}
+                      onChange={(e) => setNewLabel(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleAdd()}
                       className="h-11"
                     />
                   </div>
@@ -339,14 +366,18 @@ export default function AdminNotifications() {
                     <Toggle enabled={newNotifyComplete} onChange={setNewNotifyComplete} />
                     <div>
                       <p className="text-sm font-medium">Complete bookings</p>
-                      <p className="text-xs text-muted-foreground">Paid or invoiced registrations</p>
+                      <p className="text-xs text-muted-foreground">
+                        Paid or invoiced registrations
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <Toggle enabled={newNotifyIncomplete} onChange={setNewNotifyIncomplete} />
                     <div>
                       <p className="text-sm font-medium">Incomplete forms</p>
-                      <p className="text-xs text-muted-foreground">Attendee details submitted, payment not yet done</p>
+                      <p className="text-xs text-muted-foreground">
+                        Attendee details submitted, payment not yet done
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -368,7 +399,9 @@ export default function AdminNotifications() {
                 <h2 className="text-lg font-bold flex items-center gap-2">
                   <Bell className="w-5 h-5" /> Notification Recipients
                 </h2>
-                <span className="text-sm text-muted-foreground">{emails?.length ?? "—"} configured</span>
+                <span className="text-sm text-muted-foreground">
+                  {emails?.length ?? "—"} configured
+                </span>
               </div>
 
               {loading ? (
@@ -380,8 +413,12 @@ export default function AdminNotifications() {
                   <div className="w-14 h-14 bg-muted rounded-full flex items-center justify-center mb-4">
                     <Mail className="w-7 h-7 text-muted-foreground" />
                   </div>
-                  <p className="text-muted-foreground font-medium">No notification emails configured yet.</p>
-                  <p className="text-sm text-muted-foreground mt-1">Add a staff email address above to get started.</p>
+                  <p className="text-muted-foreground font-medium">
+                    No notification emails configured yet.
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Add a staff email address above to get started.
+                  </p>
                 </div>
               ) : (
                 <>
@@ -392,18 +429,33 @@ export default function AdminNotifications() {
                     <span />
                   </div>
                   <ul className="divide-y divide-border">
-                    {(emails || []).map(e => (
-                      <li key={e.id} className="grid grid-cols-1 sm:grid-cols-[1fr_140px_140px_40px] gap-4 items-center px-6 py-4">
+                    {(emails || []).map((e) => (
+                      <li
+                        key={e.id}
+                        className="grid grid-cols-1 sm:grid-cols-[1fr_140px_140px_40px] gap-4 items-center px-6 py-4"
+                      >
                         <div className="min-w-0">
                           <p className="font-medium truncate">{e.email}</p>
                           {e.label && <p className="text-sm text-muted-foreground">{e.label}</p>}
                           <div className="flex flex-wrap gap-2 mt-2 sm:hidden">
-                            <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${e.notifyComplete ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground line-through"}`}>
-                              {e.notifyComplete ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                            <span
+                              className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${e.notifyComplete ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground line-through"}`}
+                            >
+                              {e.notifyComplete ? (
+                                <CheckCircle2 className="w-3 h-3" />
+                              ) : (
+                                <XCircle className="w-3 h-3" />
+                              )}
                               Complete
                             </span>
-                            <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${e.notifyIncomplete ? "bg-amber-100 text-amber-700" : "bg-muted text-muted-foreground line-through"}`}>
-                              {e.notifyIncomplete ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                            <span
+                              className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${e.notifyIncomplete ? "bg-amber-100 text-amber-700" : "bg-muted text-muted-foreground line-through"}`}
+                            >
+                              {e.notifyIncomplete ? (
+                                <CheckCircle2 className="w-3 h-3" />
+                              ) : (
+                                <XCircle className="w-3 h-3" />
+                              )}
                               Incomplete
                             </span>
                           </div>
@@ -412,7 +464,7 @@ export default function AdminNotifications() {
                         <div className="hidden sm:flex justify-center">
                           <Toggle
                             enabled={e.notifyComplete}
-                            onChange={val => handleToggle(e.id, "notifyComplete", val)}
+                            onChange={(val) => handleToggle(e.id, "notifyComplete", val)}
                             disabled={togglingId === e.id}
                           />
                         </div>
@@ -420,7 +472,7 @@ export default function AdminNotifications() {
                         <div className="hidden sm:flex justify-center">
                           <Toggle
                             enabled={e.notifyIncomplete}
-                            onChange={val => handleToggle(e.id, "notifyIncomplete", val)}
+                            onChange={(val) => handleToggle(e.id, "notifyIncomplete", val)}
                             disabled={togglingId === e.id}
                           />
                         </div>
@@ -441,8 +493,14 @@ export default function AdminNotifications() {
 
                   {(emails?.length ?? 0) > 0 && (
                     <div className="px-6 py-3 bg-muted/20 border-t border-border flex flex-wrap gap-4 text-sm text-muted-foreground">
-                      <span><strong className="text-foreground">{completeCount}</strong> receive complete booking notifications</span>
-                      <span><strong className="text-foreground">{incompleteCount}</strong> receive incomplete form notifications</span>
+                      <span>
+                        <strong className="text-foreground">{completeCount}</strong> receive
+                        complete booking notifications
+                      </span>
+                      <span>
+                        <strong className="text-foreground">{incompleteCount}</strong> receive
+                        incomplete form notifications
+                      </span>
                     </div>
                   )}
                 </>
@@ -457,7 +515,9 @@ export default function AdminNotifications() {
             <div className="mb-8">
               <p className="text-muted-foreground">
                 Customise the subject line for each type of organiser notification email. Use{" "}
-                <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">{"{{variable}}"}</code>{" "}
+                <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">
+                  {"{{variable}}"}
+                </code>{" "}
                 tokens to insert dynamic values. Leave blank to use the built-in defaults.
               </p>
             </div>
@@ -468,7 +528,6 @@ export default function AdminNotifications() {
               </div>
             ) : (
               <div className="bg-white border border-border p-6 space-y-8">
-
                 <SubjectField
                   label="Complete Booking"
                   placeholder="New Registration: {{orderReference}} — {{firstName}} {{lastName}}"
@@ -502,15 +561,21 @@ export default function AdminNotifications() {
                     className="bg-primary hover:bg-primary/90 text-white"
                   >
                     {subjectsSaving ? (
-                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving…</>
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving…
+                      </>
                     ) : subjectsSaved ? (
-                      <><Check className="w-4 h-4 mr-2" /> Saved</>
+                      <>
+                        <Check className="w-4 h-4 mr-2" /> Saved
+                      </>
                     ) : (
                       "Save Subjects"
                     )}
                   </Button>
                   {subjectsSaved && (
-                    <span className="text-sm text-green-600 font-medium">Subject lines updated.</span>
+                    <span className="text-sm text-green-600 font-medium">
+                      Subject lines updated.
+                    </span>
                   )}
                 </div>
               </div>

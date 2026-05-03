@@ -6,7 +6,14 @@ import { readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { db } from "@workspace/db";
-import { emailLogsTable, emailTemplatesTable, bookingsTable, attendeesTable, notificationEmailsTable, eventSettingsTable } from "@workspace/db";
+import {
+  emailLogsTable,
+  emailTemplatesTable,
+  bookingsTable,
+  attendeesTable,
+  notificationEmailsTable,
+  eventSettingsTable,
+} from "@workspace/db";
 import type { EventSettings } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { generatePdfReceipt } from "./pdf";
@@ -15,18 +22,31 @@ import { buildGoogleCalendarUrl, buildOutlookCalendarUrl, type CalendarEvent } f
 async function downloadHttpsPdf(url: string, redirectsLeft = 5): Promise<Buffer | null> {
   return new Promise((resolve) => {
     const lib = url.startsWith("https") ? https : http;
-    lib.get(url, (res) => {
-      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        if (redirectsLeft <= 0) { resolve(null); return; }
-        downloadHttpsPdf(res.headers.location, redirectsLeft - 1).then(resolve);
-        return;
-      }
-      if (res.statusCode !== 200) { resolve(null); return; }
-      const chunks: Buffer[] = [];
-      res.on("data", (c: Buffer) => chunks.push(c));
-      res.on("end", () => resolve(Buffer.concat(chunks)));
-      res.on("error", () => resolve(null));
-    }).on("error", () => resolve(null));
+    lib
+      .get(url, (res) => {
+        if (
+          res.statusCode &&
+          res.statusCode >= 300 &&
+          res.statusCode < 400 &&
+          res.headers.location
+        ) {
+          if (redirectsLeft <= 0) {
+            resolve(null);
+            return;
+          }
+          downloadHttpsPdf(res.headers.location, redirectsLeft - 1).then(resolve);
+          return;
+        }
+        if (res.statusCode !== 200) {
+          resolve(null);
+          return;
+        }
+        const chunks: Buffer[] = [];
+        res.on("data", (c: Buffer) => chunks.push(c));
+        res.on("end", () => resolve(Buffer.concat(chunks)));
+        res.on("error", () => resolve(null));
+      })
+      .on("error", () => resolve(null));
   });
 }
 
@@ -39,7 +59,10 @@ function getCompanyInfoPdf(): Buffer | null {
     const assetPath = join(_dir, "assets", "company-info.pdf");
     if (existsSync(assetPath)) {
       _companyInfoPdf = readFileSync(assetPath);
-      logger.info({ sizeBytes: _companyInfoPdf.length }, "Company info PDF loaded for email attachments");
+      logger.info(
+        { sizeBytes: _companyInfoPdf.length },
+        "Company info PDF loaded for email attachments",
+      );
     } else {
       logger.warn({ assetPath }, "Company info PDF not found — will not be attached to emails");
       _companyInfoPdf = null;
@@ -123,7 +146,7 @@ async function logEmail(
   recipient: string,
   type: "confirmation" | "receipt" | "welcome" | "invoice" | "test",
   status: "sent" | "failed" | "pending",
-  errorMessage?: string
+  errorMessage?: string,
 ) {
   try {
     await db.insert(emailLogsTable).values({
@@ -149,7 +172,10 @@ export async function sendMail(options: {
 }): Promise<boolean> {
   const transporter = createTransporter();
   if (!transporter) {
-    logger.info({ to: options.to, subject: options.subject }, "Email not sent — SMTP not configured");
+    logger.info(
+      { to: options.to, subject: options.subject },
+      "Email not sent — SMTP not configured",
+    );
     return false;
   }
 
@@ -189,10 +215,12 @@ type BrandingSettings = {
   logoDataUrl?: string | null;
 };
 
-export function wrapInBrandedLayout(content: string, settingsOrTitle?: BrandingSettings | string): string {
-  const settings: BrandingSettings = (typeof settingsOrTitle === "object" && settingsOrTitle !== null)
-    ? settingsOrTitle
-    : {};
+export function wrapInBrandedLayout(
+  content: string,
+  settingsOrTitle?: BrandingSettings | string,
+): string {
+  const settings: BrandingSettings =
+    typeof settingsOrTitle === "object" && settingsOrTitle !== null ? settingsOrTitle : {};
 
   const eventName = settings.eventName || "HR Analytics Summit";
   const eventDate = settings.eventDate || "3 September 2026";
@@ -251,7 +279,7 @@ async function buildConfirmationEmailHtml(
   booking: typeof bookingsTable.$inferSelect,
   attendees: Array<typeof attendeesTable.$inferSelect>,
   lead: typeof attendeesTable.$inferSelect,
-  settings: EventSettings
+  settings: EventSettings,
 ): Promise<{ html: string; subject: string }> {
   const passLabels: Record<string, string> = {
     single: "HR Professional Pass",
@@ -278,7 +306,7 @@ async function buildConfirmationEmailHtml(
       <td style="padding:8px 4px;border-bottom:1px solid #eee;">${a.company}</td>
       <td style="padding:8px 4px;border-bottom:1px solid #eee;">${a.workEmail}</td>
       <td style="padding:8px 4px;border-bottom:1px solid #eee;">${a.phone || "—"}</td>
-    </tr>`
+    </tr>`,
     )
     .join("");
 
@@ -296,8 +324,12 @@ async function buildConfirmationEmailHtml(
 
   const priceSummaryHtml = [
     `<div class="price-row"><span>Subtotal (excl. VAT)</span><span>${formatCurrency(subtotal)}</span></div>`,
-    groupDiscount > 0 ? `<div class="price-row"><span>Group Discount</span><span>-${formatCurrency(groupDiscount)}</span></div>` : "",
-    promoDiscount > 0 ? `<div class="price-row"><span>Promo Code (${booking.promoCode})</span><span>-${formatCurrency(promoDiscount)}</span></div>` : "",
+    groupDiscount > 0
+      ? `<div class="price-row"><span>Group Discount</span><span>-${formatCurrency(groupDiscount)}</span></div>`
+      : "",
+    promoDiscount > 0
+      ? `<div class="price-row"><span>Promo Code (${booking.promoCode})</span><span>-${formatCurrency(promoDiscount)}</span></div>`
+      : "",
     `<div class="price-row"><span>VAT (20%)</span><span>${formatCurrency(vat)}</span></div>`,
     `<div class="price-total"><span>Total</span><span>${formatCurrency(total)}</span></div>`,
   ].join("");
@@ -307,9 +339,10 @@ async function buildConfirmationEmailHtml(
     : null;
   const managementLinkHtml = manageUrl ? buildManageLinkSection(manageUrl) : "";
 
-  const billingEditUrl = booking.managementToken && booking.paymentMethod === "invoice"
-    ? `${process.env.APP_BASE_URL || "https://register.hranalyticssummit.com"}/manage/${booking.managementToken}/billing`
-    : "";
+  const billingEditUrl =
+    booking.managementToken && booking.paymentMethod === "invoice"
+      ? `${process.env.APP_BASE_URL || "https://register.hranalyticssummit.com"}/manage/${booking.managementToken}/billing`
+      : "";
   const billingEditLinkHtml = billingEditUrl
     ? `<p style="margin:14px 0 0;font-size:14px;"><a href="${billingEditUrl}" style="color:#E74F3E;font-weight:600;text-decoration:underline;">${booking.poNumber ? "Update PO number or billing details →" : "Add a PO number / update billing details →"}</a></p>`
     : "";
@@ -375,9 +408,10 @@ async function buildConfirmationEmailHtml(
           `<p style="margin:6px 0 0;font-size:13px;color:#555;">Add or update your PO number and billing details from the secure self-service link below — we'll re-issue the invoice automatically.</p>` +
           billingEditLinkHtml +
           `</div>`;
-        const extraPo = (poNumberHtml && !body.includes("{{poNumber}}") && !body.includes("{{poNumberSection}}"))
-          ? poNumberHtml
-          : "";
+        const extraPo =
+          poNumberHtml && !body.includes("{{poNumber}}") && !body.includes("{{poNumberSection}}")
+            ? poNumberHtml
+            : "";
         const insert = extraPo + fallbackBlock;
         // Detect </body> presence first — `.replace()` always returns a truthy
         // string even on no match, so `||` cannot be used as a fallback signal.
@@ -439,10 +473,7 @@ async function buildConfirmationEmailHtml(
 }
 
 export async function sendBookingEmails(bookingId: number): Promise<void> {
-  const [booking] = await db
-    .select()
-    .from(bookingsTable)
-    .where(eq(bookingsTable.id, bookingId));
+  const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
 
   if (!booking) {
     logger.warn({ bookingId }, "Booking not found for email sending");
@@ -462,8 +493,12 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
     return;
   }
 
-  const { html: confirmationHtml, subject: confirmationSubject } =
-    await buildConfirmationEmailHtml(booking, attendees, lead, settings);
+  const { html: confirmationHtml, subject: confirmationSubject } = await buildConfirmationEmailHtml(
+    booking,
+    attendees,
+    lead,
+    settings,
+  );
 
   // Prefer Stripe invoice PDF, then fall back to our custom receipt
   let pdfBuffer: Buffer | null = null;
@@ -474,7 +509,10 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
       pdfBuffer = await downloadHttpsPdf(stripeInvoicePdfUrl);
       if (pdfBuffer) {
         pdfFilename = `invoice-${booking.orderReference || bookingId}.pdf`;
-        logger.info({ bookingId, sizeBytes: pdfBuffer.length }, "Using Stripe invoice PDF for email attachment");
+        logger.info(
+          { bookingId, sizeBytes: pdfBuffer.length },
+          "Using Stripe invoice PDF for email attachment",
+        );
       } else {
         logger.warn({ bookingId }, "Stripe PDF not available — falling back to custom receipt");
       }
@@ -485,7 +523,11 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
   if (!pdfBuffer) {
     try {
       pdfBuffer = await generatePdfReceipt(booking, attendees);
-      if (pdfBuffer) logger.info({ bookingId, sizeBytes: pdfBuffer.length }, "Using custom PDF receipt for email attachment");
+      if (pdfBuffer)
+        logger.info(
+          { bookingId, sizeBytes: pdfBuffer.length },
+          "Using custom PDF receipt for email attachment",
+        );
     } catch (err) {
       logger.error({ err }, "Failed to generate PDF receipt");
     }
@@ -497,7 +539,11 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
   }
   const companyInfoPdf = getCompanyInfoPdf();
   if (companyInfoPdf && booking.paymentMethod === "invoice") {
-    attachments.push({ filename: "DBL-company-information.pdf", content: companyInfoPdf, contentType: "application/pdf" });
+    attachments.push({
+      filename: "DBL-company-information.pdf",
+      content: companyInfoPdf,
+      contentType: "application/pdf",
+    });
   }
 
   const confirmSent = await sendMail({
@@ -514,7 +560,7 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
     lead.workEmail,
     "confirmation",
     confirmSent ? "sent" : "failed",
-    confirmSent ? undefined : "SMTP not configured or send failed"
+    confirmSent ? undefined : "SMTP not configured or send failed",
   );
 
   if (pdfBuffer) {
@@ -542,7 +588,10 @@ export async function sendReissuedInvoiceEmail(bookingId: number): Promise<void>
     return;
   }
   const settings = await getEventSettings();
-  const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
+  const attendees = await db
+    .select()
+    .from(attendeesTable)
+    .where(eq(attendeesTable.bookingId, bookingId));
   const lead = attendees.find((a) => a.isLead) || attendees[0];
   if (!lead) return;
 
@@ -550,8 +599,12 @@ export async function sendReissuedInvoiceEmail(bookingId: number): Promise<void>
   const orderRef = booking.orderReference || `#${bookingId}`;
 
   // Build the standard confirmation body but prepend a re-issue notice banner
-  const { html: bodyHtml, subject: baseSubject } =
-    await buildConfirmationEmailHtml(booking, attendees, lead, settings);
+  const { html: bodyHtml, subject: baseSubject } = await buildConfirmationEmailHtml(
+    booking,
+    attendees,
+    lead,
+    settings,
+  );
 
   const reissueBanner = `
     <div style="background:#fff8f7;border:2px solid #E74F3E;border-radius:6px;padding:18px 22px;margin:0 0 20px;">
@@ -571,15 +624,22 @@ export async function sendReissuedInvoiceEmail(bookingId: number): Promise<void>
   let pdfBuffer: Buffer | null = null;
   const pdfFilename = `invoice-${booking.orderReference || bookingId}.pdf`;
   if (booking.stripeInvoicePdfUrl) {
-    try { pdfBuffer = await downloadHttpsPdf(booking.stripeInvoicePdfUrl); }
-    catch (err) { logger.warn({ err, bookingId }, "Failed to download re-issued invoice PDF"); }
+    try {
+      pdfBuffer = await downloadHttpsPdf(booking.stripeInvoicePdfUrl);
+    } catch (err) {
+      logger.warn({ err, bookingId }, "Failed to download re-issued invoice PDF");
+    }
   }
   if (!pdfBuffer) {
-    try { pdfBuffer = await generatePdfReceipt(booking, attendees); }
-    catch (err) { logger.warn({ err }, "Failed to generate fallback PDF for re-issued invoice"); }
+    try {
+      pdfBuffer = await generatePdfReceipt(booking, attendees);
+    } catch (err) {
+      logger.warn({ err }, "Failed to generate fallback PDF for re-issued invoice");
+    }
   }
   const attachments: Array<{ filename: string; content: Buffer; contentType: string }> = [];
-  if (pdfBuffer) attachments.push({ filename: pdfFilename, content: pdfBuffer, contentType: "application/pdf" });
+  if (pdfBuffer)
+    attachments.push({ filename: pdfFilename, content: pdfBuffer, contentType: "application/pdf" });
 
   const sent = await sendMail({
     to: recipient,
@@ -590,15 +650,17 @@ export async function sendReissuedInvoiceEmail(bookingId: number): Promise<void>
     fromEmail: settings.fromEmail,
   });
   void baseSubject;
-  await logEmail(bookingId, recipient, "invoice", sent ? "sent" : "failed",
-    sent ? undefined : "SMTP not configured or send failed");
+  await logEmail(
+    bookingId,
+    recipient,
+    "invoice",
+    sent ? "sent" : "failed",
+    sent ? undefined : "SMTP not configured or send failed",
+  );
 }
 
 export async function resendConfirmationAndReceipt(bookingId: number): Promise<void> {
-  const [booking] = await db
-    .select()
-    .from(bookingsTable)
-    .where(eq(bookingsTable.id, bookingId));
+  const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
 
   if (!booking) {
     logger.warn({ bookingId }, "Booking not found for email resend");
@@ -618,8 +680,12 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
     return;
   }
 
-  const { html: confirmationHtml, subject: confirmationSubject } =
-    await buildConfirmationEmailHtml(booking, attendees, lead, settings);
+  const { html: confirmationHtml, subject: confirmationSubject } = await buildConfirmationEmailHtml(
+    booking,
+    attendees,
+    lead,
+    settings,
+  );
 
   // Prefer Stripe invoice PDF, then fall back to custom receipt
   let pdfBuffer: Buffer | null = null;
@@ -630,18 +696,31 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
       pdfBuffer = await downloadHttpsPdf(stripeInvoicePdfUrlResend);
       if (pdfBuffer) {
         pdfFilename = `invoice-${booking.orderReference || bookingId}.pdf`;
-        logger.info({ bookingId, sizeBytes: pdfBuffer.length }, "Using Stripe invoice PDF for resend");
+        logger.info(
+          { bookingId, sizeBytes: pdfBuffer.length },
+          "Using Stripe invoice PDF for resend",
+        );
       } else {
-        logger.warn({ bookingId }, "Stripe PDF not available for resend — falling back to custom receipt");
+        logger.warn(
+          { bookingId },
+          "Stripe PDF not available for resend — falling back to custom receipt",
+        );
       }
     } catch (err) {
-      logger.warn({ err }, "Could not download Stripe PDF for resend — falling back to custom receipt");
+      logger.warn(
+        { err },
+        "Could not download Stripe PDF for resend — falling back to custom receipt",
+      );
     }
   }
   if (!pdfBuffer) {
     try {
       pdfBuffer = await generatePdfReceipt(booking, attendees);
-      if (pdfBuffer) logger.info({ bookingId, sizeBytes: pdfBuffer.length }, "Using custom PDF receipt for resend");
+      if (pdfBuffer)
+        logger.info(
+          { bookingId, sizeBytes: pdfBuffer.length },
+          "Using custom PDF receipt for resend",
+        );
     } catch (err) {
       logger.error({ err }, "Failed to generate PDF for resend");
     }
@@ -653,7 +732,11 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
   }
   const companyInfoPdfResend = getCompanyInfoPdf();
   if (companyInfoPdfResend && booking.paymentMethod === "invoice") {
-    attachments.push({ filename: "DBL-company-information.pdf", content: companyInfoPdfResend, contentType: "application/pdf" });
+    attachments.push({
+      filename: "DBL-company-information.pdf",
+      content: companyInfoPdfResend,
+      contentType: "application/pdf",
+    });
   }
 
   const sent = await sendMail({
@@ -665,8 +748,13 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
     fromEmail: settings.fromEmail,
   });
 
-  await logEmail(bookingId, lead.workEmail, "confirmation", sent ? "sent" : "failed",
-    sent ? undefined : "SMTP not configured or send failed");
+  await logEmail(
+    bookingId,
+    lead.workEmail,
+    "confirmation",
+    sent ? "sent" : "failed",
+    sent ? undefined : "SMTP not configured or send failed",
+  );
   if (pdfBuffer) {
     await logEmail(bookingId, lead.workEmail, "receipt", sent ? "sent" : "failed");
   }
@@ -681,18 +769,27 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
     .from(notificationEmailsTable)
     .orderBy(notificationEmailsTable.createdAt);
 
-  const recipients: string[] = storedEmails.filter(e => e.notifyComplete).map((e) => e.email);
-  if (process.env.ORGANISER_EMAIL && !recipients.includes(process.env.ORGANISER_EMAIL.toLowerCase())) {
+  const recipients: string[] = storedEmails.filter((e) => e.notifyComplete).map((e) => e.email);
+  if (
+    process.env.ORGANISER_EMAIL &&
+    !recipients.includes(process.env.ORGANISER_EMAIL.toLowerCase())
+  ) {
     recipients.push(process.env.ORGANISER_EMAIL);
   }
 
   if (recipients.length === 0) {
-    logger.info({ bookingId }, "No notification recipients configured — skipping organiser notification");
+    logger.info(
+      { bookingId },
+      "No notification recipients configured — skipping organiser notification",
+    );
     return;
   }
 
   const settings = await getEventSettings();
-  const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
+  const attendees = await db
+    .select()
+    .from(attendeesTable)
+    .where(eq(attendeesTable.bookingId, bookingId));
   const lead = attendees.find((a) => a.isLead) || attendees[0];
 
   const passLabels: Record<string, string> = {
@@ -707,7 +804,9 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
   const groupDiscount = parseFloat(booking.groupDiscountAmount?.toString() || "0");
   const promoDiscount = parseFloat(booking.promoDiscountAmount?.toString() || "0");
 
-  const attendeeRows = attendees.map((a, i) => `
+  const attendeeRows = attendees
+    .map(
+      (a, i) => `
     <tr style="background:${i % 2 === 0 ? "#f9f9f9" : "#fff"}">
       <td style="padding:8px 10px;border:1px solid #e5e5e5">${a.firstName} ${a.lastName}${a.isLead ? ' <span style="font-size:11px;color:#E74F3E;font-weight:bold">(Buyer)</span>' : ""}</td>
       <td style="padding:8px 10px;border:1px solid #e5e5e5">${a.workEmail}</td>
@@ -715,7 +814,9 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
       <td style="padding:8px 10px;border:1px solid #e5e5e5">${a.jobTitle || "—"}</td>
       <td style="padding:8px 10px;border:1px solid #e5e5e5">${a.company || "—"}</td>
     </tr>
-  `).join("");
+  `,
+    )
+    .join("");
 
   const defaultCompleteSubject = `New Registration: {{orderReference}} — {{firstName}} {{lastName}}`;
   const subjectTemplate = settings.notifyCompleteSubject || defaultCompleteSubject;
@@ -752,7 +853,9 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
       <tr><td style="padding:7px 0;font-weight:bold;border-bottom:1px solid #f0f0f0">Total</td><td style="border-bottom:1px solid #f0f0f0"><strong>£${total.toFixed(2)}</strong></td></tr>
     </table>
 
-    ${booking.paymentMethod === "invoice" && booking.billingName ? `
+    ${
+      booking.paymentMethod === "invoice" && booking.billingName
+        ? `
     <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:0.05em;color:#888">Billing Details</h3>
     <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px">
       <tr><td style="padding:7px 0;color:#666;width:180px;border-bottom:1px solid #f0f0f0">Billing Contact</td><td style="border-bottom:1px solid #f0f0f0">${booking.billingName}</td></tr>
@@ -760,8 +863,19 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
       <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Invoice Email</td><td style="border-bottom:1px solid #f0f0f0">${booking.billingEmail || "—"}</td></tr>
       <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Address</td><td style="border-bottom:1px solid #f0f0f0">${(() => {
         if (booking.billingAddressLine1) {
-          const cityRegion = booking.billingTown && booking.billingRegion ? `${booking.billingTown}, ${booking.billingRegion}` : (booking.billingTown || booking.billingRegion);
-          return [booking.billingAddressLine1, booking.billingAddressLine2, cityRegion, booking.billingPostcode, booking.billingCountry].filter(Boolean).join("<br>");
+          const cityRegion =
+            booking.billingTown && booking.billingRegion
+              ? `${booking.billingTown}, ${booking.billingRegion}`
+              : booking.billingTown || booking.billingRegion;
+          return [
+            booking.billingAddressLine1,
+            booking.billingAddressLine2,
+            cityRegion,
+            booking.billingPostcode,
+            booking.billingCountry,
+          ]
+            .filter(Boolean)
+            .join("<br>");
         }
         return (booking.billingAddress || "—").replace(/\n/g, "<br>");
       })()}</td></tr>
@@ -769,7 +883,9 @@ export async function sendOrganiserNotification(bookingId: number): Promise<void
       ${booking.billingVatNumber ? `<tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">VAT Number</td><td style="border-bottom:1px solid #f0f0f0">${booking.billingVatNumber}</td></tr>` : ""}
       ${booking.poNumber ? `<tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">PO Number</td><td style="border-bottom:1px solid #f0f0f0;font-family:monospace"><strong>${booking.poNumber}</strong></td></tr>` : ""}
     </table>
-    ` : ""}
+    `
+        : ""
+    }
 
     <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:0.05em;color:#888">Attendees (${attendees.length})</h3>
     <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:24px">
@@ -809,17 +925,26 @@ export async function sendIncompleteFormNotification(bookingId: number): Promise
     .from(notificationEmailsTable)
     .orderBy(notificationEmailsTable.createdAt);
 
-  const recipients: string[] = storedEmails.filter(e => e.notifyIncomplete).map((e) => e.email);
-  if (process.env.ORGANISER_EMAIL && !recipients.includes(process.env.ORGANISER_EMAIL.toLowerCase())) {
+  const recipients: string[] = storedEmails.filter((e) => e.notifyIncomplete).map((e) => e.email);
+  if (
+    process.env.ORGANISER_EMAIL &&
+    !recipients.includes(process.env.ORGANISER_EMAIL.toLowerCase())
+  ) {
     recipients.push(process.env.ORGANISER_EMAIL);
   }
 
   if (recipients.length === 0) {
-    logger.info({ bookingId }, "No notification recipients configured — skipping incomplete form notification");
+    logger.info(
+      { bookingId },
+      "No notification recipients configured — skipping incomplete form notification",
+    );
     return;
   }
 
-  const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
+  const attendees = await db
+    .select()
+    .from(attendeesTable)
+    .where(eq(attendeesTable.bookingId, bookingId));
   const lead = attendees.find((a) => a.isLead) || attendees[0];
   if (!lead) return;
 
@@ -831,7 +956,16 @@ export async function sendIncompleteFormNotification(bookingId: number): Promise
 
   const submittedAt = booking.updatedAt || booking.createdAt;
   const submittedAtStr = submittedAt
-    ? new Date(submittedAt).toLocaleString("en-GB", { timeZone: "Europe/London", weekday: "short", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZoneName: "short" })
+    ? new Date(submittedAt).toLocaleString("en-GB", {
+        timeZone: "Europe/London",
+        weekday: "short",
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZoneName: "short",
+      })
     : "Unknown";
 
   const dataRows = [
@@ -845,12 +979,16 @@ export async function sendIncompleteFormNotification(bookingId: number): Promise
     ["Submitted At", submittedAtStr],
   ];
 
-  const tableRows = dataRows.map(([label, value], i) => `
+  const tableRows = dataRows
+    .map(
+      ([label, value], i) => `
     <tr style="background:${i % 2 === 0 ? "#1e293b" : "#263548"}">
       <td style="padding:11px 16px;font-weight:bold;color:#94a3b8;font-size:13px;width:160px;border-bottom:1px solid #334155">${label}</td>
       <td style="padding:11px 16px;color:#f1f5f9;font-size:13px;border-bottom:1px solid #334155">${value}</td>
     </tr>
-  `).join("");
+  `,
+    )
+    .join("");
 
   const settings = await getEventSettings();
   const defaultIncompleteSubject = `Incomplete Registration: {{firstName}} {{lastName}} — {{eventName}}`;
@@ -926,7 +1064,10 @@ export async function sendIncompleteFormNotification(bookingId: number): Promise
       logger.error({ err, bookingId, to }, "Failed to send incomplete form notification");
     }
   }
-  logger.info({ bookingId, sentCount, total: recipients.length }, "Incomplete form notifications sent");
+  logger.info(
+    { bookingId, sentCount, total: recipients.length },
+    "Incomplete form notifications sent",
+  );
 }
 
 async function getOrganiserEmails(): Promise<string[]> {
@@ -934,8 +1075,11 @@ async function getOrganiserEmails(): Promise<string[]> {
     .select()
     .from(notificationEmailsTable)
     .orderBy(notificationEmailsTable.createdAt);
-  const recipients: string[] = storedEmails.filter(e => e.notifyComplete).map((e) => e.email);
-  if (process.env.ORGANISER_EMAIL && !recipients.includes(process.env.ORGANISER_EMAIL.toLowerCase())) {
+  const recipients: string[] = storedEmails.filter((e) => e.notifyComplete).map((e) => e.email);
+  if (
+    process.env.ORGANISER_EMAIL &&
+    !recipients.includes(process.env.ORGANISER_EMAIL.toLowerCase())
+  ) {
     recipients.push(process.env.ORGANISER_EMAIL);
   }
   return recipients;
@@ -944,10 +1088,17 @@ async function getOrganiserEmails(): Promise<string[]> {
 function formatCalendarRangeLabel(start: Date, end: Date, tz: string): string {
   try {
     const dateFmt = new Intl.DateTimeFormat("en-GB", {
-      weekday: "short", day: "2-digit", month: "short", year: "numeric", timeZone: tz,
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      timeZone: tz,
     });
     const timeFmt = new Intl.DateTimeFormat("en-GB", {
-      hour: "2-digit", minute: "2-digit", hour12: false, timeZone: tz,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: tz,
     });
     return `${dateFmt.format(start)} · ${timeFmt.format(start)}–${timeFmt.format(end)}`;
   } catch {
@@ -1015,7 +1166,8 @@ export function getCalendarPlaceholders(settings: EventSettings): CalendarPlaceh
     const start = new Date(settings.eventStartAt);
     const end = new Date(settings.eventEndAt);
     const eventName = settings.eventName || "HR Analytics Summit";
-    const location = [settings.eventVenue, settings.eventVenuePostcode].filter(Boolean).join(", ") || null;
+    const location =
+      [settings.eventVenue, settings.eventVenuePostcode].filter(Boolean).join(", ") || null;
     const ev: CalendarEvent = {
       uid: `event-settings-${settings.id}-main@hranalyticssummit.com`,
       title: eventName,
@@ -1062,7 +1214,9 @@ export function getCalendarPlaceholders(settings: EventSettings): CalendarPlaceh
     socialCalendarLinks = renderCalendarBlockHtml({
       heading: "Pre-event social",
       title: name,
-      subtitle: formatCalendarRangeLabel(start, end, tz) + (settings.socialVenue ? ` · ${settings.socialVenue}` : ""),
+      subtitle:
+        formatCalendarRangeLabel(start, end, tz) +
+        (settings.socialVenue ? ` · ${settings.socialVenue}` : ""),
       google: socialGoogleCalendarUrl,
       outlook: socialOutlookCalendarUrl,
       icsUrl: socialIcsCalendarUrl,
@@ -1124,7 +1278,7 @@ function buildManageLinkSection(manageUrl: string): string {
 export async function sendWelcomeEmail(
   bookingId: number | null,
   firstName: string,
-  toEmail: string
+  toEmail: string,
 ): Promise<void> {
   try {
     const [template] = await db
@@ -1142,7 +1296,10 @@ export async function sendWelcomeEmail(
 
     let manageLinkHtml = "";
     if (bookingId) {
-      const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
+      const [booking] = await db
+        .select()
+        .from(bookingsTable)
+        .where(eq(bookingsTable.id, bookingId));
       if (booking?.managementToken) {
         manageLinkHtml = buildManageLinkSection(`${appBaseUrl}/manage/${booking.managementToken}`);
       }
@@ -1179,7 +1336,7 @@ export async function sendWelcomeEmail(
       toEmail,
       "welcome",
       sent ? "sent" : "failed",
-      sent ? undefined : "SMTP not configured or send failed"
+      sent ? undefined : "SMTP not configured or send failed",
     );
   } catch (err) {
     logger.error({ err }, "Failed to send welcome email");
@@ -1189,12 +1346,21 @@ export async function sendWelcomeEmail(
 export async function sendAttendeeChangeNotification(
   bookingId: number,
   attendeeId: number,
-  updatedData: { firstName: string; lastName: string; jobTitle?: string; company?: string; workEmail: string }
+  updatedData: {
+    firstName: string;
+    lastName: string;
+    jobTitle?: string;
+    company?: string;
+    workEmail: string;
+  },
 ): Promise<void> {
   try {
     const recipients = await getOrganiserEmails();
     if (recipients.length === 0) {
-      logger.info({ bookingId, attendeeId }, "No notification recipients — skipping attendee change notification");
+      logger.info(
+        { bookingId, attendeeId },
+        "No notification recipients — skipping attendee change notification",
+      );
       return;
     }
 
@@ -1202,7 +1368,8 @@ export async function sendAttendeeChangeNotification(
     if (!booking) return;
 
     const settings = await getEventSettings();
-    const orderRef = booking.orderReference || `${settings.refPrefix}-${settings.refOffset + bookingId}`;
+    const orderRef =
+      booking.orderReference || `${settings.refPrefix}-${settings.refOffset + bookingId}`;
     const changedAt = new Date().toLocaleString("en-GB", {
       timeZone: "Europe/London",
       weekday: "short",
@@ -1259,11 +1426,15 @@ export async function sendAttendeeChangeNotification(
                   ["Company", updatedData.company || "—"],
                   ["Work Email", updatedData.workEmail],
                   ["Changed At", changedAt],
-                ].map(([label, value], i) => `
+                ]
+                  .map(
+                    ([label, value], i) => `
                   <tr style="background:${i % 2 === 0 ? "#1e293b" : "#263548"}">
                     <td style="padding:11px 16px;font-weight:bold;color:#94a3b8;font-size:13px;width:160px;border-bottom:1px solid #334155">${label}</td>
                     <td style="padding:11px 16px;color:#f1f5f9;font-size:13px;border-bottom:1px solid #334155">${value}</td>
-                  </tr>`).join("")}
+                  </tr>`,
+                  )
+                  .join("")}
               </table>
             </td>
           </tr>
@@ -1287,7 +1458,10 @@ export async function sendAttendeeChangeNotification(
         await sendMail({ to, subject, html });
         sentCount++;
       } catch (err) {
-        logger.error({ err, bookingId, attendeeId, to }, "Failed to send attendee change notification");
+        logger.error(
+          { err, bookingId, attendeeId, to },
+          "Failed to send attendee change notification",
+        );
       }
     }
     logger.info({ bookingId, attendeeId, sentCount }, "Attendee change notifications sent");
@@ -1300,7 +1474,10 @@ export async function sendCheckoutExpiredEmail(bookingId: number): Promise<void>
   const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
   if (!booking) return;
 
-  const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
+  const attendees = await db
+    .select()
+    .from(attendeesTable)
+    .where(eq(attendeesTable.bookingId, bookingId));
   const lead = attendees.find((a) => a.isLead) || attendees[0];
   if (!lead) return;
 
@@ -1310,7 +1487,8 @@ export async function sendCheckoutExpiredEmail(bookingId: number): Promise<void>
   const name = `${lead.firstName} ${lead.lastName}`;
   const checkoutUrl = settings.orgWebsite || "https://www.hranalyticssummit.com";
 
-  const html = wrapInBrandedLayout(`
+  const html = wrapInBrandedLayout(
+    `
     <div style="background:#fff3cd;border:1px solid #ffc107;padding:16px 20px;border-radius:4px;margin-bottom:24px;">
       <strong style="color:#856404;">⚠ Checkout session expired</strong>
     </div>
@@ -1324,7 +1502,9 @@ export async function sendCheckoutExpiredEmail(bookingId: number): Promise<void>
       </a>
     </p>
     <p style="color:#666;font-size:14px;">If you have any questions, please contact us at <a href="mailto:douglas@dynamicbusinessleaders.co.uk">douglas@dynamicbusinessleaders.co.uk</a>.</p>
-  `, settings);
+  `,
+    settings,
+  );
 
   const recipientEmail = booking.billingEmail || lead.workEmail;
 
@@ -1338,11 +1518,17 @@ export async function sendCheckoutExpiredEmail(bookingId: number): Promise<void>
   logger.info({ bookingId, to: recipientEmail }, "Checkout expired email sent");
 }
 
-export async function sendRefundConfirmationEmail(bookingId: number, refundAmountPence: number): Promise<void> {
+export async function sendRefundConfirmationEmail(
+  bookingId: number,
+  refundAmountPence: number,
+): Promise<void> {
   const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
   if (!booking) return;
 
-  const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
+  const attendees = await db
+    .select()
+    .from(attendeesTable)
+    .where(eq(attendeesTable.bookingId, bookingId));
   const lead = attendees.find((a) => a.isLead) || attendees[0];
   if (!lead) return;
 
@@ -1353,7 +1539,8 @@ export async function sendRefundConfirmationEmail(bookingId: number, refundAmoun
   const refundAmount = (refundAmountPence / 100).toFixed(2);
   const orderRef = booking.orderReference || `HRAS26-${6541 + bookingId}`;
 
-  const html = wrapInBrandedLayout(`
+  const html = wrapInBrandedLayout(
+    `
     <h2 style="margin-top:0;">Your Refund Has Been Processed</h2>
     <p>Hi ${name},</p>
     <p>We have processed a refund for your registration at <strong>HR Analytics Summit 2026</strong>. The amount will appear in your account within 5–10 business days depending on your bank.</p>
@@ -1366,7 +1553,9 @@ export async function sendRefundConfirmationEmail(bookingId: number, refundAmoun
     </div>
     <p>If you have any questions about your refund, please contact us at <a href="mailto:douglas@dynamicbusinessleaders.co.uk">douglas@dynamicbusinessleaders.co.uk</a> quoting your booking reference above.</p>
     <p>We hope to see you at a future event.</p>
-  `, settings);
+  `,
+    settings,
+  );
 
   await sendMail({
     to: booking.billingEmail || lead.workEmail,
@@ -1386,7 +1575,10 @@ export async function sendInvoicePaymentFailedEmail(
   const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
   if (!booking) return;
 
-  const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
+  const attendees = await db
+    .select()
+    .from(attendeesTable)
+    .where(eq(attendeesTable.bookingId, bookingId));
   const lead = attendees.find((a) => a.isLead) || attendees[0];
   if (!lead) return;
 
@@ -1407,7 +1599,8 @@ export async function sendInvoicePaymentFailedEmail(
       </div>`
     : "";
 
-  const html = wrapInBrandedLayout(`
+  const html = wrapInBrandedLayout(
+    `
     <div style="background:#fff3cd;border:1px solid #ffc107;padding:16px 20px;border-radius:4px;margin-bottom:24px;">
       <strong style="color:#856404;">⚠ Invoice payment unsuccessful</strong>
     </div>
@@ -1417,15 +1610,21 @@ export async function sendInvoicePaymentFailedEmail(
     ${declineNote}
     ${attemptNote}
     <p>Please use the button below to pay your invoice. If you continue to have difficulties, contact your bank or reach out to us directly.</p>
-    ${paymentUrl ? `
+    ${
+      paymentUrl
+        ? `
     <p style="text-align:center;margin:32px 0;">
       <a href="${paymentUrl}" class="cta-btn" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;border-radius:300px;text-decoration:none;font-weight:600;">
         Pay Invoice Now →
       </a>
     </p>
-    ` : ""}
+    `
+        : ""
+    }
     <p style="color:#666;font-size:14px;">If you need assistance, email us at <a href="mailto:douglas@dynamicbusinessleaders.co.uk">douglas@dynamicbusinessleaders.co.uk</a> or call <a href="tel:+447763618052">07763 618052</a>.</p>
-  `, settings);
+  `,
+    settings,
+  );
 
   await sendMail({
     to: booking.billingEmail || lead.workEmail,
@@ -1434,7 +1633,10 @@ export async function sendInvoicePaymentFailedEmail(
     html,
   });
 
-  logger.info({ bookingId, orderRef, declineReason, attemptCount }, "Invoice payment failed email sent");
+  logger.info(
+    { bookingId, orderRef, declineReason, attemptCount },
+    "Invoice payment failed email sent",
+  );
 }
 
 export async function sendDisputeAlertEmail(
@@ -1447,13 +1649,19 @@ export async function sendDisputeAlertEmail(
   const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
   if (!booking) return;
 
-  const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
+  const attendees = await db
+    .select()
+    .from(attendeesTable)
+    .where(eq(attendeesTable.bookingId, bookingId));
   const lead = attendees.find((a) => a.isLead) || attendees[0];
 
   const settings = await getEventSettings();
   const recipients = await getOrganiserEmails();
   if (recipients.length === 0) {
-    logger.warn({ bookingId, disputeId }, "sendDisputeAlertEmail: no organiser emails configured, skipping");
+    logger.warn(
+      { bookingId, disputeId },
+      "sendDisputeAlertEmail: no organiser emails configured, skipping",
+    );
     return;
   }
 
@@ -1461,11 +1669,17 @@ export async function sendDisputeAlertEmail(
   const orderRef = booking.orderReference || `HRAS26-${6541 + bookingId}`;
   const disputeAmount = (disputeAmountPence / 100).toFixed(2);
   const deadlineStr = evidenceDueBy
-    ? evidenceDueBy.toLocaleDateString("en-GB", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
+    ? evidenceDueBy.toLocaleDateString("en-GB", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
     : "Check Stripe dashboard";
   const stripeUrl = `https://dashboard.stripe.com/disputes/${disputeId}`;
 
-  const html = wrapInBrandedLayout(`
+  const html = wrapInBrandedLayout(
+    `
     <div style="background:#f8d7da;border:2px solid #dc3545;padding:16px 20px;border-radius:4px;margin-bottom:24px;">
       <strong style="color:#842029;font-size:16px;">🚨 Chargeback / Dispute Filed</strong>
     </div>
@@ -1486,7 +1700,9 @@ export async function sendDisputeAlertEmail(
       </a>
     </p>
     <p style="font-size:14px;color:#666;">Evidence to submit typically includes: the booking confirmation email, signed terms and conditions, and any correspondence with the customer.</p>
-  `, settings);
+  `,
+    settings,
+  );
 
   await sendMail({
     to: recipients,
@@ -1494,7 +1710,10 @@ export async function sendDisputeAlertEmail(
     html,
   });
 
-  logger.info({ bookingId, disputeId, disputeAmount, deadlineStr, recipients }, "Dispute alert email sent to organisers");
+  logger.info(
+    { bookingId, disputeId, disputeAmount, deadlineStr, recipients },
+    "Dispute alert email sent to organisers",
+  );
 }
 
 export async function sendInvoiceReminder(bookingId: number): Promise<void> {
@@ -1504,7 +1723,10 @@ export async function sendInvoiceReminder(bookingId: number): Promise<void> {
     throw new Error("No Stripe invoice found for this booking");
   }
 
-  const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
+  const attendees = await db
+    .select()
+    .from(attendeesTable)
+    .where(eq(attendeesTable.bookingId, bookingId));
   const lead = attendees.find((a) => a.isLead) || attendees[0];
   if (!lead) throw new Error("No attendee found for booking");
 
@@ -1534,7 +1756,10 @@ export async function sendInvoiceReminder(bookingId: number): Promise<void> {
   const recipientName = booking.billingName || `${lead.firstName} ${lead.lastName}`;
 
   // Load editable template (intro body + subject) from DB, falling back to defaults
-  const [storedTemplate] = await db.select().from(emailTemplatesTable).where(eq(emailTemplatesTable.type, "invoice_reminder"));
+  const [storedTemplate] = await db
+    .select()
+    .from(emailTemplatesTable)
+    .where(eq(emailTemplatesTable.type, "invoice_reminder"));
   const payOnlineButton = booking.stripeInvoicePaymentUrl
     ? `<p style="margin:24px 0;text-align:center;"><a href="${booking.stripeInvoicePaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:14px 32px;text-decoration:none;font-weight:bold;font-size:15px;border-radius:4px;">Pay Invoice Online →</a></p>`
     : "";
@@ -1557,22 +1782,28 @@ export async function sendInvoiceReminder(bookingId: number): Promise<void> {
     }
   } else {
     introHtml = `<p>Dear ${recipientName},</p>
-    <p>${isOverdue
-      ? `We are writing to remind you that invoice <strong>${orderRef}</strong> for your registration to the <strong>HR Analytics Summit 2026</strong> was due on <strong>${dueDateStr}</strong> and remains unpaid.`
-      : `This is a friendly reminder that invoice <strong>${orderRef}</strong> for your registration to the <strong>HR Analytics Summit 2026</strong> is due on <strong>${dueDateStr}</strong>.`
+    <p>${
+      isOverdue
+        ? `We are writing to remind you that invoice <strong>${orderRef}</strong> for your registration to the <strong>HR Analytics Summit 2026</strong> was due on <strong>${dueDateStr}</strong> and remains unpaid.`
+        : `This is a friendly reminder that invoice <strong>${orderRef}</strong> for your registration to the <strong>HR Analytics Summit 2026</strong> is due on <strong>${dueDateStr}</strong>.`
     }</p>
     <p>Please arrange payment at your earliest convenience using the details below. A copy of the invoice PDF is attached to this email for your reference.</p>`;
   }
 
-  let rawSubject = storedTemplate?.subject || (isOverdue
-    ? `Overdue Invoice — {{orderReference}} — HR Analytics Summit 2026`
-    : `Invoice Reminder — {{orderReference}} — HR Analytics Summit 2026`);
+  let rawSubject =
+    storedTemplate?.subject ||
+    (isOverdue
+      ? `Overdue Invoice — {{orderReference}} — HR Analytics Summit 2026`
+      : `Invoice Reminder — {{orderReference}} — HR Analytics Summit 2026`);
   for (const [key, val] of Object.entries(templateVars)) {
     rawSubject = rawSubject.replaceAll(key, val);
   }
-  const subject = isOverdue ? rawSubject.replace(/^Invoice Reminder/, "Overdue Invoice") : rawSubject;
+  const subject = isOverdue
+    ? rawSubject.replace(/^Invoice Reminder/, "Overdue Invoice")
+    : rawSubject;
 
-  const html = wrapInBrandedLayout(`
+  const html = wrapInBrandedLayout(
+    `
     <div style="background:${isOverdue ? "#fff3cd" : "#e8f4fd"};border-left:4px solid ${isOverdue ? "#E74F3E" : "#F48847"};padding:16px 20px;border-radius:4px;margin-bottom:24px;">
       <strong style="color:${isOverdue ? "#E74F3E" : "#F48847"};font-size:15px;">${isOverdue ? "⚠️ Invoice Overdue" : "📋 Invoice Reminder"}</strong>
     </div>
@@ -1613,14 +1844,20 @@ export async function sendInvoiceReminder(bookingId: number): Promise<void> {
 
     <p style="font-size:14px;color:#666;">If you have already arranged payment, please disregard this email. For queries, please contact <a href="mailto:douglas@dynamicbusinessleaders.co.uk">douglas@dynamicbusinessleaders.co.uk</a>.</p>
     <p style="font-size:14px;color:#666;"><strong>Dynamic Business Leaders Limited</strong> · Company No. 12252258 · VAT No. 336124621</p>
-  `, settings);
+  `,
+    settings,
+  );
 
   let pdfBuffer: Buffer | null = null;
   const pdfFilename = `invoice-${orderRef}.pdf`;
   if (booking.stripeInvoicePdfUrl) {
     try {
       pdfBuffer = await downloadHttpsPdf(booking.stripeInvoicePdfUrl);
-      if (pdfBuffer) logger.info({ bookingId, sizeBytes: pdfBuffer.length }, "Stripe invoice PDF attached to reminder");
+      if (pdfBuffer)
+        logger.info(
+          { bookingId, sizeBytes: pdfBuffer.length },
+          "Stripe invoice PDF attached to reminder",
+        );
     } catch (err) {
       logger.warn({ err }, "Could not download Stripe PDF for reminder — attaching custom receipt");
     }
@@ -1634,9 +1871,15 @@ export async function sendInvoiceReminder(bookingId: number): Promise<void> {
   }
 
   const attachments: Array<{ filename: string; content: Buffer; contentType: string }> = [];
-  if (pdfBuffer) attachments.push({ filename: pdfFilename, content: pdfBuffer, contentType: "application/pdf" });
+  if (pdfBuffer)
+    attachments.push({ filename: pdfFilename, content: pdfBuffer, contentType: "application/pdf" });
   const companyInfoPdf = getCompanyInfoPdf();
-  if (companyInfoPdf) attachments.push({ filename: "DBL-company-information.pdf", content: companyInfoPdf, contentType: "application/pdf" });
+  if (companyInfoPdf)
+    attachments.push({
+      filename: "DBL-company-information.pdf",
+      content: companyInfoPdf,
+      contentType: "application/pdf",
+    });
 
   await sendMail({ to, subject, html, attachments });
   logger.info({ bookingId, to, orderRef, isOverdue }, "Invoice reminder email sent");

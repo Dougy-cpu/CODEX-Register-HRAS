@@ -1,7 +1,18 @@
 import { ReactNode, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import logoUrl from "@assets/HRAS_Logo_v02_White_BG.png";
-import { LayoutDashboard, Users, Tag, Percent, Mail, Bell, Ticket, Settings, LogOut, Activity } from "lucide-react";
+import {
+  LayoutDashboard,
+  Users,
+  Tag,
+  Percent,
+  Mail,
+  Bell,
+  Ticket,
+  Settings,
+  LogOut,
+  Activity,
+} from "lucide-react";
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -55,14 +66,21 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
         </div>
         <nav className="flex-1 py-6 px-4 space-y-1">
           {navItems.map((item) => (
-            <Link key={item.href} href={item.href} className="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-md hover:bg-white/10 text-slate-300 hover:text-white transition-colors">
+            <Link
+              key={item.href}
+              href={item.href}
+              className="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-md hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
+            >
               <item.icon className="w-5 h-5" />
               {item.label}
             </Link>
           ))}
         </nav>
         <div className="p-4 border-t border-white/10">
-          <button onClick={handleLogout} className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium rounded-md hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
+          <button
+            onClick={handleLogout}
+            className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium rounded-md hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+          >
             <LogOut className="w-5 h-5" />
             Logout
           </button>
@@ -74,9 +92,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
         <header className="h-20 bg-white border-b border-border flex items-center px-8 sticky top-0 z-10">
           <h1 className="text-2xl font-bold">{title}</h1>
         </header>
-        <div className="p-8 flex-1">
-          {children}
-        </div>
+        <div className="p-8 flex-1">{children}</div>
       </main>
     </div>
   );

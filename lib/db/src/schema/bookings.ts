@@ -1,4 +1,13 @@
-import { pgTable, text, serial, timestamp, integer, numeric, pgEnum, boolean } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  serial,
+  timestamp,
+  integer,
+  numeric,
+  pgEnum,
+  boolean,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -14,10 +23,7 @@ export const bookingStatusEnum = pgEnum("booking_status", [
 
 export const passTypeEnum = pgEnum("pass_type", ["single", "business"]);
 
-export const attendeeTypeEnum = pgEnum("attendee_type", [
-  "hr_professional",
-  "consultant_vendor",
-]);
+export const attendeeTypeEnum = pgEnum("attendee_type", ["hr_professional", "consultant_vendor"]);
 
 export const paymentMethodEnum = pgEnum("payment_method", ["card", "invoice"]);
 
@@ -60,7 +66,10 @@ export const bookingsTable = pgTable("bookings", {
   managementToken: text("management_token").unique(),
   partialNotificationSent: boolean("partial_notification_sent").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
 });
 
 export const insertBookingSchema = createInsertSchema(bookingsTable).omit({

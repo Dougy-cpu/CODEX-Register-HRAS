@@ -21,9 +21,9 @@ const DEFAULT_OPTIONS = [
 async function seedDefaultsIfEmpty() {
   const existing = await db.select().from(hearAboutUsOptionsTable).limit(1);
   if (existing.length === 0) {
-    await db.insert(hearAboutUsOptionsTable).values(
-      DEFAULT_OPTIONS.map((label, i) => ({ label, position: i }))
-    );
+    await db
+      .insert(hearAboutUsOptionsTable)
+      .values(DEFAULT_OPTIONS.map((label, i) => ({ label, position: i })));
   }
 }
 
@@ -34,7 +34,7 @@ router.get("/hear-about-us-options", async (_req, res): Promise<void> => {
     .select()
     .from(hearAboutUsOptionsTable)
     .orderBy(asc(hearAboutUsOptionsTable.position));
-  res.json(options.map(o => ({ id: o.id, label: o.label })));
+  res.json(options.map((o) => ({ id: o.id, label: o.label })));
 });
 
 // Admin — returns options with per-option response counts + analytics summary
@@ -72,7 +72,7 @@ router.get("/admin/hear-about-us-options", adminAuth, async (_req, res): Promise
     .from(bookingsTable);
 
   res.json({
-    options: options.map(o => ({
+    options: options.map((o) => ({
       id: o.id,
       label: o.label,
       position: o.position,
@@ -129,7 +129,7 @@ router.put("/admin/hear-about-us-options/:id/move", adminAuth, async (req, res):
     .from(hearAboutUsOptionsTable)
     .orderBy(asc(hearAboutUsOptionsTable.position));
 
-  const idx = all.findIndex(o => o.id === id);
+  const idx = all.findIndex((o) => o.id === id);
   if (idx === -1) {
     res.status(404).json({ error: "Option not found" });
     return;

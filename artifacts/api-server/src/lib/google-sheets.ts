@@ -54,7 +54,7 @@ const SHEET_HEADERS = [
 
 async function ensureSheetHeaders(
   sheets: ReturnType<typeof google.sheets>,
-  spreadsheetId: string
+  spreadsheetId: string,
 ): Promise<void> {
   const range = "Sheet1!A1:W1";
   const existing = await sheets.spreadsheets.values.get({ spreadsheetId, range });
@@ -78,10 +78,7 @@ export async function syncBookingToSheets(bookingId: number): Promise<void> {
 
   const { sheets, spreadsheetId } = client;
 
-  const [booking] = await db
-    .select()
-    .from(bookingsTable)
-    .where(eq(bookingsTable.id, bookingId));
+  const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
 
   if (!booking) {
     logger.error({ bookingId }, "Booking not found for Google Sheets sync");
@@ -137,6 +134,6 @@ export async function syncBookingToSheets(bookingId: number): Promise<void> {
 
   logger.info(
     { bookingId, orderRef: booking.orderReference, attendeeCount: rows.length },
-    "Booking attendees synced to Google Sheets"
+    "Booking attendees synced to Google Sheets",
   );
 }

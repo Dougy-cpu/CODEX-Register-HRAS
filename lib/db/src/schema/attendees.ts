@@ -21,7 +21,10 @@ export const attendeesTable = pgTable("attendees", {
   gdprConsent: boolean("gdpr_consent").notNull().default(false),
   gdprConsentAt: timestamp("gdpr_consent_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
 });
 
 export const insertAttendeeSchema = createInsertSchema(attendeesTable).omit({

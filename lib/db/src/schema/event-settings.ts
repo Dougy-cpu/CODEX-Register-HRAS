@@ -36,7 +36,10 @@ export const eventSettingsTable = pgTable("event_settings", {
   socialEndAt: timestamp("social_end_at", { withTimezone: true }),
   socialVenue: text("social_venue"),
   socialDescription: text("social_description"),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
 });
 
 export type EventSettings = typeof eventSettingsTable.$inferSelect;

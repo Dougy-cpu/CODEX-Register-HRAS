@@ -7,7 +7,13 @@ import { promoCodesTable } from "@workspace/db";
 import { isCodeUsedByEmail } from "./promo-codes";
 import { v4 as uuidv4 } from "uuid";
 import { deriveAdminToken, getAdminPassword } from "../middleware/admin-auth";
-import { sendIncompleteFormNotification, sendBookingEmails, sendOrganiserNotification, sendReissuedInvoiceEmail, getEventSettings } from "../lib/email";
+import {
+  sendIncompleteFormNotification,
+  sendBookingEmails,
+  sendOrganiserNotification,
+  sendReissuedInvoiceEmail,
+  getEventSettings,
+} from "../lib/email";
 import { logger } from "../lib/logger";
 import { reissueBookingInvoice, getStripeInvoiceStatus } from "../lib/invoice";
 import { getStripe } from "./stripe";
@@ -23,10 +29,13 @@ function isAdminRequest(req: import("express").Request): boolean {
 const router: IRouter = Router();
 
 async function generateOrderRef(bookingId?: number): Promise<string> {
-  const [settings] = await db.select({
-    refPrefix: eventSettingsTable.refPrefix,
-    refOffset: eventSettingsTable.refOffset,
-  }).from(eventSettingsTable).limit(1);
+  const [settings] = await db
+    .select({
+      refPrefix: eventSettingsTable.refPrefix,
+      refOffset: eventSettingsTable.refOffset,
+    })
+    .from(eventSettingsTable)
+    .limit(1);
   const prefix = settings?.refPrefix ?? "HRAS26";
   const offset = settings?.refOffset ?? 6541;
   if (bookingId) {
@@ -41,8 +50,12 @@ function formatBooking(b: typeof bookingsTable.$inferSelect) {
     subtotalAmount: parseFloat(b.subtotalAmount?.toString() || "0"),
     vatAmount: parseFloat(b.vatAmount?.toString() || "0"),
     totalAmount: parseFloat(b.totalAmount?.toString() || "0"),
-    promoDiscountAmount: b.promoDiscountAmount ? parseFloat(b.promoDiscountAmount.toString()) : null,
-    groupDiscountAmount: b.groupDiscountAmount ? parseFloat(b.groupDiscountAmount.toString()) : null,
+    promoDiscountAmount: b.promoDiscountAmount
+      ? parseFloat(b.promoDiscountAmount.toString())
+      : null,
+    groupDiscountAmount: b.groupDiscountAmount
+      ? parseFloat(b.groupDiscountAmount.toString())
+      : null,
     createdAt: b.createdAt.toISOString(),
     updatedAt: b.updatedAt.toISOString(),
   };
@@ -81,7 +94,8 @@ router.post("/bookings", async (req, res): Promise<void> => {
         subtotalAmount: pricing.subtotalAfterDiscounts.toString(),
         vatAmount: pricing.vatAmount.toString(),
         totalAmount: pricing.total.toString(),
-        groupDiscountAmount: pricing.groupDiscountAmount > 0 ? pricing.groupDiscountAmount.toString() : null,
+        groupDiscountAmount:
+          pricing.groupDiscountAmount > 0 ? pricing.groupDiscountAmount.toString() : null,
         currentStep: Math.max(currentStep, existing[0].currentStep),
       })
       .where(eq(bookingsTable.id, existing[0].id))
@@ -103,7 +117,8 @@ router.post("/bookings", async (req, res): Promise<void> => {
       subtotalAmount: pricing.subtotalAfterDiscounts.toString(),
       vatAmount: pricing.vatAmount.toString(),
       totalAmount: pricing.total.toString(),
-      groupDiscountAmount: pricing.groupDiscountAmount > 0 ? pricing.groupDiscountAmount.toString() : null,
+      groupDiscountAmount:
+        pricing.groupDiscountAmount > 0 ? pricing.groupDiscountAmount.toString() : null,
       currentStep,
       managementToken: uuidv4(),
     })
@@ -127,7 +142,15 @@ router.post("/bookings/start", async (req, res): Promise<void> => {
     gdprConsent,
   } = req.body;
 
-  if (!sessionToken || !attendeeType || !firstName || !lastName || !jobTitle || !company || !workEmail) {
+  if (
+    !sessionToken ||
+    !attendeeType ||
+    !firstName ||
+    !lastName ||
+    !jobTitle ||
+    !company ||
+    !workEmail
+  ) {
     res.status(400).json({ error: "Missing required fields" });
     return;
   }
@@ -154,7 +177,8 @@ router.post("/bookings/start", async (req, res): Promise<void> => {
           subtotalAmount: pricing.subtotalAfterDiscounts.toString(),
           vatAmount: pricing.vatAmount.toString(),
           totalAmount: pricing.total.toString(),
-          groupDiscountAmount: pricing.groupDiscountAmount > 0 ? pricing.groupDiscountAmount.toString() : null,
+          groupDiscountAmount:
+            pricing.groupDiscountAmount > 0 ? pricing.groupDiscountAmount.toString() : null,
           currentStep: Math.max(2, existing.currentStep),
         })
         .where(eq(bookingsTable.id, existing.id))
@@ -172,7 +196,8 @@ router.post("/bookings/start", async (req, res): Promise<void> => {
           subtotalAmount: pricing.subtotalAfterDiscounts.toString(),
           vatAmount: pricing.vatAmount.toString(),
           totalAmount: pricing.total.toString(),
-          groupDiscountAmount: pricing.groupDiscountAmount > 0 ? pricing.groupDiscountAmount.toString() : null,
+          groupDiscountAmount:
+            pricing.groupDiscountAmount > 0 ? pricing.groupDiscountAmount.toString() : null,
           currentStep: 2,
           managementToken,
         })
@@ -192,14 +217,35 @@ router.post("/bookings/start", async (req, res): Promise<void> => {
     if (existingAttendee) {
       const [updated] = await tx
         .update(attendeesTable)
-        .set({ firstName, lastName, jobTitle, company, workEmail, phone: phone || null, gdprConsent: gdprConsent ?? false, gdprConsentAt })
+        .set({
+          firstName,
+          lastName,
+          jobTitle,
+          company,
+          workEmail,
+          phone: phone || null,
+          gdprConsent: gdprConsent ?? false,
+          gdprConsentAt,
+        })
         .where(eq(attendeesTable.id, existingAttendee.id))
         .returning();
       attendee = updated;
     } else {
       const [created] = await tx
         .insert(attendeesTable)
-        .values({ bookingId, isLead: true, firstName, lastName, jobTitle, company, workEmail, phone: phone || null, gdprConsent: gdprConsent ?? false, gdprConsentAt, seatIndex: 0 })
+        .values({
+          bookingId,
+          isLead: true,
+          firstName,
+          lastName,
+          jobTitle,
+          company,
+          workEmail,
+          phone: phone || null,
+          gdprConsent: gdprConsent ?? false,
+          gdprConsentAt,
+          seatIndex: 0,
+        })
         .returning();
       attendee = created;
     }
@@ -287,16 +333,14 @@ router.get("/bookings/:id", async (req, res): Promise<void> => {
   }
 
   const sessionHeader = req.headers["x-booking-session"] as string | undefined;
-  const ownsBooking = sessionHeader && booking.sessionToken && sessionHeader === booking.sessionToken;
+  const ownsBooking =
+    sessionHeader && booking.sessionToken && sessionHeader === booking.sessionToken;
   if (!ownsBooking && !isAdminRequest(req)) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
 
-  const attendees = await db
-    .select()
-    .from(attendeesTable)
-    .where(eq(attendeesTable.bookingId, id));
+  const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, id));
 
   res.json({
     ...formatBooking(booking),
@@ -351,9 +395,8 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
 
   const newPassType = passType ?? existing.passType;
   const newQuantity = quantity ?? existing.quantity;
-  const newPromoCode = promoCode !== undefined
-    ? (promoCode ? promoCode.toUpperCase() : null)
-    : existing.promoCode;
+  const newPromoCode =
+    promoCode !== undefined ? (promoCode ? promoCode.toUpperCase() : null) : existing.promoCode;
 
   const pricing = await calculatePricing(newPassType, newQuantity, newPromoCode);
 
@@ -361,8 +404,10 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
     subtotalAmount: pricing.subtotalAfterDiscounts.toString(),
     vatAmount: pricing.vatAmount.toString(),
     totalAmount: pricing.total.toString(),
-    groupDiscountAmount: pricing.groupDiscountAmount > 0 ? pricing.groupDiscountAmount.toString() : null,
-    promoDiscountAmount: pricing.promoDiscountAmount > 0 ? pricing.promoDiscountAmount.toString() : null,
+    groupDiscountAmount:
+      pricing.groupDiscountAmount > 0 ? pricing.groupDiscountAmount.toString() : null,
+    promoDiscountAmount:
+      pricing.promoDiscountAmount > 0 ? pricing.promoDiscountAmount.toString() : null,
   };
 
   if (passType !== undefined) updateData.passType = passType;
@@ -404,10 +449,17 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
   // invoice, re-issue it so the customer gets an updated PDF/email.
   let reissueResult: { reissued?: boolean; alreadyPaid?: boolean; error?: string } = {};
   const billingTouched =
-    billingName !== undefined || billingCompany !== undefined || billingEmail !== undefined ||
-    billingAddressLine1 !== undefined || billingAddressLine2 !== undefined ||
-    billingTown !== undefined || billingRegion !== undefined || billingPostcode !== undefined ||
-    billingCountry !== undefined || billingPhone !== undefined || billingVatNumber !== undefined ||
+    billingName !== undefined ||
+    billingCompany !== undefined ||
+    billingEmail !== undefined ||
+    billingAddressLine1 !== undefined ||
+    billingAddressLine2 !== undefined ||
+    billingTown !== undefined ||
+    billingRegion !== undefined ||
+    billingPostcode !== undefined ||
+    billingCountry !== undefined ||
+    billingPhone !== undefined ||
+    billingVatNumber !== undefined ||
     poNumber !== undefined;
 
   if (admin && billingTouched && updated.paymentMethod === "invoice" && updated.stripeInvoiceId) {
@@ -417,7 +469,11 @@ router.patch("/bookings/:id", async (req, res): Promise<void> => {
         const result = await reissueBookingInvoice(stripe, id);
         reissueResult = result.alreadyPaid ? { alreadyPaid: true } : { reissued: true };
         if (!result.alreadyPaid) {
-          try { await sendReissuedInvoiceEmail(id); } catch (err) { logger.error({ err }, "Failed to send re-issued invoice email"); }
+          try {
+            await sendReissuedInvoiceEmail(id);
+          } catch (err) {
+            logger.error({ err }, "Failed to send re-issued invoice email");
+          }
         }
       } catch (err: any) {
         reissueResult = { error: err?.message || "Re-issue failed" };
@@ -450,7 +506,10 @@ router.get("/bookings/by-management-token/:token/billing", async (req, res): Pro
       const { paid } = await getStripeInvoiceStatus(stripe, booking.stripeInvoiceId);
       if (paid) {
         alreadyPaid = true;
-        await db.update(bookingsTable).set({ status: "paid" }).where(eq(bookingsTable.id, booking.id));
+        await db
+          .update(bookingsTable)
+          .set({ status: "paid" })
+          .where(eq(bookingsTable.id, booking.id));
       }
     }
   }
@@ -503,7 +562,9 @@ router.post("/bookings/by-management-token/:token/billing", async (req, res): Pr
   const settings = await getEventSettings();
   if (settings?.attendeeChangesLocked) {
     res.status(423).json({
-      error: settings.attendeeChangesLockedMessage || "Booking edits are currently locked. Please contact us.",
+      error:
+        settings.attendeeChangesLockedMessage ||
+        "Booking edits are currently locked. Please contact us.",
       locked: true,
     });
     return;
@@ -520,7 +581,10 @@ router.post("/bookings/by-management-token/:token/billing", async (req, res): Pr
     if (stripe) {
       const { paid } = await getStripeInvoiceStatus(stripe, booking.stripeInvoiceId);
       if (paid) {
-        await db.update(bookingsTable).set({ status: "paid" }).where(eq(bookingsTable.id, booking.id));
+        await db
+          .update(bookingsTable)
+          .set({ status: "paid" })
+          .where(eq(bookingsTable.id, booking.id));
         res.status(409).json({ error: "Invoice has already been paid", alreadyPaid: true });
         return;
       }
@@ -573,13 +637,18 @@ router.post("/bookings/by-management-token/:token/billing", async (req, res): Pr
           reissue = { alreadyPaid: true };
         } else {
           reissue = { reissued: true };
-          try { await sendReissuedInvoiceEmail(booking.id); } catch (err) {
+          try {
+            await sendReissuedInvoiceEmail(booking.id);
+          } catch (err) {
             logger.error({ err }, "Failed to send re-issued invoice email");
           }
         }
       } catch (err: any) {
         reissue = { error: err?.message || "Failed to re-issue invoice" };
-        logger.error({ err, bookingId: booking.id }, "Failed to re-issue invoice on self-serve billing edit");
+        logger.error(
+          { err, bookingId: booking.id },
+          "Failed to re-issue invoice on self-serve billing edit",
+        );
       }
     }
   }
@@ -653,12 +722,20 @@ router.post("/bookings/:id/confirm-free", async (req, res): Promise<void> => {
   }
 
   if (existing.promoCode) {
-    const [promo] = await db.select().from(promoCodesTable).where(eq(promoCodesTable.code, existing.promoCode));
+    const [promo] = await db
+      .select()
+      .from(promoCodesTable)
+      .where(eq(promoCodesTable.code, existing.promoCode));
     if (promo?.oncePerCustomer) {
-      const [lead] = await db.select().from(attendeesTable).where(and(eq(attendeesTable.bookingId, id), eq(attendeesTable.isLead, true)));
+      const [lead] = await db
+        .select()
+        .from(attendeesTable)
+        .where(and(eq(attendeesTable.bookingId, id), eq(attendeesTable.isLead, true)));
       const email = (lead?.workEmail || "").trim().toLowerCase();
-      if (email && await isCodeUsedByEmail(existing.promoCode, email)) {
-        res.status(400).json({ error: "This promo code has already been used on a previous booking with this email" });
+      if (email && (await isCodeUsedByEmail(existing.promoCode, email))) {
+        res.status(400).json({
+          error: "This promo code has already been used on a previous booking with this email",
+        });
         return;
       }
     }
@@ -670,13 +747,18 @@ router.post("/bookings/:id/confirm-free", async (req, res): Promise<void> => {
   if (existing.promoCode) {
     const reserved = await incrementPromoUsage(existing.promoCode, existing.quantity);
     if (!reserved) {
-      const [promo] = await db.select().from(promoCodesTable).where(eq(promoCodesTable.code, existing.promoCode));
-      const remaining = promo && promo.maxUses !== null ? Math.max(0, promo.maxUses - promo.usedCount) : 0;
-      const msg = promo?.discountType === "complimentary"
-        ? remaining === 0
-          ? "This complimentary code has been fully redeemed — no tickets remain"
-          : `Only ${remaining} complimentary ticket${remaining === 1 ? "" : "s"} remain on this code — please reduce your quantity`
-        : "This promo code has already been used up";
+      const [promo] = await db
+        .select()
+        .from(promoCodesTable)
+        .where(eq(promoCodesTable.code, existing.promoCode));
+      const remaining =
+        promo && promo.maxUses !== null ? Math.max(0, promo.maxUses - promo.usedCount) : 0;
+      const msg =
+        promo?.discountType === "complimentary"
+          ? remaining === 0
+            ? "This complimentary code has been fully redeemed — no tickets remain"
+            : `Only ${remaining} complimentary ticket${remaining === 1 ? "" : "s"} remain on this code — please reduce your quantity`
+          : "This promo code has already been used up";
       res.status(400).json({ error: msg });
       return;
     }
@@ -689,8 +771,16 @@ router.post("/bookings/:id/confirm-free", async (req, res): Promise<void> => {
     .set({ status: "paid", currentStep: 5, orderReference: orderRef, updatedAt: new Date() })
     .where(eq(bookingsTable.id, id));
 
-  try { await sendBookingEmails(id); } catch (err) { logger.error({ err, bookingId: id }, "confirm-free: failed to send confirmation emails"); }
-  try { await sendOrganiserNotification(id); } catch (err) { logger.error({ err, bookingId: id }, "confirm-free: failed to send organiser notification"); }
+  try {
+    await sendBookingEmails(id);
+  } catch (err) {
+    logger.error({ err, bookingId: id }, "confirm-free: failed to send confirmation emails");
+  }
+  try {
+    await sendOrganiserNotification(id);
+  } catch (err) {
+    logger.error({ err, bookingId: id }, "confirm-free: failed to send organiser notification");
+  }
 
   res.json({ confirmed: true, orderReference: orderRef });
 });
@@ -706,7 +796,11 @@ router.get("/bookings/:id/pricing", async (req, res): Promise<void> => {
   }
 
   const promoCode = req.query.promoCode as string | undefined;
-  const pricing = await calculatePricing(booking.passType, booking.quantity, promoCode || booking.promoCode);
+  const pricing = await calculatePricing(
+    booking.passType,
+    booking.quantity,
+    promoCode || booking.promoCode,
+  );
 
   res.json(pricing);
 });

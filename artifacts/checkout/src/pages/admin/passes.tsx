@@ -2,7 +2,15 @@ import { useState, useEffect, useRef } from "react";
 import AdminLayout from "@/components/layout/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Ticket, Infinity as InfinityIcon, AlertTriangle, Check, Plus, Trash2, GripVertical } from "lucide-react";
+import {
+  Ticket,
+  Infinity as InfinityIcon,
+  AlertTriangle,
+  Check,
+  Plus,
+  Trash2,
+  GripVertical,
+} from "lucide-react";
 
 interface PassInventoryRow {
   passType: string;
@@ -28,7 +36,8 @@ const PASS_TYPES = [
   {
     passType: "business" as const,
     label: "Business Pass",
-    description: "For consultants and vendors — includes everything in the HR pass plus exclusive extras",
+    description:
+      "For consultants and vendors — includes everything in the HR pass plus exclusive extras",
     showExtraBenefits: true,
   },
 ];
@@ -112,8 +121,8 @@ function BenefitsList({
           key={idx}
           draggable
           onDragStart={() => handleDragStart(idx)}
-          onDragOver={e => handleDragOver(e, idx)}
-          onDrop={e => handleDrop(e, idx)}
+          onDragOver={(e) => handleDragOver(e, idx)}
+          onDrop={(e) => handleDrop(e, idx)}
           onDragEnd={handleDragEnd}
           className={`flex items-center gap-2 group transition-opacity ${dragOver === idx && dragging !== idx ? "border-t-2 border-primary" : ""} ${dragging === idx ? "opacity-40" : ""}`}
         >
@@ -132,8 +141,8 @@ function BenefitsList({
         <Input
           ref={inputRef}
           value={draft}
-          onChange={e => setDraft(e.target.value)}
-          onKeyDown={e => {
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
               add();
@@ -179,7 +188,7 @@ export default function AdminPasses() {
   useEffect(() => {
     setInvLoading(true);
     adminFetch("/api/admin/passes/inventory")
-      .then(res => res.ok ? res.json() : [])
+      .then((res) => (res.ok ? res.json() : []))
       .then((rows: PassInventoryRow[]) => {
         const inv: Record<string, number | null> = { single: null, business: null };
         const inp: Record<string, string> = { single: "", business: "" };
@@ -196,7 +205,7 @@ export default function AdminPasses() {
   useEffect(() => {
     setCfgLoading(true);
     adminFetch("/api/admin/passes/config")
-      .then(res => res.ok ? res.json() : {})
+      .then((res) => (res.ok ? res.json() : {}))
       .then((data: Record<string, PassConfig | null>) => {
         setConfigs(data);
         const drafts: Record<string, PassConfig> = {};
@@ -217,18 +226,21 @@ export default function AdminPasses() {
   }, []);
 
   const handleInvSave = async (passType: string) => {
-    setInvErrors(e => ({ ...e, [passType]: "" }));
+    setInvErrors((e) => ({ ...e, [passType]: "" }));
     const raw = invInputs[passType].trim();
     let val: number | null = null;
     if (raw !== "") {
       const n = parseInt(raw, 10);
       if (isNaN(n) || n < 0) {
-        setInvErrors(e => ({ ...e, [passType]: "Enter a positive number, or leave blank for unlimited" }));
+        setInvErrors((e) => ({
+          ...e,
+          [passType]: "Enter a positive number, or leave blank for unlimited",
+        }));
         return;
       }
       val = n;
     }
-    setInvSaving(s => ({ ...s, [passType]: true }));
+    setInvSaving((s) => ({ ...s, [passType]: true }));
     try {
       const res = await adminFetch(`/api/admin/passes/inventory/${passType}`, {
         method: "PUT",
@@ -236,39 +248,39 @@ export default function AdminPasses() {
       });
       if (res.ok) {
         const row: PassInventoryRow = await res.json();
-        setInventory(i => ({ ...i, [passType]: row.remaining }));
-        setInvSaved(s => ({ ...s, [passType]: true }));
-        setTimeout(() => setInvSaved(s => ({ ...s, [passType]: false })), 2000);
+        setInventory((i) => ({ ...i, [passType]: row.remaining }));
+        setInvSaved((s) => ({ ...s, [passType]: true }));
+        setTimeout(() => setInvSaved((s) => ({ ...s, [passType]: false })), 2000);
       } else {
         const body = await res.json().catch(() => ({}));
-        setInvErrors(e => ({ ...e, [passType]: body.error || "Failed to save" }));
+        setInvErrors((e) => ({ ...e, [passType]: body.error || "Failed to save" }));
       }
     } finally {
-      setInvSaving(s => ({ ...s, [passType]: false }));
+      setInvSaving((s) => ({ ...s, [passType]: false }));
     }
   };
 
   const handleCfgSave = async (passType: string) => {
-    setCfgErrors(e => ({ ...e, [passType]: "" }));
+    setCfgErrors((e) => ({ ...e, [passType]: "" }));
     const draft = cfgDrafts[passType];
     if (!draft) return;
 
     const curPrice = parseFloat(draft.currentPrice);
     const origPrice = parseFloat(draft.originalPrice);
     if (isNaN(curPrice) || curPrice < 0) {
-      setCfgErrors(e => ({ ...e, [passType]: "Enter a valid current price" }));
+      setCfgErrors((e) => ({ ...e, [passType]: "Enter a valid current price" }));
       return;
     }
     if (isNaN(origPrice) || origPrice < 0) {
-      setCfgErrors(e => ({ ...e, [passType]: "Enter a valid original (full) price" }));
+      setCfgErrors((e) => ({ ...e, [passType]: "Enter a valid original (full) price" }));
       return;
     }
     if (!draft.pricingPeriodName.trim()) {
-      setCfgErrors(e => ({ ...e, [passType]: "Pricing period name is required" }));
+      setCfgErrors((e) => ({ ...e, [passType]: "Pricing period name is required" }));
       return;
     }
 
-    setCfgSaving(s => ({ ...s, [passType]: true }));
+    setCfgSaving((s) => ({ ...s, [passType]: true }));
     try {
       const res = await adminFetch(`/api/admin/passes/config/${passType}`, {
         method: "PUT",
@@ -282,20 +294,24 @@ export default function AdminPasses() {
       });
       if (res.ok) {
         const row: PassConfig = await res.json();
-        setConfigs(c => ({ ...c, [passType]: row }));
-        setCfgSaved(s => ({ ...s, [passType]: true }));
-        setTimeout(() => setCfgSaved(s => ({ ...s, [passType]: false })), 2000);
+        setConfigs((c) => ({ ...c, [passType]: row }));
+        setCfgSaved((s) => ({ ...s, [passType]: true }));
+        setTimeout(() => setCfgSaved((s) => ({ ...s, [passType]: false })), 2000);
       } else {
         const body = await res.json().catch(() => ({}));
-        setCfgErrors(e => ({ ...e, [passType]: body.error || "Failed to save" }));
+        setCfgErrors((e) => ({ ...e, [passType]: body.error || "Failed to save" }));
       }
     } finally {
-      setCfgSaving(s => ({ ...s, [passType]: false }));
+      setCfgSaving((s) => ({ ...s, [passType]: false }));
     }
   };
 
-  const updateDraft = (passType: string, field: keyof PassConfig, value: PassConfig[keyof PassConfig]) => {
-    setCfgDrafts(d => ({ ...d, [passType]: { ...d[passType], [field]: value } }));
+  const updateDraft = (
+    passType: string,
+    field: keyof PassConfig,
+    value: PassConfig[keyof PassConfig],
+  ) => {
+    setCfgDrafts((d) => ({ ...d, [passType]: { ...d[passType], [field]: value } }));
   };
 
   const discountPct = (passType: string) => {
@@ -336,7 +352,8 @@ export default function AdminPasses() {
         {activeTab === "config" && (
           <div className="space-y-6">
             <p className="text-muted-foreground text-sm">
-              Configure pricing, the current pricing period name, and what's included in each pass. Changes appear immediately on the checkout page.
+              Configure pricing, the current pricing period name, and what's included in each pass.
+              Changes appear immediately on the checkout page.
             </p>
 
             {cfgLoading ? (
@@ -371,10 +388,12 @@ export default function AdminPasses() {
                             min="0"
                             step="1"
                             value={draft.currentPrice}
-                            onChange={e => updateDraft(passType, "currentPrice", e.target.value)}
+                            onChange={(e) => updateDraft(passType, "currentPrice", e.target.value)}
                             className="h-10"
                           />
-                          <p className="text-xs text-muted-foreground mt-1">The price buyers pay now</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            The price buyers pay now
+                          </p>
                         </div>
                         <div>
                           <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
@@ -385,10 +404,12 @@ export default function AdminPasses() {
                             min="0"
                             step="1"
                             value={draft.originalPrice}
-                            onChange={e => updateDraft(passType, "originalPrice", e.target.value)}
+                            onChange={(e) => updateDraft(passType, "originalPrice", e.target.value)}
                             className="h-10"
                           />
-                          <p className="text-xs text-muted-foreground mt-1">Shown as strikethrough</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Shown as strikethrough
+                          </p>
                         </div>
                         <div>
                           <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
@@ -398,16 +419,22 @@ export default function AdminPasses() {
                             type="text"
                             placeholder="e.g. Early Bird"
                             value={draft.pricingPeriodName}
-                            onChange={e => updateDraft(passType, "pricingPeriodName", e.target.value)}
+                            onChange={(e) =>
+                              updateDraft(passType, "pricingPeriodName", e.target.value)
+                            }
                             className="h-10"
                           />
-                          <p className="text-xs text-muted-foreground mt-1">Shown below the price</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Shown below the price
+                          </p>
                         </div>
                       </div>
 
                       {pct !== null && (
                         <div className="bg-green-50 border border-green-200 rounded-sm px-4 py-2.5 text-sm text-green-800 font-medium">
-                          Discount badge will show: <strong>{pct}% off</strong> (£{parseFloat(draft.currentPrice).toFixed(0)} vs £{parseFloat(draft.originalPrice).toFixed(0)})
+                          Discount badge will show: <strong>{pct}% off</strong> (£
+                          {parseFloat(draft.currentPrice).toFixed(0)} vs £
+                          {parseFloat(draft.originalPrice).toFixed(0)})
                         </div>
                       )}
 
@@ -417,7 +444,7 @@ export default function AdminPasses() {
                         </label>
                         <BenefitsList
                           benefits={draft.benefits}
-                          onChange={list => updateDraft(passType, "benefits", list)}
+                          onChange={(list) => updateDraft(passType, "benefits", list)}
                           placeholder="Add an included benefit…"
                         />
                       </div>
@@ -427,10 +454,13 @@ export default function AdminPasses() {
                           <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
                             Exclusive to Business Pass
                           </label>
-                          <p className="text-xs text-muted-foreground mb-3">These extras are shown separately with a gold accent below the standard benefits.</p>
+                          <p className="text-xs text-muted-foreground mb-3">
+                            These extras are shown separately with a gold accent below the standard
+                            benefits.
+                          </p>
                           <BenefitsList
                             benefits={draft.extraBenefits}
-                            onChange={list => updateDraft(passType, "extraBenefits", list)}
+                            onChange={(list) => updateDraft(passType, "extraBenefits", list)}
                             placeholder="Add an exclusive benefit…"
                           />
                         </div>
@@ -447,8 +477,14 @@ export default function AdminPasses() {
                           className={`h-10 px-6 ${cfgSaved[passType] ? "bg-green-600 hover:bg-green-700" : "bg-primary hover:bg-primary/90"} text-white`}
                         >
                           {cfgSaved[passType] ? (
-                            <span className="flex items-center gap-1.5"><Check className="w-4 h-4" /> Saved</span>
-                          ) : cfgSaving[passType] ? "Saving…" : "Save Changes"}
+                            <span className="flex items-center gap-1.5">
+                              <Check className="w-4 h-4" /> Saved
+                            </span>
+                          ) : cfgSaving[passType] ? (
+                            "Saving…"
+                          ) : (
+                            "Save Changes"
+                          )}
                         </Button>
                       </div>
                     </div>
@@ -462,15 +498,17 @@ export default function AdminPasses() {
         {activeTab === "inventory" && (
           <div className="space-y-4">
             <p className="text-muted-foreground text-sm">
-              Set the number of remaining tickets for each pass type. When a count is configured, it will be 
-              displayed on the checkout as urgency messaging to encourage bookings. Leave blank for unlimited.
+              Set the number of remaining tickets for each pass type. When a count is configured, it
+              will be displayed on the checkout as urgency messaging to encourage bookings. Leave
+              blank for unlimited.
             </p>
 
             <div className="bg-amber-50 border border-amber-200 rounded-sm p-4 flex gap-3">
               <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
               <p className="text-sm text-amber-800">
-                These counts are informational only — the checkout does not enforce them or prevent over-booking. 
-                They are purely for displaying urgency messaging to prospective attendees.
+                These counts are informational only — the checkout does not enforce them or prevent
+                over-booking. They are purely for displaying urgency messaging to prospective
+                attendees.
               </p>
             </div>
 
@@ -499,8 +537,10 @@ export default function AdminPasses() {
                                 min="0"
                                 placeholder="Unlimited"
                                 value={invInputs[passType]}
-                                onChange={e => setInvInputs(i => ({ ...i, [passType]: e.target.value }))}
-                                onKeyDown={e => e.key === "Enter" && handleInvSave(passType)}
+                                onChange={(e) =>
+                                  setInvInputs((i) => ({ ...i, [passType]: e.target.value }))
+                                }
+                                onKeyDown={(e) => e.key === "Enter" && handleInvSave(passType)}
                                 className="h-10"
                               />
                             </div>
@@ -510,14 +550,20 @@ export default function AdminPasses() {
                               className={`h-10 ${invSaved[passType] ? "bg-green-600 hover:bg-green-700" : "bg-primary hover:bg-primary/90"} text-white`}
                             >
                               {invSaved[passType] ? (
-                                <span className="flex items-center gap-1.5"><Check className="w-4 h-4" /> Saved</span>
-                              ) : invSaving[passType] ? "Saving…" : "Save"}
+                                <span className="flex items-center gap-1.5">
+                                  <Check className="w-4 h-4" /> Saved
+                                </span>
+                              ) : invSaving[passType] ? (
+                                "Saving…"
+                              ) : (
+                                "Save"
+                              )}
                             </Button>
                             {invInputs[passType] !== "" && (
                               <Button
                                 variant="outline"
                                 className="h-10"
-                                onClick={() => setInvInputs(i => ({ ...i, [passType]: "" }))}
+                                onClick={() => setInvInputs((i) => ({ ...i, [passType]: "" }))}
                               >
                                 Set Unlimited
                               </Button>
@@ -532,22 +578,30 @@ export default function AdminPasses() {
                             {current === null ? (
                               <>
                                 <InfinityIcon className="w-4 h-4 text-muted-foreground" />
-                                <span className="text-muted-foreground">Currently showing as <strong>unlimited</strong> on checkout</span>
+                                <span className="text-muted-foreground">
+                                  Currently showing as <strong>unlimited</strong> on checkout
+                                </span>
                               </>
                             ) : current <= 10 ? (
                               <>
                                 <span className="inline-block w-2 h-2 rounded-full bg-red-500 shrink-0" />
-                                <span className="text-red-700 font-semibold">Only {current} left — high urgency shown on checkout</span>
+                                <span className="text-red-700 font-semibold">
+                                  Only {current} left — high urgency shown on checkout
+                                </span>
                               </>
                             ) : current <= 30 ? (
                               <>
                                 <span className="inline-block w-2 h-2 rounded-full bg-amber-500 shrink-0" />
-                                <span className="text-amber-700 font-semibold">{current} remaining — urgency shown on checkout</span>
+                                <span className="text-amber-700 font-semibold">
+                                  {current} remaining — urgency shown on checkout
+                                </span>
                               </>
                             ) : (
                               <>
                                 <span className="inline-block w-2 h-2 rounded-full bg-green-500 shrink-0" />
-                                <span className="text-muted-foreground">{current} remaining shown on checkout</span>
+                                <span className="text-muted-foreground">
+                                  {current} remaining shown on checkout
+                                </span>
                               </>
                             )}
                           </div>

@@ -28,8 +28,11 @@ function fmtDate(iso: string | null | undefined) {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "—";
   return d.toLocaleString("en-GB", {
-    day: "numeric", month: "short", year: "numeric",
-    hour: "2-digit", minute: "2-digit",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -41,9 +44,7 @@ function StatusBadge({ status }: { status: string }) {
         ? "bg-blue-100 text-blue-800"
         : "bg-yellow-100 text-yellow-800";
   return (
-    <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${cls}`}>
-      {status}
-    </span>
+    <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${cls}`}>{status}</span>
   );
 }
 
@@ -68,13 +69,17 @@ function CompletedTable({ rows }: { rows: RegRow[] }) {
                 <td className="px-6 py-4 font-mono font-medium">{reg.orderReference || "—"}</td>
                 <td className="px-6 py-4">
                   <p className="font-bold">{reg.leadName || reg.billingName || "Unknown"}</p>
-                  <p className="text-xs text-muted-foreground">{reg.leadCompany || reg.billingCompany}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {reg.leadCompany || reg.billingCompany}
+                  </p>
                 </td>
                 <td className="px-6 py-4">
                   <span className="capitalize">{reg.passType}</span>
                   <span className="text-muted-foreground ml-1">(×{reg.quantity})</span>
                 </td>
-                <td className="px-6 py-4 font-medium">£{Number(reg.totalAmount).toLocaleString()}</td>
+                <td className="px-6 py-4 font-medium">
+                  £{Number(reg.totalAmount).toLocaleString()}
+                </td>
                 <td className="px-6 py-4">
                   <StatusBadge status={reg.status} />
                 </td>
@@ -159,7 +164,7 @@ export default function AdminDashboard() {
   const { data: stats, isLoading } = useGetAdminStats({
     query: {
       queryKey: ["adminStats"],
-    }
+    },
   });
 
   if (isLoading || !stats) {
@@ -181,20 +186,26 @@ export default function AdminDashboard() {
         <Card className="p-5 border-l-4 border-l-primary rounded-sm shadow-sm col-span-2 lg:col-span-1">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Total Revenue</p>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
+                Total Revenue
+              </p>
               <h2 className="text-3xl font-bold">£{stats.totalRevenue.toLocaleString()}</h2>
             </div>
             <div className="p-2 bg-primary/10 rounded-full">
               <TrendingUp className="w-5 h-5 text-primary" />
             </div>
           </div>
-          <p className="text-xs text-muted-foreground mt-3">+ £{stats.totalVat.toLocaleString()} VAT</p>
+          <p className="text-xs text-muted-foreground mt-3">
+            + £{stats.totalVat.toLocaleString()} VAT
+          </p>
         </Card>
 
         <Card className="p-5 border-l-4 border-l-secondary rounded-sm shadow-sm">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Completed</p>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
+                Completed
+              </p>
               <h2 className="text-3xl font-bold">{stats.completedRegistrations}</h2>
             </div>
             <div className="p-2 bg-secondary/10 rounded-full">
@@ -207,7 +218,9 @@ export default function AdminDashboard() {
         <Card className="p-5 border-l-4 border-l-yellow-400 rounded-sm shadow-sm">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Partial</p>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
+                Partial
+              </p>
               <h2 className="text-3xl font-bold">{stats.partialRegistrations}</h2>
             </div>
             <div className="p-2 bg-yellow-100 rounded-full">
@@ -220,7 +233,9 @@ export default function AdminDashboard() {
         <Card className="p-5 border-l-4 border-l-accent rounded-sm shadow-sm">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Card Payments</p>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
+                Card Payments
+              </p>
               <h2 className="text-3xl font-bold">{stats.paymentMethodCounts.card}</h2>
             </div>
             <div className="p-2 bg-accent/20 rounded-full">
@@ -232,7 +247,9 @@ export default function AdminDashboard() {
         <Card className="p-5 border-l-4 border-l-blue-500 rounded-sm shadow-sm">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Invoices</p>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
+                Invoices
+              </p>
               <h2 className="text-3xl font-bold">{stats.paymentMethodCounts.invoice}</h2>
             </div>
             <div className="p-2 bg-blue-500/10 rounded-full">
@@ -274,7 +291,12 @@ export default function AdminDashboard() {
                   <span className="font-medium">{stats.passCounts.single}</span>
                 </div>
                 <div className="w-full bg-muted h-2 rounded-full overflow-hidden">
-                  <div className="bg-primary h-full" style={{ width: `${(stats.passCounts.single / Math.max(1, stats.completedRegistrations)) * 100}%` }}></div>
+                  <div
+                    className="bg-primary h-full"
+                    style={{
+                      width: `${(stats.passCounts.single / Math.max(1, stats.completedRegistrations)) * 100}%`,
+                    }}
+                  ></div>
                 </div>
               </div>
               <div>
@@ -283,7 +305,12 @@ export default function AdminDashboard() {
                   <span className="font-medium">{stats.passCounts.business}</span>
                 </div>
                 <div className="w-full bg-muted h-2 rounded-full overflow-hidden">
-                  <div className="bg-slate-800 h-full" style={{ width: `${(stats.passCounts.business / Math.max(1, stats.completedRegistrations)) * 100}%` }}></div>
+                  <div
+                    className="bg-slate-800 h-full"
+                    style={{
+                      width: `${(stats.passCounts.business / Math.max(1, stats.completedRegistrations)) * 100}%`,
+                    }}
+                  ></div>
                 </div>
               </div>
             </div>

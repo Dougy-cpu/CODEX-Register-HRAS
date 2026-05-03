@@ -10,11 +10,11 @@ import { useQueryClient } from "@tanstack/react-query";
 export default function AdminDiscountTiers() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("single");
-  
+
   const { data: tiers, isLoading } = useListDiscountTiers({
     query: {
       queryKey: ["discountTiers"],
-    }
+    },
   });
 
   const updateTiers = useUpdateDiscountTiers();
@@ -24,8 +24,8 @@ export default function AdminDiscountTiers() {
   // Sync server data to local state when it arrives
   if (tiers && Object.keys(localTiers).length === 0) {
     const grouped = {
-      single: tiers.filter(t => t.passType === "single"),
-      business: tiers.filter(t => t.passType === "business"),
+      single: tiers.filter((t) => t.passType === "single"),
+      business: tiers.filter((t) => t.passType === "business"),
     };
     setLocalTiers(grouped);
   }
@@ -35,12 +35,12 @@ export default function AdminDiscountTiers() {
     await updateTiers.mutateAsync({
       data: {
         passType: passType as "single" | "business",
-        tiers: passTiers.map(t => ({
+        tiers: passTiers.map((t) => ({
           minQuantity: Number(t.minQuantity),
           discountPercent: Number(t.discountPercent),
-          label: t.label || null
-        }))
-      }
+          label: t.label || null,
+        })),
+      },
     });
     queryClient.invalidateQueries({ queryKey: ["discountTiers"] });
   };
@@ -49,7 +49,7 @@ export default function AdminDiscountTiers() {
     const current = localTiers[passType] || [];
     setLocalTiers({
       ...localTiers,
-      [passType]: [...current, { minQuantity: 2, discountPercent: 10, label: "" }]
+      [passType]: [...current, { minQuantity: 2, discountPercent: 10, label: "" }],
     });
   };
 
@@ -57,7 +57,7 @@ export default function AdminDiscountTiers() {
     const current = localTiers[passType] || [];
     setLocalTiers({
       ...localTiers,
-      [passType]: current.filter((_, i) => i !== index)
+      [passType]: current.filter((_, i) => i !== index),
     });
   };
 
@@ -66,7 +66,7 @@ export default function AdminDiscountTiers() {
     current[index] = { ...current[index], [field]: value };
     setLocalTiers({
       ...localTiers,
-      [passType]: current
+      [passType]: current,
     });
   };
 
@@ -82,7 +82,7 @@ export default function AdminDiscountTiers() {
 
   const renderTabContent = (passType: string) => {
     const passTiers = localTiers[passType] || [];
-    
+
     return (
       <div className="bg-white p-6 border border-border shadow-sm mt-6">
         <div className="flex justify-between items-center mb-6">
@@ -102,32 +102,37 @@ export default function AdminDiscountTiers() {
               <div className="col-span-5">Label (Optional)</div>
               <div className="col-span-1 text-right"></div>
             </div>
-            
+
             {passTiers.map((tier, idx) => (
               <div key={idx} className="grid grid-cols-12 gap-4 items-center">
                 <div className="col-span-3">
-                  <Input 
-                    type="number" 
-                    value={tier.minQuantity} 
-                    onChange={e => updateTier(passType, idx, "minQuantity", e.target.value)} 
+                  <Input
+                    type="number"
+                    value={tier.minQuantity}
+                    onChange={(e) => updateTier(passType, idx, "minQuantity", e.target.value)}
                   />
                 </div>
                 <div className="col-span-3">
-                  <Input 
-                    type="number" 
-                    value={tier.discountPercent} 
-                    onChange={e => updateTier(passType, idx, "discountPercent", e.target.value)} 
+                  <Input
+                    type="number"
+                    value={tier.discountPercent}
+                    onChange={(e) => updateTier(passType, idx, "discountPercent", e.target.value)}
                   />
                 </div>
                 <div className="col-span-5">
-                  <Input 
-                    value={tier.label || ""} 
+                  <Input
+                    value={tier.label || ""}
                     placeholder="e.g. Group Discount"
-                    onChange={e => updateTier(passType, idx, "label", e.target.value)} 
+                    onChange={(e) => updateTier(passType, idx, "label", e.target.value)}
                   />
                 </div>
                 <div className="col-span-1 text-right">
-                  <Button variant="ghost" size="icon" onClick={() => removeTier(passType, idx)} className="text-destructive">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeTier(passType, idx)}
+                    className="text-destructive"
+                  >
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
@@ -147,12 +152,24 @@ export default function AdminDiscountTiers() {
 
   return (
     <AdminLayout title="Volume Discounts">
-      <p className="text-muted-foreground mb-8">Configure automatic group discounts applied based on the number of attendees.</p>
+      <p className="text-muted-foreground mb-8">
+        Configure automatic group discounts applied based on the number of attendees.
+      </p>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="bg-white border border-border h-12 w-full justify-start rounded-none">
-          <TabsTrigger value="single" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-8 rounded-none">Single Pass</TabsTrigger>
-          <TabsTrigger value="business" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-8 rounded-none">Business Pass</TabsTrigger>
+          <TabsTrigger
+            value="single"
+            className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-8 rounded-none"
+          >
+            Single Pass
+          </TabsTrigger>
+          <TabsTrigger
+            value="business"
+            className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary h-full px-8 rounded-none"
+          >
+            Business Pass
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="single">{renderTabContent("single")}</TabsContent>
         <TabsContent value="business">{renderTabContent("business")}</TabsContent>

@@ -59,7 +59,7 @@ async function getOrCreateVatRate(stripe: Stripe): Promise<string | null> {
 
 export async function getStripeInvoiceStatus(
   stripe: Stripe,
-  invoiceId: string
+  invoiceId: string,
 ): Promise<{ status: Stripe.Invoice.Status | null; paid: boolean }> {
   try {
     const inv = await stripe.invoices.retrieve(invoiceId);
@@ -81,7 +81,7 @@ export async function getStripeInvoiceStatus(
  */
 export async function reissueBookingInvoice(
   stripe: Stripe,
-  bookingId: number
+  bookingId: number,
 ): Promise<
   | { alreadyPaid: true }
   | {
@@ -104,10 +104,7 @@ export async function reissueBookingInvoice(
   if (booking.stripeInvoiceId) {
     const { paid, status } = await getStripeInvoiceStatus(stripe, booking.stripeInvoiceId);
     if (paid) {
-      await db
-        .update(bookingsTable)
-        .set({ status: "paid" })
-        .where(eq(bookingsTable.id, bookingId));
+      await db.update(bookingsTable).set({ status: "paid" }).where(eq(bookingsTable.id, bookingId));
       return { alreadyPaid: true };
     }
     // Void the existing invoice if it's still open/finalized/uncollectible.
@@ -128,7 +125,10 @@ export async function reissueBookingInvoice(
     }
   }
 
-  const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, bookingId));
+  const attendees = await db
+    .select()
+    .from(attendeesTable)
+    .where(eq(attendeesTable.bookingId, bookingId));
   const lead = attendees.find((a) => a.isLead) || attendees[0];
   if (!lead) throw new Error("No attendee found for booking");
 
@@ -151,9 +151,7 @@ export async function reissueBookingInvoice(
         state: booking.billingRegion || undefined,
         postal_code: booking.billingPostcode || undefined,
         country:
-          booking.billingCountry === "United Kingdom"
-            ? "GB"
-            : (booking.billingCountry || "GB"),
+          booking.billingCountry === "United Kingdom" ? "GB" : booking.billingCountry || "GB",
       }
     : undefined;
 
@@ -169,7 +167,10 @@ export async function reissueBookingInvoice(
         ...(addressInput ? { address: addressInput } : {}),
       });
     } catch (err) {
-      logger.warn({ err, customerId: customer.id }, "Failed to sync Stripe customer billing details");
+      logger.warn(
+        { err, customerId: customer.id },
+        "Failed to sync Stripe customer billing details",
+      );
     }
   } else {
     customer = await stripe.customers.create({

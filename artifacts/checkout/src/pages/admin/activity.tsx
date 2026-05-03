@@ -176,9 +176,7 @@ function FeedCard({ item }: { item: FeedItem }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2 flex-wrap">
           <div>
-            <span className={`font-semibold text-sm ${cfg.color}`}>
-              {cfg.label}
-            </span>
+            <span className={`font-semibold text-sm ${cfg.color}`}>{cfg.label}</span>
             {item.booking && (
               <span className="ml-2 text-sm text-slate-600 font-mono">
                 {item.booking.orderReference}
@@ -207,10 +205,12 @@ function FeedCard({ item }: { item: FeedItem }) {
                     ? `${item.attendee.firstName} ${item.attendee.lastName}`
                     : item.booking?.billingName || "—"}
                 </span>
-                {(item.attendee?.jobTitle || item.attendee?.company || item.booking?.billingCompany) && (
+                {(item.attendee?.jobTitle ||
+                  item.attendee?.company ||
+                  item.booking?.billingCompany) && (
                   <span className="text-slate-500">
                     {item.attendee?.jobTitle ? ` · ${item.attendee.jobTitle}` : ""}
-                    {(item.attendee?.company || item.booking?.billingCompany)
+                    {item.attendee?.company || item.booking?.billingCompany
                       ? `, ${item.attendee?.company || item.booking?.billingCompany}`
                       : ""}
                   </span>
@@ -225,9 +225,7 @@ function FeedCard({ item }: { item: FeedItem }) {
                 <span>{item.attendee?.phone || item.booking?.billingPhone}</span>
               )}
             </div>
-            {passLabel && (
-              <div className="text-xs text-slate-500">{passLabel}</div>
-            )}
+            {passLabel && <div className="text-xs text-slate-500">{passLabel}</div>}
           </div>
         ) : (
           <>
@@ -235,10 +233,7 @@ function FeedCard({ item }: { item: FeedItem }) {
               <div className="mt-1 text-sm text-slate-700">
                 <span className="font-medium">{item.booking.billingName}</span>
                 {item.booking.billingCompany && (
-                  <span className="text-slate-500">
-                    {" "}
-                    · {item.booking.billingCompany}
-                  </span>
+                  <span className="text-slate-500"> · {item.booking.billingCompany}</span>
                 )}
                 <span className="text-slate-500"> · {passLabel}</span>
                 <span className="ml-2 font-semibold text-slate-900">
@@ -263,12 +258,9 @@ function FeedCard({ item }: { item: FeedItem }) {
 
         {item.type === "email_failure" && item.data && (
           <div className="mt-1 text-sm text-red-600">
-            {String(item.data.emailType || "Email")} to{" "}
-            {String(item.data.toEmail || "unknown")}
+            {String(item.data.emailType || "Email")} to {String(item.data.toEmail || "unknown")}
             {Boolean(item.data.error) && (
-              <span className="block text-xs text-red-500 mt-0.5">
-                {String(item.data.error)}
-              </span>
+              <span className="block text-xs text-red-500 mt-0.5">{String(item.data.error)}</span>
             )}
           </div>
         )}
@@ -329,8 +321,7 @@ export default function AdminActivity() {
     alerts: ["invoice_overdue", "email_failure"],
   };
 
-  const filteredFeed =
-    data?.feed.filter((item) => filterMap[filter]?.includes(item.type)) ?? [];
+  const filteredFeed = data?.feed.filter((item) => filterMap[filter]?.includes(item.type)) ?? [];
 
   const stats = data?.stats;
 
@@ -351,9 +342,7 @@ export default function AdminActivity() {
                   <p className="text-2xl font-bold text-slate-900">
                     {stats?.unpaidInvoices ?? "—"}
                   </p>
-                  <p className="text-xs text-slate-500 font-medium">
-                    Unpaid Invoices
-                  </p>
+                  <p className="text-xs text-slate-500 font-medium">Unpaid Invoices</p>
                 </div>
               </div>
             </CardContent>
@@ -368,12 +357,8 @@ export default function AdminActivity() {
                   <Users className="w-5 h-5 text-orange-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-slate-900">
-                    {stats?.tbcAttendees ?? "—"}
-                  </p>
-                  <p className="text-xs text-slate-500 font-medium">
-                    TBC Seats
-                  </p>
+                  <p className="text-2xl font-bold text-slate-900">{stats?.tbcAttendees ?? "—"}</p>
+                  <p className="text-xs text-slate-500 font-medium">TBC Seats</p>
                 </div>
               </div>
             </CardContent>
@@ -388,12 +373,8 @@ export default function AdminActivity() {
                   <Mail className="w-5 h-5 text-red-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-slate-900">
-                    {stats?.emailFailures ?? "—"}
-                  </p>
-                  <p className="text-xs text-slate-500 font-medium">
-                    Email Failures
-                  </p>
+                  <p className="text-2xl font-bold text-slate-900">{stats?.emailFailures ?? "—"}</p>
+                  <p className="text-xs text-slate-500 font-medium">Email Failures</p>
                 </div>
               </div>
             </CardContent>
@@ -409,9 +390,7 @@ export default function AdminActivity() {
                   <p className="text-2xl font-bold text-slate-900">
                     {stats?.totalThisMonth ?? "—"}
                   </p>
-                  <p className="text-xs text-slate-500 font-medium">
-                    This Month
-                  </p>
+                  <p className="text-xs text-slate-500 font-medium">This Month</p>
                 </div>
               </div>
             </CardContent>
@@ -430,9 +409,7 @@ export default function AdminActivity() {
                   <p className="text-2xl font-bold text-slate-900">
                     {stats?.partialCheckouts ?? "—"}
                   </p>
-                  <p className="text-xs text-slate-500 font-medium">
-                    Partial Checkouts
-                  </p>
+                  <p className="text-xs text-slate-500 font-medium">Partial Checkouts</p>
                 </div>
               </div>
             </CardContent>
@@ -452,8 +429,7 @@ export default function AdminActivity() {
               <div className="divide-y divide-amber-200">
                 {data.unpaidInvoiceList.map((b) => {
                   if (!b) return null;
-                  const isOverdue =
-                    b.invoiceDueDate && new Date(b.invoiceDueDate) < new Date();
+                  const isOverdue = b.invoiceDueDate && new Date(b.invoiceDueDate) < new Date();
                   return (
                     <div
                       key={b.id}
@@ -475,10 +451,10 @@ export default function AdminActivity() {
                         {b.invoiceDueDate && (
                           <span className="text-xs text-slate-500">
                             Due{" "}
-                            {new Date(b.invoiceDueDate).toLocaleDateString(
-                              "en-GB",
-                              { day: "numeric", month: "short" }
-                            )}
+                            {new Date(b.invoiceDueDate).toLocaleDateString("en-GB", {
+                              day: "numeric",
+                              month: "short",
+                            })}
                           </span>
                         )}
                         {isOverdue ? (
@@ -509,9 +485,7 @@ export default function AdminActivity() {
                 disabled={refreshing}
                 className="gap-2"
               >
-                <RefreshCw
-                  className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`}
-                />
+                <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
                 Refresh
               </Button>
             </div>

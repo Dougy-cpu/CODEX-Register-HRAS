@@ -30,34 +30,12 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: [
-          "'self'",
-          "https://js.stripe.com",
-          "'unsafe-inline'",
-        ],
-        frameSrc: [
-          "'self'",
-          "https://js.stripe.com",
-        ],
-        connectSrc: [
-          "'self'",
-          "https://api.stripe.com",
-          "https://js.stripe.com",
-        ],
-        imgSrc: [
-          "'self'",
-          "data:",
-          "https://q.stripe.com",
-        ],
-        styleSrc: [
-          "'self'",
-          "'unsafe-inline'",
-          "https://fonts.googleapis.com",
-        ],
-        fontSrc: [
-          "'self'",
-          "https://fonts.gstatic.com",
-        ],
+        scriptSrc: ["'self'", "https://js.stripe.com", "'unsafe-inline'"],
+        frameSrc: ["'self'", "https://js.stripe.com"],
+        connectSrc: ["'self'", "https://api.stripe.com", "https://js.stripe.com"],
+        imgSrc: ["'self'", "data:", "https://q.stripe.com"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
         formAction: ["'self'"],

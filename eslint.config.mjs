@@ -4,12 +4,7 @@ import reactHooks from "eslint-plugin-react-hooks";
 
 export default tseslint.config(
   {
-    ignores: [
-      ".local/**",
-      "**/node_modules/**",
-      "**/dist/**",
-      "**/build/**",
-    ],
+    ignores: [".local/**", "**/node_modules/**", "**/dist/**", "**/build/**"],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
@@ -31,5 +26,5 @@ export default tseslint.config(
       ],
       "@typescript-eslint/no-explicit-any": "warn",
     },
-  }
+  },
 );
