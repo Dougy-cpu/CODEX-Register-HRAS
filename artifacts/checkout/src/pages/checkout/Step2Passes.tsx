@@ -25,6 +25,7 @@ import {
   X,
 } from "lucide-react";
 import type { BookingWithAttendees } from "@/types/booking";
+import { CompShortfallPrompt } from "./CompShortfallPrompt";
 
 interface Step2PassesProps {
   booking: BookingWithAttendees;
@@ -906,39 +907,12 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
                   </button>
                 </div>
                 {compShortfall && compRemaining !== null && (
-                  <div className="bg-amber-50 border border-amber-300 px-3 py-2.5 text-sm text-amber-900 space-y-2">
-                    <p className="font-semibold">
-                      Only {compRemaining} complimentary ticket{compRemaining === 1 ? "" : "s"}{" "}
-                      {compRemaining === 1 ? "remains" : "remain"} on this code, but you've selected{" "}
-                      {quantity}.
-                    </p>
-                    <p className="text-xs">
-                      Reduce your quantity to use the code, or remove the code to keep all{" "}
-                      {quantity} tickets at the standard price.
-                    </p>
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {compRemaining > 0 && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="h-8 border-amber-400 bg-white hover:bg-amber-100"
-                          onClick={handleReduceToCompCap}
-                        >
-                          Reduce to {compRemaining} ticket{compRemaining === 1 ? "" : "s"}
-                        </Button>
-                      )}
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="h-8 border-amber-400 bg-white hover:bg-amber-100"
-                        onClick={handleRemovePromo}
-                      >
-                        Keep my quantity (remove code)
-                      </Button>
-                    </div>
-                  </div>
+                  <CompShortfallPrompt
+                    remaining={compRemaining}
+                    quantity={quantity}
+                    onReduce={handleReduceToCompCap}
+                    onRemove={handleRemovePromo}
+                  />
                 )}
               </>
             ) : (

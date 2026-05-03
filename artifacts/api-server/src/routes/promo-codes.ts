@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { eq, and, lte, gte, or, isNull, inArray } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { promoCodesTable, bookingsTable, attendeesTable } from "@workspace/db";
@@ -6,7 +6,14 @@ import { PASS_PRICES } from "../lib/pricing";
 
 const router: IRouter = Router();
 
-router.post("/promo-codes/validate", async (req, res): Promise<void> => {
+/**
+ * Express handler for `POST /api/promo-codes/validate`.
+ *
+ * Exported so unit/integration tests can invoke it directly with fake
+ * `req`/`res` objects (matching the pattern used by other route tests in
+ * this package), without needing a full HTTP listener.
+ */
+export async function validatePromoCodeHandler(req: Request, res: Response): Promise<void> {
   const { code, passType, quantity, leadEmail } = req.body;
 
   if (!code || !passType || !quantity) {
@@ -123,7 +130,9 @@ router.post("/promo-codes/validate", async (req, res): Promise<void> => {
     message: promo.description || null,
     remainingSeats,
   });
-});
+}
+
+router.post("/promo-codes/validate", validatePromoCodeHandler);
 
 // Returns true if the given normalised email is the lead attendee on any
 // paid/invoiced booking that already used this promo code.
