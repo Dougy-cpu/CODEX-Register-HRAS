@@ -62,6 +62,14 @@ export const bookingsTable = pgTable("bookings", {
   billingVatNumber: text("billing_vat_number"),
   poNumber: text("po_number"),
   invoiceDueDate: timestamp("invoice_due_date", { withTimezone: true }),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+  stripeInvoiceStatus: text("stripe_invoice_status"),
+  stripeInvoiceStatusSyncedAt: timestamp("stripe_invoice_status_synced_at", {
+    withTimezone: true,
+  }),
+  paidConfirmationEmailSentAt: timestamp("paid_confirmation_email_sent_at", {
+    withTimezone: true,
+  }),
   hearAboutUs: text("hear_about_us"),
   managementToken: text("management_token").unique(),
   partialNotificationSent: boolean("partial_notification_sent").notNull().default(false),

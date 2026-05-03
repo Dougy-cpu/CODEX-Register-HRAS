@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BookingAttendeeType } from "./bookingAttendeeType";
+import type { BookingInvoiceBadgeStatus } from "./bookingInvoiceBadgeStatus";
 import type { BookingPassType } from "./bookingPassType";
 import type { BookingPaymentMethod } from "./bookingPaymentMethod";
 import type { BookingStatus } from "./bookingStatus";
@@ -71,6 +72,13 @@ export interface Booking {
   managementToken?: string | null;
   /** @nullable */
   invoiceDueDate?: Date | null;
+  /** @nullable */
+  paidAt?: Date | null;
+  /** @nullable */
+  stripeInvoiceStatus?: string | null;
+  /** @nullable */
+  stripeInvoiceStatusSyncedAt?: Date | null;
+  invoiceBadgeStatus?: BookingInvoiceBadgeStatus;
   createdAt: Date;
   updatedAt: Date;
 }

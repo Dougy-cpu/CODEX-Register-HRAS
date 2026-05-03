@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import Stripe from "stripe";
-import { eq } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { bookingsTable, attendeesTable, promoCodesTable } from "@workspace/db";
 import { isCodeUsedByEmail } from "./promo-codes";
@@ -48,6 +48,147 @@ const DISPUTE_REASON_LABELS: Record<string, string> = {
 };
 
 const router: IRouter = Router();
+
+/**
+ * Shared handler for Stripe `invoice.paid` and `invoice.payment_succeeded` events.
+ *
+ * Idempotency:
+ *  - The status flip + emails are gated on `paidConfirmationEmailSentAt IS NULL`,
+ *    claimed via a conditional UPDATE so concurrent webhook deliveries (and the
+ *    two near-identical Stripe events) cannot fire duplicate emails.
+ *  - Subsequent calls become a no-op once the row is claimed.
+ *
+ * Side effects on first successful call:
+ *  - status → "paid", paidAt set, stripeInvoiceStatus cached as "paid"
+ *  - sendBookingEmails (confirmation + welcome — same as card flow)
+ *  - sendOrganiserNotification
+ *  - syncBookingToSheets
+ */
+async function handleInvoicePaidEvent(event: Stripe.Event): Promise<void> {
+  const invoice = event.data.object as Stripe.Invoice;
+  const invoiceId = invoice.id;
+  if (!invoiceId) {
+    logger.warn({ eventType: event.type }, "invoice paid event without invoice id, skipping");
+    return;
+  }
+
+  const [booking] = await db
+    .select()
+    .from(bookingsTable)
+    .where(eq(bookingsTable.stripeInvoiceId, invoiceId));
+
+  if (!booking) {
+    logger.info(
+      { invoiceId, eventType: event.type },
+      "invoice paid: no matching booking, skipping",
+    );
+    return;
+  }
+
+  // Cache the latest Stripe status no matter what — even if we already processed,
+  // a fresh sync is cheap and keeps the badge accurate.
+  await db
+    .update(bookingsTable)
+    .set({
+      stripeInvoiceStatus: "paid",
+      stripeInvoiceStatusSyncedAt: new Date(),
+    })
+    .where(eq(bookingsTable.id, booking.id));
+
+  // Already sent the paid emails — nothing more to do.
+  if (booking.paidConfirmationEmailSentAt) {
+    logger.info(
+      { bookingId: booking.id, invoiceId, eventType: event.type },
+      "invoice paid: emails already sent, skipping",
+    );
+    return;
+  }
+
+  const rawPaymentIntent = (invoice as unknown as Record<string, unknown>).payment_intent;
+  const paymentIntentId: string | null =
+    typeof rawPaymentIntent === "string"
+      ? rawPaymentIntent
+      : rawPaymentIntent && typeof rawPaymentIntent === "object" && "id" in rawPaymentIntent
+        ? (rawPaymentIntent as { id: string }).id
+        : null;
+
+  // Flip status to paid (idempotent: only the first webhook to find a non-paid row
+  // wins). We deliberately keep paymentMethod = "invoice" so invoice-specific UI
+  // (badge, manage page invoice section) keeps rendering after settlement; we only
+  // record the payment intent for traceability.
+  await db
+    .update(bookingsTable)
+    .set({
+      status: "paid",
+      paidAt: booking.paidAt ?? new Date(),
+      updatedAt: new Date(),
+      ...(paymentIntentId ? { stripePaymentIntentId: paymentIntentId } : {}),
+    })
+    .where(eq(bookingsTable.id, booking.id));
+
+  // Side effects that are safe to re-run (sheet sync is upsert; organiser notif we
+  // accept as best-effort) — ok to run more than once across retries; they only
+  // happen here on the path where status wasn't yet paid OR emails haven't sent.
+  try {
+    await syncBookingToSheets(booking.id);
+  } catch (err) {
+    logger.error({ err, bookingId: booking.id }, "invoice paid: sheets sync failed");
+  }
+
+  try {
+    await sendOrganiserNotification(booking.id);
+  } catch (err) {
+    logger.error(
+      { err, bookingId: booking.id },
+      "invoice paid: failed to send organiser notification",
+    );
+  }
+
+  // Atomic claim for the customer-facing emails: only one webhook delivery may flip
+  // paidConfirmationEmailSentAt from NULL → now(). If sendBookingEmails fails we
+  // reset the timestamp back to NULL and rethrow so Stripe retries the webhook
+  // (otherwise a transient SMTP blip would silently lose the confirmation forever).
+  const emailClaim = await db
+    .update(bookingsTable)
+    .set({ paidConfirmationEmailSentAt: new Date() })
+    .where(and(eq(bookingsTable.id, booking.id), isNull(bookingsTable.paidConfirmationEmailSentAt)))
+    .returning({ id: bookingsTable.id });
+
+  if (emailClaim.length === 0) {
+    logger.info(
+      { bookingId: booking.id, invoiceId, eventType: event.type },
+      "invoice paid: confirmation emails already claimed by another delivery, skipping",
+    );
+    return;
+  }
+
+  logger.info(
+    {
+      bookingId: booking.id,
+      invoiceId,
+      orderRef: booking.orderReference,
+      paymentIntentId,
+      eventType: event.type,
+    },
+    "invoice paid: booking marked paid, sending confirmation emails",
+  );
+
+  try {
+    await sendBookingEmails(booking.id);
+  } catch (err) {
+    // Release the claim so a webhook retry can try again — better one-day-late
+    // than never.
+    await db
+      .update(bookingsTable)
+      .set({ paidConfirmationEmailSentAt: null })
+      .where(eq(bookingsTable.id, booking.id));
+    logger.error(
+      { err, bookingId: booking.id },
+      "invoice paid: failed to send confirmation/welcome emails — released claim for retry",
+    );
+    throw err;
+  }
+}
 
 async function isPromoOncePerCustomerViolation(
   bookingId: number,
@@ -284,80 +425,71 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
   }
 
   // When someone pays a Stripe invoice (e.g. via the hosted payment link), automatically
-  // flip the booking status from "invoiced" → "paid". Confirmation emails were already
-  // sent at invoice creation so we don't resend them here.
-  if (event.type === "invoice.paid") {
+  // flip the booking status to "paid" and send the same confirmation + welcome emails the
+  // card flow does. Both `invoice.paid` and `invoice.payment_succeeded` are wired here for
+  // resilience — Stripe sends both in quick succession and webhooks can be retried, so the
+  // handler must be fully idempotent (gated by paidConfirmationEmailSentAt).
+  if (event.type === "invoice.paid" || event.type === "invoice.payment_succeeded") {
+    await handleInvoicePaidEvent(event);
+  }
+
+  // Invoice cancelled in Stripe (manually voided or via API). Cache the status so the
+  // UI badge reflects "voided", and cancel the booking if it isn't already in a terminal
+  // state. We deliberately don't refund anything here (voiding only applies to unpaid
+  // invoices in Stripe).
+  if (event.type === "invoice.voided") {
     const invoice = event.data.object as Stripe.Invoice;
     const invoiceId = invoice.id;
-
     const [booking] = await db
       .select()
       .from(bookingsTable)
       .where(eq(bookingsTable.stripeInvoiceId, invoiceId));
-
-    if (!booking) {
-      // Could be an invoice unrelated to this system — ignore silently
-      logger.info({ invoiceId }, "invoice.paid: no matching booking found, skipping");
-      res.json({ received: true });
-      return;
+    if (booking) {
+      const updates: Partial<typeof bookingsTable.$inferInsert> = {
+        stripeInvoiceStatus: "void",
+        stripeInvoiceStatusSyncedAt: new Date(),
+        updatedAt: new Date(),
+      };
+      if (booking.status !== "cancelled" && booking.status !== "refunded") {
+        updates.status = "cancelled";
+      }
+      await db.update(bookingsTable).set(updates).where(eq(bookingsTable.id, booking.id));
+      logger.info(
+        { bookingId: booking.id, invoiceId, prevStatus: booking.status },
+        "invoice.voided: booking updated",
+      );
+      try {
+        await syncBookingToSheets(booking.id);
+      } catch (err) {
+        logger.error({ err, bookingId: booking.id }, "invoice.voided: sheets sync failed");
+      }
+    } else {
+      logger.info({ invoiceId }, "invoice.voided: no matching booking, skipping");
     }
+  }
 
-    if (booking.status === "paid") {
+  // Stripe gives up trying to collect — cache the status so the UI badge reflects it.
+  // We leave the booking in `invoiced` so the organiser can decide whether to chase or
+  // cancel manually.
+  if (event.type === "invoice.marked_uncollectible") {
+    const invoice = event.data.object as Stripe.Invoice;
+    const invoiceId = invoice.id;
+    const [booking] = await db
+      .select()
+      .from(bookingsTable)
+      .where(eq(bookingsTable.stripeInvoiceId, invoiceId));
+    if (booking) {
+      await db
+        .update(bookingsTable)
+        .set({
+          stripeInvoiceStatus: "uncollectible",
+          stripeInvoiceStatusSyncedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(bookingsTable.id, booking.id));
       logger.info(
         { bookingId: booking.id, invoiceId },
-        "invoice.paid: already marked paid, skipping",
-      );
-      res.json({ received: true });
-      return;
-    }
-
-    const rawPaymentIntent = (invoice as unknown as Record<string, unknown>).payment_intent;
-    const paymentIntentId: string | null =
-      typeof rawPaymentIntent === "string"
-        ? rawPaymentIntent
-        : rawPaymentIntent && typeof rawPaymentIntent === "object" && "id" in rawPaymentIntent
-          ? (rawPaymentIntent as { id: string }).id
-          : null;
-
-    await db
-      .update(bookingsTable)
-      .set({
-        status: "paid",
-        updatedAt: new Date(),
-        ...(paymentIntentId
-          ? { paymentMethod: "card" as const, stripePaymentIntentId: paymentIntentId }
-          : {}),
-      })
-      .where(eq(bookingsTable.id, booking.id));
-
-    logger.info(
-      {
-        bookingId: booking.id,
-        invoiceId,
-        orderRef: booking.orderReference,
-        paymentIntentId,
-        paymentMethod: paymentIntentId ? "card" : booking.paymentMethod,
-      },
-      "invoice.paid: booking marked as paid",
-    );
-
-    // Re-sync to Google Sheets so the status column reflects "paid"
-    try {
-      await syncBookingToSheets(booking.id);
-    } catch (err) {
-      logger.error(
-        { err, bookingId: booking.id },
-        "invoice.paid: failed to re-sync to Google Sheets",
-      );
-    }
-
-    // Notify the organiser that the invoice has been settled
-    try {
-      await sendOrganiserNotification(booking.id);
-    } catch (err) {
-      logger.error(
-        { err, bookingId: booking.id },
-        "invoice.paid: failed to send organiser notification",
+        "invoice.marked_uncollectible: cached status",
       );
     }
   }

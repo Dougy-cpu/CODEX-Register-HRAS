@@ -29,16 +29,14 @@ export const BookingStatus = {
   disputed: "disputed",
 } as const;
 
-export type BookingPassType =
-  (typeof BookingPassType)[keyof typeof BookingPassType];
+export type BookingPassType = (typeof BookingPassType)[keyof typeof BookingPassType];
 
 export const BookingPassType = {
   single: "single",
   business: "business",
 } as const;
 
-export type BookingAttendeeType =
-  (typeof BookingAttendeeType)[keyof typeof BookingAttendeeType];
+export type BookingAttendeeType = (typeof BookingAttendeeType)[keyof typeof BookingAttendeeType];
 
 export const BookingAttendeeType = {
   hr_professional: "hr_professional",
@@ -55,6 +53,17 @@ export type BookingPaymentMethod =
 export const BookingPaymentMethod = {
   card: "card",
   invoice: "invoice",
+} as const;
+
+export type BookingInvoiceBadgeStatus =
+  (typeof BookingInvoiceBadgeStatus)[keyof typeof BookingInvoiceBadgeStatus];
+
+export const BookingInvoiceBadgeStatus = {
+  paid: "paid",
+  voided: "voided",
+  overdue: "overdue",
+  sent: "sent",
+  pending: "pending",
 } as const;
 
 export interface Booking {
@@ -118,6 +127,13 @@ export interface Booking {
   managementToken?: string | null;
   /** @nullable */
   invoiceDueDate?: string | null;
+  /** @nullable */
+  paidAt?: string | null;
+  /** @nullable */
+  stripeInvoiceStatus?: string | null;
+  /** @nullable */
+  stripeInvoiceStatusSyncedAt?: string | null;
+  invoiceBadgeStatus?: BookingInvoiceBadgeStatus;
   createdAt: string;
   updatedAt: string;
 }
@@ -504,8 +520,7 @@ export interface PromoCodeValidationResult {
   remainingSeats?: number | null;
 }
 
-export type DiscountTierPassType =
-  (typeof DiscountTierPassType)[keyof typeof DiscountTierPassType];
+export type DiscountTierPassType = (typeof DiscountTierPassType)[keyof typeof DiscountTierPassType];
 
 export const DiscountTierPassType = {
   single: "single",
@@ -603,8 +618,7 @@ export const EmailLogType = {
   test: "test",
 } as const;
 
-export type EmailLogStatus =
-  (typeof EmailLogStatus)[keyof typeof EmailLogStatus];
+export type EmailLogStatus = (typeof EmailLogStatus)[keyof typeof EmailLogStatus];
 
 export const EmailLogStatus = {
   sent: "sent",
@@ -640,6 +654,17 @@ export interface AdminLoginResponse {
   expiresAt: string;
 }
 
+export type RegistrationSummaryInvoiceBadgeStatus =
+  (typeof RegistrationSummaryInvoiceBadgeStatus)[keyof typeof RegistrationSummaryInvoiceBadgeStatus];
+
+export const RegistrationSummaryInvoiceBadgeStatus = {
+  paid: "paid",
+  voided: "voided",
+  overdue: "overdue",
+  sent: "sent",
+  pending: "pending",
+} as const;
+
 export interface RegistrationSummary {
   id: number;
   /** @nullable */
@@ -663,6 +688,11 @@ export interface RegistrationSummary {
   stripeInvoicePaymentUrl?: string | null;
   /** @nullable */
   invoiceDueDate?: string | null;
+  /** @nullable */
+  paidAt?: string | null;
+  /** @nullable */
+  stripeInvoiceStatus?: string | null;
+  invoiceBadgeStatus?: RegistrationSummaryInvoiceBadgeStatus;
   currentStep: number;
   createdAt: string;
   updatedAt: string;

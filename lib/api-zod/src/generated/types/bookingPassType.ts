@@ -6,8 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BookingPassType =
-  (typeof BookingPassType)[keyof typeof BookingPassType];
+export type BookingPassType = (typeof BookingPassType)[keyof typeof BookingPassType];
 
 export const BookingPassType = {
   single: "single",

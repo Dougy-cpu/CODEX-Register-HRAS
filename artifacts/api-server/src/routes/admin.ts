@@ -26,6 +26,8 @@ import {
   recordAdminLoginSuccess,
 } from "../middleware/admin-login-throttle";
 import { logger } from "../lib/logger";
+import { refreshStripeInvoiceStatusIfStale } from "../lib/invoice";
+import { deriveInvoiceBadge } from "../lib/invoice-status";
 
 const router: IRouter = Router();
 
@@ -48,6 +50,18 @@ function formatBooking(b: typeof bookingsTable.$inferSelect) {
       ? parseFloat(b.groupDiscountAmount.toString())
       : null,
     invoiceDueDate: b.invoiceDueDate ? b.invoiceDueDate.toISOString() : null,
+    paidAt: b.paidAt ? b.paidAt.toISOString() : null,
+    stripeInvoiceStatusSyncedAt: b.stripeInvoiceStatusSyncedAt
+      ? b.stripeInvoiceStatusSyncedAt.toISOString()
+      : null,
+    invoiceBadgeStatus: deriveInvoiceBadge({
+      status: b.status,
+      paymentMethod: b.paymentMethod,
+      stripeInvoiceId: b.stripeInvoiceId,
+      stripeInvoiceStatus: b.stripeInvoiceStatus,
+      invoiceDueDate: b.invoiceDueDate,
+      paidAt: b.paidAt,
+    }),
     createdAt: b.createdAt.toISOString(),
     updatedAt: b.updatedAt.toISOString(),
   };
@@ -381,13 +395,19 @@ router.get("/admin/registrations/:id", adminAuth, async (req, res): Promise<void
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
 
-  const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, id));
-  if (!booking) {
+  const [initial] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, id));
+  if (!initial) {
     res.status(404).json({ error: "Booking not found" });
     return;
   }
 
-  const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, id));
+  // Live re-poll Stripe if our cached invoice status is stale.
+  await refreshStripeInvoiceStatusIfStale(getStripe(), id);
+
+  const [[booking], attendees] = await Promise.all([
+    db.select().from(bookingsTable).where(eq(bookingsTable.id, id)),
+    db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, id)),
+  ]);
 
   res.json({
     ...formatBooking(booking),

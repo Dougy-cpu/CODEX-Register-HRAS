@@ -46,6 +46,7 @@ import {
   Copy,
   Link,
 } from "lucide-react";
+import { InvoiceBadge } from "@/components/InvoiceBadge";
 
 const STATUS_OPTIONS = [
   { value: "paid", label: "Paid" },
@@ -569,11 +570,9 @@ function ExpandedRegistrationDetail({
               className={`font-bold uppercase text-xs tracking-wider ${isInvoiceOverdue ? "text-red-700" : "text-blue-700"}`}
             >
               Invoice Details
-              {isInvoiceOverdue && (
-                <span className="ml-2 inline-flex items-center gap-1 bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs font-bold uppercase">
-                  <AlertTriangle className="w-3 h-3" /> Overdue
-                </span>
-              )}
+              <span className="ml-2 inline-flex">
+                <InvoiceBadge status={data?.invoiceBadgeStatus} />
+              </span>
             </h4>
             <button
               onClick={handleSendReminder}

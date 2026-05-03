@@ -6,8 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BookingAttendeeType =
-  (typeof BookingAttendeeType)[keyof typeof BookingAttendeeType];
+export type BookingAttendeeType = (typeof BookingAttendeeType)[keyof typeof BookingAttendeeType];
 
 export const BookingAttendeeType = {
   hr_professional: "hr_professional",

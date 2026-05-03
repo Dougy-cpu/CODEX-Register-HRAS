@@ -37,14 +37,7 @@ export const GetBookingResponse = zod
   .object({
     id: zod.number(),
     sessionToken: zod.string(),
-    status: zod.enum([
-      "partial",
-      "pending_payment",
-      "paid",
-      "invoiced",
-      "cancelled",
-      "disputed",
-    ]),
+    status: zod.enum(["partial", "pending_payment", "paid", "invoiced", "cancelled", "disputed"]),
     passType: zod.enum(["single", "business"]),
     attendeeType: zod.enum(["hr_professional", "consultant_vendor"]),
     quantity: zod.number(),
@@ -79,6 +72,10 @@ export const GetBookingResponse = zod
     poNumber: zod.string().nullish(),
     managementToken: zod.string().nullish(),
     invoiceDueDate: zod.coerce.date().nullish(),
+    paidAt: zod.coerce.date().nullish(),
+    stripeInvoiceStatus: zod.string().nullish(),
+    stripeInvoiceStatusSyncedAt: zod.coerce.date().nullish(),
+    invoiceBadgeStatus: zod.enum(["paid", "voided", "overdue", "sent", "pending"]).optional(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   })
@@ -138,14 +135,7 @@ export const UpdateBookingBody = zod.object({
   poNumber: zod.string().nullish(),
   invoiceDueDate: zod.coerce.date().nullish(),
   status: zod
-    .enum([
-      "partial",
-      "pending_payment",
-      "paid",
-      "invoiced",
-      "cancelled",
-      "disputed",
-    ])
+    .enum(["partial", "pending_payment", "paid", "invoiced", "cancelled", "disputed"])
     .optional(),
   stripeInvoiceId: zod.string().nullish(),
   stripeInvoicePdfUrl: zod.string().nullish(),
@@ -155,14 +145,7 @@ export const UpdateBookingBody = zod.object({
 export const UpdateBookingResponse = zod.object({
   id: zod.number(),
   sessionToken: zod.string(),
-  status: zod.enum([
-    "partial",
-    "pending_payment",
-    "paid",
-    "invoiced",
-    "cancelled",
-    "disputed",
-  ]),
+  status: zod.enum(["partial", "pending_payment", "paid", "invoiced", "cancelled", "disputed"]),
   passType: zod.enum(["single", "business"]),
   attendeeType: zod.enum(["hr_professional", "consultant_vendor"]),
   quantity: zod.number(),
@@ -197,6 +180,10 @@ export const UpdateBookingResponse = zod.object({
   poNumber: zod.string().nullish(),
   managementToken: zod.string().nullish(),
   invoiceDueDate: zod.coerce.date().nullish(),
+  paidAt: zod.coerce.date().nullish(),
+  stripeInvoiceStatus: zod.string().nullish(),
+  stripeInvoiceStatusSyncedAt: zod.coerce.date().nullish(),
+  invoiceBadgeStatus: zod.enum(["paid", "voided", "overdue", "sent", "pending"]).optional(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -212,14 +199,7 @@ export const GetBookingBySessionResponse = zod
   .object({
     id: zod.number(),
     sessionToken: zod.string(),
-    status: zod.enum([
-      "partial",
-      "pending_payment",
-      "paid",
-      "invoiced",
-      "cancelled",
-      "disputed",
-    ]),
+    status: zod.enum(["partial", "pending_payment", "paid", "invoiced", "cancelled", "disputed"]),
     passType: zod.enum(["single", "business"]),
     attendeeType: zod.enum(["hr_professional", "consultant_vendor"]),
     quantity: zod.number(),
@@ -254,6 +234,10 @@ export const GetBookingBySessionResponse = zod
     poNumber: zod.string().nullish(),
     managementToken: zod.string().nullish(),
     invoiceDueDate: zod.coerce.date().nullish(),
+    paidAt: zod.coerce.date().nullish(),
+    stripeInvoiceStatus: zod.string().nullish(),
+    stripeInvoiceStatusSyncedAt: zod.coerce.date().nullish(),
+    invoiceBadgeStatus: zod.enum(["paid", "voided", "overdue", "sent", "pending"]).optional(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   })
@@ -427,12 +411,7 @@ export const ValidatePromoCodeBody = zod.object({
 export const ValidatePromoCodeResponse = zod.object({
   valid: zod.boolean(),
   code: zod.string(),
-  discountType: zod.enum([
-    "percentage",
-    "fixed",
-    "per_ticket",
-    "complimentary",
-  ]),
+  discountType: zod.enum(["percentage", "fixed", "per_ticket", "complimentary"]),
   discountValue: zod.number(),
   discountAmount: zod.number(),
   message: zod.string().nullish(),
@@ -450,12 +429,7 @@ export const ValidatePromoCodeResponse = zod.object({
 export const ListPromoCodesResponseItem = zod.object({
   id: zod.number(),
   code: zod.string(),
-  discountType: zod.enum([
-    "percentage",
-    "fixed",
-    "per_ticket",
-    "complimentary",
-  ]),
+  discountType: zod.enum(["percentage", "fixed", "per_ticket", "complimentary"]),
   discountValue: zod.number(),
   maxUses: zod.number().nullish(),
   usedCount: zod.number(),
@@ -477,12 +451,7 @@ export const ListPromoCodesResponse = zod.array(ListPromoCodesResponseItem);
  */
 export const CreatePromoCodeBody = zod.object({
   code: zod.string(),
-  discountType: zod.enum([
-    "percentage",
-    "fixed",
-    "per_ticket",
-    "complimentary",
-  ]),
+  discountType: zod.enum(["percentage", "fixed", "per_ticket", "complimentary"]),
   discountValue: zod.number(),
   maxUses: zod.number().nullish(),
   validFrom: zod.coerce.date().nullish(),
@@ -505,9 +474,7 @@ export const UpdatePromoCodeParams = zod.object({
 
 export const UpdatePromoCodeBody = zod.object({
   code: zod.string().optional(),
-  discountType: zod
-    .enum(["percentage", "fixed", "per_ticket", "complimentary"])
-    .optional(),
+  discountType: zod.enum(["percentage", "fixed", "per_ticket", "complimentary"]).optional(),
   discountValue: zod.number().optional(),
   maxUses: zod.number().nullish(),
   validFrom: zod.coerce.date().nullish(),
@@ -524,12 +491,7 @@ export const UpdatePromoCodeBody = zod.object({
 export const UpdatePromoCodeResponse = zod.object({
   id: zod.number(),
   code: zod.string(),
-  discountType: zod.enum([
-    "percentage",
-    "fixed",
-    "per_ticket",
-    "complimentary",
-  ]),
+  discountType: zod.enum(["percentage", "fixed", "per_ticket", "complimentary"]),
   discountValue: zod.number(),
   maxUses: zod.number().nullish(),
   usedCount: zod.number(),
@@ -562,9 +524,7 @@ export const ListDiscountTiersResponseItem = zod.object({
   discountPercent: zod.number(),
   label: zod.string().nullish(),
 });
-export const ListDiscountTiersResponse = zod.array(
-  ListDiscountTiersResponseItem,
-);
+export const ListDiscountTiersResponse = zod.array(ListDiscountTiersResponseItem);
 
 /**
  * @summary Replace all discount tiers for a pass type (admin)
@@ -587,9 +547,7 @@ export const UpdateDiscountTiersResponseItem = zod.object({
   discountPercent: zod.number(),
   label: zod.string().nullish(),
 });
-export const UpdateDiscountTiersResponse = zod.array(
-  UpdateDiscountTiersResponseItem,
-);
+export const UpdateDiscountTiersResponse = zod.array(UpdateDiscountTiersResponseItem);
 
 /**
  * @summary Create a Stripe Checkout session for a booking
@@ -763,6 +721,9 @@ export const ListRegistrationsResponse = zod.object({
       stripeInvoiceId: zod.string().nullish(),
       stripeInvoicePaymentUrl: zod.string().nullish(),
       invoiceDueDate: zod.coerce.date().nullish(),
+      paidAt: zod.coerce.date().nullish(),
+      stripeInvoiceStatus: zod.string().nullish(),
+      invoiceBadgeStatus: zod.enum(["paid", "voided", "overdue", "sent", "pending"]).optional(),
       currentStep: zod.number(),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),
@@ -784,14 +745,7 @@ export const GetRegistrationResponse = zod
   .object({
     id: zod.number(),
     sessionToken: zod.string(),
-    status: zod.enum([
-      "partial",
-      "pending_payment",
-      "paid",
-      "invoiced",
-      "cancelled",
-      "disputed",
-    ]),
+    status: zod.enum(["partial", "pending_payment", "paid", "invoiced", "cancelled", "disputed"]),
     passType: zod.enum(["single", "business"]),
     attendeeType: zod.enum(["hr_professional", "consultant_vendor"]),
     quantity: zod.number(),
@@ -826,6 +780,10 @@ export const GetRegistrationResponse = zod
     poNumber: zod.string().nullish(),
     managementToken: zod.string().nullish(),
     invoiceDueDate: zod.coerce.date().nullish(),
+    paidAt: zod.coerce.date().nullish(),
+    stripeInvoiceStatus: zod.string().nullish(),
+    stripeInvoiceStatusSyncedAt: zod.coerce.date().nullish(),
+    invoiceBadgeStatus: zod.enum(["paid", "voided", "overdue", "sent", "pending"]).optional(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   })
@@ -891,13 +849,9 @@ export const GetAdminEventSettingsResponse = zod
     eventStartAt: zod.coerce
       .date()
       .nullish()
-      .describe(
-        "ISO-8601 UTC start of the main event. Used for calendar links.",
-      ),
+      .describe("ISO-8601 UTC start of the main event. Used for calendar links."),
     eventEndAt: zod.coerce.date().nullish(),
-    eventTimezone: zod
-      .string()
-      .describe("IANA timezone identifier, default Europe London."),
+    eventTimezone: zod.string().describe("IANA timezone identifier, default Europe London."),
     eventDescription: zod.string().nullish(),
     socialEnabled: zod
       .boolean()
@@ -982,13 +936,9 @@ export const UpdateAdminEventSettingsResponse = zod
     eventStartAt: zod.coerce
       .date()
       .nullish()
-      .describe(
-        "ISO-8601 UTC start of the main event. Used for calendar links.",
-      ),
+      .describe("ISO-8601 UTC start of the main event. Used for calendar links."),
     eventEndAt: zod.coerce.date().nullish(),
-    eventTimezone: zod
-      .string()
-      .describe("IANA timezone identifier, default Europe London."),
+    eventTimezone: zod.string().describe("IANA timezone identifier, default Europe London."),
     eventDescription: zod.string().nullish(),
     socialEnabled: zod
       .boolean()
@@ -1037,6 +987,9 @@ export const GetAdminStatsResponse = zod.object({
       stripeInvoiceId: zod.string().nullish(),
       stripeInvoicePaymentUrl: zod.string().nullish(),
       invoiceDueDate: zod.coerce.date().nullish(),
+      paidAt: zod.coerce.date().nullish(),
+      stripeInvoiceStatus: zod.string().nullish(),
+      invoiceBadgeStatus: zod.enum(["paid", "voided", "overdue", "sent", "pending"]).optional(),
       currentStep: zod.number(),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),

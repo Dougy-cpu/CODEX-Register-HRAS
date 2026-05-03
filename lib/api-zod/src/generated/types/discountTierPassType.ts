@@ -6,8 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type DiscountTierPassType =
-  (typeof DiscountTierPassType)[keyof typeof DiscountTierPassType];
+export type DiscountTierPassType = (typeof DiscountTierPassType)[keyof typeof DiscountTierPassType];
 
 export const DiscountTierPassType = {
   single: "single",

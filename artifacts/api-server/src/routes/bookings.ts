@@ -20,7 +20,9 @@ import {
   reissueBookingInvoice,
   applyReissueInvoiceResultTx,
   getStripeInvoiceStatus,
+  refreshStripeInvoiceStatusIfStale,
 } from "../lib/invoice";
+import { deriveInvoiceBadge } from "../lib/invoice-status";
 import { getStripe } from "./stripe";
 
 function isAdminRequest(req: import("express").Request): boolean {
@@ -61,6 +63,18 @@ function formatBooking(b: typeof bookingsTable.$inferSelect) {
     groupDiscountAmount: b.groupDiscountAmount
       ? parseFloat(b.groupDiscountAmount.toString())
       : null,
+    paidAt: b.paidAt ? b.paidAt.toISOString() : null,
+    stripeInvoiceStatusSyncedAt: b.stripeInvoiceStatusSyncedAt
+      ? b.stripeInvoiceStatusSyncedAt.toISOString()
+      : null,
+    invoiceBadgeStatus: deriveInvoiceBadge({
+      status: b.status,
+      paymentMethod: b.paymentMethod,
+      stripeInvoiceId: b.stripeInvoiceId,
+      stripeInvoiceStatus: b.stripeInvoiceStatus,
+      invoiceDueDate: b.invoiceDueDate,
+      paidAt: b.paidAt,
+    }),
     createdAt: b.createdAt.toISOString(),
     updatedAt: b.updatedAt.toISOString(),
   };
@@ -276,20 +290,24 @@ router.post("/bookings/start", async (req, res): Promise<void> => {
 
 router.get("/bookings/by-session/:sessionToken", async (req, res): Promise<void> => {
   const { sessionToken } = req.params;
-  const [booking] = await db
+  const [initial] = await db
     .select()
     .from(bookingsTable)
     .where(eq(bookingsTable.sessionToken, sessionToken));
 
-  if (!booking) {
+  if (!initial) {
     res.json(null);
     return;
   }
 
-  const attendees = await db
-    .select()
-    .from(attendeesTable)
-    .where(eq(attendeesTable.bookingId, booking.id));
+  // Live re-poll Stripe if our cached invoice status is stale (or unset) so the
+  // Confirmation page badge reflects reality even if the webhook hasn't fired yet.
+  await refreshStripeInvoiceStatusIfStale(getStripe(), initial.id);
+
+  const [[booking], attendees] = await Promise.all([
+    db.select().from(bookingsTable).where(eq(bookingsTable.id, initial.id)),
+    db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, initial.id)),
+  ]);
 
   res.json({
     ...formatBooking(booking),
@@ -300,18 +318,23 @@ router.get("/bookings/by-session/:sessionToken", async (req, res): Promise<void>
 router.get("/bookings/by-management-token/:token", async (req, res): Promise<void> => {
   const { token } = req.params;
 
-  const [booking] = await db
+  const [initial] = await db
     .select()
     .from(bookingsTable)
     .where(eq(bookingsTable.managementToken, token));
 
-  if (!booking) {
+  if (!initial) {
     res.status(404).json({ error: "Booking not found" });
     return;
   }
 
-  const [attendees, settingsRows] = await Promise.all([
-    db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, booking.id)),
+  // Live re-poll Stripe if our cached invoice status is stale (or unset). Errors are
+  // swallowed so a Stripe blip doesn't break the page.
+  await refreshStripeInvoiceStatusIfStale(getStripe(), initial.id);
+
+  const [[booking], attendees, settingsRows] = await Promise.all([
+    db.select().from(bookingsTable).where(eq(bookingsTable.id, initial.id)),
+    db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, initial.id)),
     db.select().from(eventSettingsTable).limit(1),
   ]);
 
@@ -331,21 +354,27 @@ router.get("/bookings/:id", async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
 
-  const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, id));
-  if (!booking) {
+  const [initial] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, id));
+  if (!initial) {
     res.status(404).json({ error: "Booking not found" });
     return;
   }
 
   const sessionHeader = req.headers["x-booking-session"] as string | undefined;
   const ownsBooking =
-    sessionHeader && booking.sessionToken && sessionHeader === booking.sessionToken;
+    sessionHeader && initial.sessionToken && sessionHeader === initial.sessionToken;
   if (!ownsBooking && !isAdminRequest(req)) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
 
-  const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, id));
+  // Live re-poll Stripe if our cached invoice status is stale (or unset).
+  await refreshStripeInvoiceStatusIfStale(getStripe(), id);
+
+  const [[booking], attendees] = await Promise.all([
+    db.select().from(bookingsTable).where(eq(bookingsTable.id, id)),
+    db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, id)),
+  ]);
 
   res.json({
     ...formatBooking(booking),

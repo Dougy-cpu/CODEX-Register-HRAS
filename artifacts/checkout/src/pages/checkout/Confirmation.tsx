@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { CheckCircle2, FileText, Calendar, MapPin, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { BookingWithAttendees } from "@/types/booking";
+import { InvoiceBadge } from "@/components/InvoiceBadge";
 
 interface ConfirmationProps {
   booking: BookingWithAttendees;
@@ -63,7 +64,10 @@ export default function Confirmation({ booking }: ConfirmationProps) {
               <div className="flex items-start gap-3">
                 <FileText className="w-5 h-5 text-accent-foreground mt-0.5" />
                 <div className="space-y-2">
-                  <h4 className="font-bold text-accent-foreground">Invoice Requested</h4>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="font-bold text-accent-foreground">Invoice Requested</h4>
+                    <InvoiceBadge status={booking.invoiceBadgeStatus} />
+                  </div>
                   <p className="text-sm text-accent-foreground/80">
                     An invoice has been sent to {booking.billingEmail || "your billing email"}.
                     Please arrange payment within 14 days.

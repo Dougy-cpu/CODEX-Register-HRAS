@@ -5,6 +5,7 @@
  * HR Analytics Summit Conference Registration API
  * OpenAPI spec version: 0.1.0
  */
+import type { RegistrationSummaryInvoiceBadgeStatus } from "./registrationSummaryInvoiceBadgeStatus";
 
 export interface RegistrationSummary {
   id: number;
@@ -29,6 +30,11 @@ export interface RegistrationSummary {
   stripeInvoicePaymentUrl?: string | null;
   /** @nullable */
   invoiceDueDate?: Date | null;
+  /** @nullable */
+  paidAt?: Date | null;
+  /** @nullable */
+  stripeInvoiceStatus?: string | null;
+  invoiceBadgeStatus?: RegistrationSummaryInvoiceBadgeStatus;
   currentStep: number;
   createdAt: Date;
   updatedAt: Date;

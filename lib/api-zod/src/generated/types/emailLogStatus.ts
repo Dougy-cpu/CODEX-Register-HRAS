@@ -6,8 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type EmailLogStatus =
-  (typeof EmailLogStatus)[keyof typeof EmailLogStatus];
+export type EmailLogStatus = (typeof EmailLogStatus)[keyof typeof EmailLogStatus];
 
 export const EmailLogStatus = {
   sent: "sent",

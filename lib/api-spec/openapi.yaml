@@ -1045,6 +1045,17 @@ components:
         invoiceDueDate:
           type: ["string", "null"]
           format: date-time
+        paidAt:
+          type: ["string", "null"]
+          format: date-time
+        stripeInvoiceStatus:
+          type: ["string", "null"]
+        stripeInvoiceStatusSyncedAt:
+          type: ["string", "null"]
+          format: date-time
+        invoiceBadgeStatus:
+          type: string
+          enum: [paid, voided, overdue, sent, pending]
         createdAt:
           type: string
           format: date-time
@@ -1754,6 +1765,14 @@ components:
         invoiceDueDate:
           type: ["string", "null"]
           format: date-time
+        paidAt:
+          type: ["string", "null"]
+          format: date-time
+        stripeInvoiceStatus:
+          type: ["string", "null"]
+        invoiceBadgeStatus:
+          type: string
+          enum: [paid, voided, overdue, sent, pending]
         currentStep:
           type: integer
         createdAt:

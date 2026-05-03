@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { customFetch } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
+import { InvoiceBadge } from "@/components/InvoiceBadge";
 import type { Attendee, BookingWithAttendees } from "@/types/booking";
 
 const attendeeSchema = z.object({
@@ -436,14 +437,19 @@ export default function ManageAttendees() {
               155 Bishopsgate, London
             </span>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Order reference:{" "}
-            <span className="font-mono font-semibold text-foreground">
-              {booking.orderReference || "PENDING"}
+          <p className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
+            <span>
+              Order reference:{" "}
+              <span className="font-mono font-semibold text-foreground">
+                {booking.orderReference || "PENDING"}
+              </span>
+              {" · "}
+              {booking.quantity} {booking.passType === "single" ? "Single Pass" : "Business Pass"}
+              {booking.quantity !== 1 ? "es" : ""}
             </span>
-            {" · "}
-            {booking.quantity} {booking.passType === "single" ? "Single Pass" : "Business Pass"}
-            {booking.quantity !== 1 ? "es" : ""}
+            {booking.paymentMethod === "invoice" && (
+              <InvoiceBadge status={booking.invoiceBadgeStatus} size="sm" />
+            )}
           </p>
         </div>
 

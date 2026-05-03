@@ -71,6 +71,53 @@ export async function getStripeInvoiceStatus(
   }
 }
 
+const STALE_INVOICE_STATUS_MS = 5 * 60 * 1000;
+
+/**
+ * If the booking has a Stripe invoice and our cached status hasn't been
+ * refreshed in the last 5 minutes (or the booking still looks unpaid), fetch
+ * the live status from Stripe and persist it. Caller-safe: errors are
+ * swallowed so the parent request never fails because of a stale-poll.
+ */
+export async function refreshStripeInvoiceStatusIfStale(
+  stripe: Stripe | null,
+  bookingId: number,
+): Promise<void> {
+  if (!stripe) return;
+  try {
+    const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
+    if (!booking || !booking.stripeInvoiceId) return;
+    if (booking.status === "paid" || booking.status === "cancelled") return;
+
+    const last = booking.stripeInvoiceStatusSyncedAt
+      ? booking.stripeInvoiceStatusSyncedAt.getTime()
+      : 0;
+    if (Date.now() - last < STALE_INVOICE_STATUS_MS) return;
+
+    const { status, paid } = await getStripeInvoiceStatus(stripe, booking.stripeInvoiceId);
+    if (status === null) return;
+
+    // Note: the `if (booking.status === "paid" || "cancelled") return;` guard
+    // above means we know `booking.status` is one of the non-terminal states here.
+    const updates: Record<string, unknown> = {
+      stripeInvoiceStatus: status,
+      stripeInvoiceStatusSyncedAt: new Date(),
+    };
+
+    if (paid) {
+      updates.status = "paid";
+      updates.paidAt = booking.paidAt ?? new Date();
+    } else if (status === "void") {
+      // Invoice voided in Stripe — reflect by cancelling the booking.
+      updates.status = "cancelled";
+    }
+
+    await db.update(bookingsTable).set(updates).where(eq(bookingsTable.id, bookingId));
+  } catch (err) {
+    logger.warn({ err, bookingId }, "refreshStripeInvoiceStatusIfStale failed");
+  }
+}
+
 export type ReissueInvoiceResult =
   | { alreadyPaid: true }
   | {
