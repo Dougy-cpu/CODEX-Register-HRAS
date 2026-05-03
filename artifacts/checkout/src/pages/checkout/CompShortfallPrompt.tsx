@@ -1,25 +1,15 @@
 import { Button } from "@/components/ui/button";
 
 export interface CompShortfallPromptProps {
-  /** Number of complimentary seats remaining on the promo code. */
   remaining: number;
-  /** Number of tickets currently selected by the user. */
   quantity: number;
-  /** Called when the user accepts the suggestion to reduce quantity to `remaining`. */
   onReduce: () => void;
-  /** Called when the user opts to keep their quantity and drop the promo code. */
   onRemove: () => void;
 }
 
-/**
- * Amber prompt shown on Step 2 when a complimentary promo code is applied
- * but the requested quantity exceeds the seats remaining on the code. Offers
- * the user two clear paths: reduce the quantity, or keep the quantity and
- * remove the code (paying full price).
- *
- * Pure presentational — owns no state, takes both action callbacks as props
- * so it stays trivially unit-testable.
- */
+// Amber prompt shown on Step 2 when the requested quantity exceeds the seats
+// remaining on an applied complimentary code. Pure presentational so it can
+// be unit-tested in isolation.
 export function CompShortfallPrompt({
   remaining,
   quantity,

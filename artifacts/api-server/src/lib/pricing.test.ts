@@ -1,10 +1,57 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
-// In-memory fake of the @workspace/db module. Tests below configure the seed
-// data via `__setupDb({ promo, tiers, passes })` before each test, which is
-// then served by both the `incrementPromoUsage` (top-level db) calls and the
-// `calculatePricing` queries.
+// Drizzle mock that *captures* the values passed to the `sql` template tag
+// and to the relational operators, so tests can assert on the actual SQL
+// fragments built by `incrementPromoUsage` (specifically: that `inc` is
+// quantity for complimentary codes and 1 otherwise, and that the WHERE
+// clause includes the conditional cap predicate). Without this, a regression
+// in those expressions would silently pass.
+// ---------------------------------------------------------------------------
+
+interface SqlNode {
+  __kind: "sql";
+  strings: readonly string[];
+  values: unknown[];
+}
+interface OpNode {
+  __kind: "op";
+  name: string;
+  args: unknown[];
+}
+
+function isSql(v: unknown): v is SqlNode {
+  return typeof v === "object" && v !== null && (v as { __kind?: string }).__kind === "sql";
+}
+function isOp(v: unknown): v is OpNode {
+  return typeof v === "object" && v !== null && (v as { __kind?: string }).__kind === "op";
+}
+
+vi.mock("drizzle-orm", () => {
+  const op =
+    (name: string) =>
+    (...args: unknown[]): OpNode => ({ __kind: "op", name, args });
+  return {
+    eq: op("eq"),
+    and: op("and"),
+    or: op("or"),
+    isNull: op("isNull"),
+    lte: op("lte"),
+    gte: op("gte"),
+    inArray: op("inArray"),
+    sql: (strings: TemplateStringsArray, ...values: unknown[]): SqlNode => ({
+      __kind: "sql",
+      strings,
+      values,
+    }),
+  };
+});
+
+// ---------------------------------------------------------------------------
+// In-memory fake of @workspace/db. Each test pre-seeds `dbState` with rows
+// and the chainable/thenable builder returns them when awaited. The mock
+// honours the *table identity* but not the WHERE predicate (predicates are
+// asserted separately in the contract tests below).
 // ---------------------------------------------------------------------------
 
 type PromoRow = {
@@ -34,63 +81,69 @@ interface FakeDbState {
 
 const dbState: FakeDbState = { promos: [], tiers: [], passes: [] };
 
+interface CapturedUpdate {
+  setArg: Record<string, unknown>;
+  whereArg: unknown;
+  rowCount: number;
+}
+const updateLog: CapturedUpdate[] = [];
+
 function resetDb() {
   dbState.promos = [];
   dbState.tiers = [];
   dbState.passes = [];
+  updateLog.length = 0;
 }
 
 vi.mock("@workspace/db", () => {
-  // Mirror drizzle's chainable-and-thenable query builder: each chain link
-  // (`from`, `where`, `orderBy`) returns a builder that is itself awaitable
-  // (resolving to the matching rows) AND can be further chained. This lets
-  // pricing.ts call any of `await db.select().from(t)`,
-  // `await db.select().from(t).where(x)`, or
-  // `await db.select().from(t).where(x).orderBy(y)` and get back the same
-  // pre-seeded rows in `dbState`.
   function rowsFor(name: string): Record<string, unknown>[] {
-    switch (name) {
-      case "promoCodes":
-        return dbState.promos as unknown as Record<string, unknown>[];
-      case "discountTiers":
-        return dbState.tiers as unknown as Record<string, unknown>[];
-      case "passConfig":
-        return dbState.passes as unknown as Record<string, unknown>[];
-      default:
-        return [];
-    }
+    if (name === "promoCodes") return dbState.promos as unknown as Record<string, unknown>[];
+    if (name === "discountTiers") return dbState.tiers as unknown as Record<string, unknown>[];
+    if (name === "passConfig") return dbState.passes as unknown as Record<string, unknown>[];
+    return [];
   }
   function makeChainable(name: string): Record<string, unknown> {
-    const builder = {
-      where: (..._a: unknown[]) => makeChainable(name),
-      orderBy: (..._a: unknown[]) => makeChainable(name),
+    return {
+      where: () => makeChainable(name),
+      orderBy: () => makeChainable(name),
       then: (
         onFulfilled?: (v: Record<string, unknown>[]) => unknown,
         onRejected?: (e: unknown) => unknown,
       ) => Promise.resolve(rowsFor(name)).then(onFulfilled, onRejected),
     };
-    return builder;
   }
-  function makeSelect(table: { __name: string }) {
-    return makeChainable(table.__name);
+
+  // Top-level `db.update(promoCodesTable)` — used by `incrementPromoUsage`
+  // when no explicit conn is passed. We honour the conditional cap by
+  // simulating the SQL predicate against the seeded `promos` row, so default-
+  // path concurrency tests are end-to-end accurate.
+  function topLevelUpdate(table: { __name: string }) {
+    return {
+      set: (setArg: Record<string, unknown>) => ({
+        where: async (whereArg: unknown) => {
+          const setUsed = setArg["usedCount"];
+          const inc = isSql(setUsed) ? Number(setUsed.values[1]) : 1;
+          if (table.__name !== "promoCodes" || dbState.promos.length === 0) {
+            updateLog.push({ setArg, whereArg, rowCount: 0 });
+            return { rowCount: 0 };
+          }
+          const row = dbState.promos[0];
+          const fits = row.maxUses === null || row.usedCount + inc <= row.maxUses;
+          let rowCount = 0;
+          if (fits) {
+            row.usedCount += inc;
+            rowCount = 1;
+          }
+          updateLog.push({ setArg, whereArg, rowCount });
+          return { rowCount };
+        },
+      }),
+    };
   }
 
   const db = {
-    select: () => ({ from: (table: { __name: string }) => makeSelect(table) }),
-    update: (table: { __name: string }) => ({
-      set: (_set: Record<string, unknown>) => ({
-        where: async () => {
-          // Apply the conditional cap check inline so tests of
-          // `incrementPromoUsage` reflect the real "rowCount = 0 when cap
-          // exceeded" behaviour. We don't bother parsing the where clause —
-          // tests configure dbState.promos to the precise pre-state.
-          if (table.__name !== "promoCodes") return { rowCount: 1 };
-          // No-op for select-only tests — the dedicated "uses supplied conn"
-          // tests below override these via custom fake conns.
-          return { rowCount: dbState.promos.length > 0 ? 1 : 0 };
-        },
-      }),
-    }),
+    select: () => ({ from: (table: { __name: string }) => makeChainable(table.__name) }),
+    update: (table: { __name: string }) => topLevelUpdate(table),
     transaction: async <T>(_cb: (tx: unknown) => Promise<T>): Promise<T> => {
       throw new Error("not used in these tests");
     },
@@ -100,10 +153,10 @@ vi.mock("@workspace/db", () => {
     db,
     promoCodesTable: {
       __name: "promoCodes",
-      code: {},
-      discountType: {},
-      usedCount: {},
-      maxUses: {},
+      code: { __col: "code" },
+      discountType: { __col: "discountType" },
+      usedCount: { __col: "usedCount" },
+      maxUses: { __col: "maxUses" },
       isActive: {},
       validFrom: {},
       validUntil: {},
@@ -113,202 +166,13 @@ vi.mock("@workspace/db", () => {
   };
 });
 
-vi.mock("drizzle-orm", () => ({
-  eq: () => ({}),
-  and: () => ({}),
-  or: () => ({}),
-  isNull: () => ({}),
-  lte: () => ({}),
-  gte: () => ({}),
-  sql: ((..._a: unknown[]) => ({})) as unknown,
-}));
-
 import { incrementPromoUsage, calculatePricing } from "./pricing";
 
 beforeEach(() => {
   resetDb();
 });
 
-// ---------------------------------------------------------------------------
-// incrementPromoUsage — verifies the optional `conn` parameter is plumbed
-// through correctly so callers can make the increment part of a transaction.
-// ---------------------------------------------------------------------------
-
-function makeFakeConn(opts: { discountType?: string | null; updateRowCount?: number }): {
-  conn: Parameters<typeof incrementPromoUsage>[2];
-  selectCalls: number;
-  updateCalls: number;
-} {
-  const counters = { selectCalls: 0, updateCalls: 0 };
-  const conn = {
-    select: () => {
-      counters.selectCalls++;
-      return {
-        from: () => ({
-          where: async () =>
-            opts.discountType === null || opts.discountType === undefined
-              ? []
-              : [{ discountType: opts.discountType }],
-        }),
-      };
-    },
-    update: () => {
-      counters.updateCalls++;
-      return {
-        set: () => ({
-          where: async () => ({ rowCount: opts.updateRowCount ?? 1 }),
-        }),
-      };
-    },
-  } as unknown as Parameters<typeof incrementPromoUsage>[2];
-  return Object.assign(counters, { conn });
-}
-
-describe("incrementPromoUsage transaction wiring", () => {
-  it("uses the supplied connection (tx) for both the lookup and the update", async () => {
-    const fake = makeFakeConn({ discountType: "percentage", updateRowCount: 1 });
-    const ok = await incrementPromoUsage("FOO", 3, fake.conn);
-    expect(ok).toBe(true);
-    expect(fake.selectCalls).toBe(1);
-    expect(fake.updateCalls).toBe(1);
-  });
-
-  it("returns false when the supplied connection's update affects no rows (cap hit)", async () => {
-    const fake = makeFakeConn({ discountType: "complimentary", updateRowCount: 0 });
-    const ok = await incrementPromoUsage("CAP", 5, fake.conn);
-    expect(ok).toBe(false);
-  });
-
-  it("returns false (and skips update) when the code is not found via the supplied connection", async () => {
-    const fake = makeFakeConn({ discountType: null });
-    const ok = await incrementPromoUsage("NOPE", 1, fake.conn);
-    expect(ok).toBe(false);
-    expect(fake.updateCalls).toBe(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// incrementPromoUsage — atomic cap enforcement: even under bursty concurrent
-// confirmations no more than `maxUses` ticket-equivalents can ever land. We
-// simulate the real Postgres conditional UPDATE in a tiny in-memory model so
-// the contract stays locked: no double-spend possible at the call boundary.
-// ---------------------------------------------------------------------------
-
-function makeAtomicCappedConn(initial: {
-  code: string;
-  discountType: PromoRow["discountType"];
-  usedCount: number;
-  maxUses: number | null;
-}): Parameters<typeof incrementPromoUsage>[2] {
-  // Critically, the update closure reads-modifies-writes the shared row
-  // *atomically* — mirroring Postgres row-locked UPDATE semantics. Multiple
-  // overlapping awaits cannot race because JS resolves microtasks one at a
-  // time and our async update callback completes synchronously after the
-  // single `if (predicate) usedCount += inc` step.
-  const row = { ...initial };
-  const conn = {
-    select: () => ({
-      from: () => ({
-        where: async () => [{ discountType: row.discountType }],
-      }),
-    }),
-    update: () => ({
-      set: () => ({
-        where: async () => {
-          // Tests pass `quantity` via the public `incrementPromoUsage` API;
-          // we know `inc` deterministically: 1 for non-comp, qty for comp.
-          // We can't observe `inc` here directly, so we reflect the
-          // conditional check as the actual contract: the *caller*'s qty is
-          // baked into the SQL by the time we arrive. To model this we
-          // expose a per-call increment via a closure variable set just
-          // before each call.
-          const inc = (conn as unknown as { __pendingInc: number }).__pendingInc;
-          if (row.maxUses === null || row.usedCount + inc <= row.maxUses) {
-            row.usedCount += inc;
-            return { rowCount: 1 };
-          }
-          return { rowCount: 0 };
-        },
-      }),
-    }),
-    __row: row,
-    __pendingInc: 1,
-  } as unknown as Parameters<typeof incrementPromoUsage>[2];
-  return conn;
-}
-
-async function callIncrement(
-  conn: Parameters<typeof incrementPromoUsage>[2],
-  code: string,
-  qty: number,
-): Promise<boolean> {
-  // Wire qty -> inc model for the fake conn (real DB encodes inc into the SQL).
-  const inc =
-    (conn as unknown as { __row: { discountType: string } }).__row.discountType === "complimentary"
-      ? Math.max(1, qty)
-      : 1;
-  (conn as unknown as { __pendingInc: number }).__pendingInc = inc;
-  return incrementPromoUsage(code, qty, conn);
-}
-
-describe("incrementPromoUsage atomic cap enforcement", () => {
-  it("never lets concurrent non-complimentary increments exceed maxUses", async () => {
-    const conn = makeAtomicCappedConn({
-      code: "TENPCT",
-      discountType: "percentage",
-      usedCount: 0,
-      maxUses: 3,
-    });
-    // Fire 10 overlapping confirmations — only 3 should commit.
-    const results = await Promise.all(
-      Array.from({ length: 10 }, () => callIncrement(conn, "TENPCT", 1)),
-    );
-    const successes = results.filter(Boolean).length;
-    expect(successes).toBe(3);
-    expect((conn as unknown as { __row: { usedCount: number } }).__row.usedCount).toBe(3);
-  });
-
-  it("counts complimentary increments by ticket quantity, not by booking", async () => {
-    const conn = makeAtomicCappedConn({
-      code: "FREE5",
-      discountType: "complimentary",
-      usedCount: 0,
-      maxUses: 5,
-    });
-    // First booking takes 3 tickets — should succeed (3 ≤ 5).
-    expect(await callIncrement(conn, "FREE5", 3)).toBe(true);
-    // Second booking wants 3 more — would overflow (3+3=6 > 5), so reject.
-    expect(await callIncrement(conn, "FREE5", 3)).toBe(false);
-    // Third booking wants 2 more — fits exactly (3+2=5 ≤ 5), so accept.
-    expect(await callIncrement(conn, "FREE5", 2)).toBe(true);
-    // Fourth booking — any qty must reject (cap hit).
-    expect(await callIncrement(conn, "FREE5", 1)).toBe(false);
-    expect((conn as unknown as { __row: { usedCount: number } }).__row.usedCount).toBe(5);
-  });
-
-  it("allows unlimited increments when maxUses is null", async () => {
-    const conn = makeAtomicCappedConn({
-      code: "NOLIMIT",
-      discountType: "percentage",
-      usedCount: 0,
-      maxUses: null,
-    });
-    const results = await Promise.all(
-      Array.from({ length: 50 }, () => callIncrement(conn, "NOLIMIT", 1)),
-    );
-    expect(results.every(Boolean)).toBe(true);
-    expect((conn as unknown as { __row: { usedCount: number } }).__row.usedCount).toBe(50);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// calculatePricing — focuses on the complimentary-code branch since that's
-// the new behaviour we want regression-proof. Verifies both the "fits"
-// (whole order zeroed) and "shortfall" (no discount applied, but
-// promoRemainingSeats surfaced for the UI prompt) paths.
-// ---------------------------------------------------------------------------
-
-function seedComplimentaryPromo(maxUses: number, usedCount: number): PromoRow {
+function seedPromo(over: Partial<PromoRow> = {}): PromoRow {
   const promo: PromoRow = {
     code: "FREEPASS",
     discountType: "complimentary",
@@ -316,34 +180,166 @@ function seedComplimentaryPromo(maxUses: number, usedCount: number): PromoRow {
     isActive: true,
     validFrom: null,
     validUntil: null,
-    maxUses,
-    usedCount,
+    maxUses: 5,
+    usedCount: 0,
     maxDiscountAmount: null,
     applicablePassTypes: null,
     minQuantity: null,
     oncePerCustomer: false,
     description: null,
+    ...over,
   };
   dbState.promos.push(promo);
   return promo;
 }
 
+// Walk an op-tree and return all `inc` values appearing in cap-style
+// predicates `usedCount + ${inc} <= maxUses`.
+function findCapInc(node: unknown): number[] {
+  const found: number[] = [];
+  const visit = (n: unknown): void => {
+    if (isSql(n)) {
+      // Cap predicate shape `${usedCount} + ${inc} <= ${maxUses}` →
+      // strings = ["", " + ", " <= ", ""], values = [usedCount, inc, maxUses].
+      if (
+        n.strings.length === 4 &&
+        n.values.length === 3 &&
+        n.strings[1].includes("+") &&
+        n.strings[2].includes("<=")
+      ) {
+        const incVal = n.values[1];
+        if (typeof incVal === "number") found.push(incVal);
+      }
+      n.values.forEach(visit);
+    } else if (isOp(n)) {
+      n.args.forEach(visit);
+    }
+  };
+  visit(node);
+  return found;
+}
+
+// ---------------------------------------------------------------------------
+// incrementPromoUsage — contract: the increment value built into the SQL is
+// `quantity` for complimentary codes and `1` for everything else, and the
+// WHERE clause includes the conditional cap predicate. These two together
+// are what guarantee Postgres-side atomic cap enforcement; testing the
+// shape of the SQL fragments locks the contract.
+// ---------------------------------------------------------------------------
+
+describe("incrementPromoUsage SQL contract", () => {
+  it("for a non-complimentary code, encodes inc=1 in both SET and the cap predicate", async () => {
+    seedPromo({ code: "TENPCT", discountType: "percentage", maxUses: 100, usedCount: 0 });
+    await incrementPromoUsage("TENPCT", 7);
+    expect(updateLog).toHaveLength(1);
+    const { setArg, whereArg } = updateLog[0];
+    const setUsed = setArg["usedCount"];
+    expect(isSql(setUsed)).toBe(true);
+    expect((setUsed as SqlNode).values[1]).toBe(1);
+    const capIncs = findCapInc(whereArg);
+    expect(capIncs).toContain(1);
+  });
+
+  it("for a complimentary code, encodes inc=quantity in both SET and the cap predicate", async () => {
+    seedPromo({ discountType: "complimentary", maxUses: 50, usedCount: 0 });
+    await incrementPromoUsage("FREEPASS", 4);
+    expect(updateLog).toHaveLength(1);
+    const { setArg, whereArg } = updateLog[0];
+    expect((setArg["usedCount"] as SqlNode).values[1]).toBe(4);
+    expect(findCapInc(whereArg)).toContain(4);
+  });
+
+  it("returns false (and skips update) when the code is not found", async () => {
+    const ok = await incrementPromoUsage("MISSING", 1);
+    expect(ok).toBe(false);
+    expect(updateLog).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// incrementPromoUsage — atomic cap behaviour through the *real* db mock.
+// Concurrency here is JS microtask-level, not multi-process; the value comes
+// from the fact that the cap predicate is enforced by the same db mock that
+// every call routes through (so a dropped cap predicate would let too many
+// succeed). Combined with the SQL contract tests above, this rounds out the
+// guarantee that Postgres-side atomic enforcement is in play.
+// ---------------------------------------------------------------------------
+
+describe("incrementPromoUsage cap enforcement (via db mock)", () => {
+  it("cannot oversubscribe a non-complimentary capped code under concurrent calls", async () => {
+    seedPromo({ code: "TENPCT", discountType: "percentage", maxUses: 3, usedCount: 0 });
+    const results = await Promise.all(
+      Array.from({ length: 10 }, () => incrementPromoUsage("TENPCT", 1)),
+    );
+    expect(results.filter(Boolean)).toHaveLength(3);
+    expect(dbState.promos[0].usedCount).toBe(3);
+  });
+
+  it("cannot oversubscribe a complimentary capped code under concurrent multi-ticket calls", async () => {
+    seedPromo({ discountType: "complimentary", maxUses: 5, usedCount: 0 });
+    // Five concurrent comp bookings of 2 tickets each = 10 tickets requested.
+    // Only those that fit (2+2 = 4 ≤ 5) should commit; the third would push
+    // total to 6 > 5 and must be rejected.
+    const results = await Promise.all(
+      Array.from({ length: 5 }, () => incrementPromoUsage("FREEPASS", 2)),
+    );
+    const successes = results.filter(Boolean).length;
+    expect(successes).toBe(2);
+    expect(dbState.promos[0].usedCount).toBe(4);
+  });
+
+  it("treats null maxUses as unlimited", async () => {
+    seedPromo({ discountType: "complimentary", maxUses: null, usedCount: 0 });
+    const results = await Promise.all(
+      Array.from({ length: 20 }, () => incrementPromoUsage("FREEPASS", 3)),
+    );
+    expect(results.every(Boolean)).toBe(true);
+    expect(dbState.promos[0].usedCount).toBe(60);
+  });
+
+  it("uses the supplied conn for both lookup and update", async () => {
+    let selects = 0;
+    let updates = 0;
+    const conn = {
+      select: () => {
+        selects++;
+        return {
+          from: () => ({
+            where: async () => [{ discountType: "percentage" }],
+          }),
+        };
+      },
+      update: () => {
+        updates++;
+        return { set: () => ({ where: async () => ({ rowCount: 1 }) }) };
+      },
+    } as unknown as Parameters<typeof incrementPromoUsage>[2];
+    const ok = await incrementPromoUsage("FOO", 1, conn);
+    expect(ok).toBe(true);
+    expect(selects).toBe(1);
+    expect(updates).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// calculatePricing — the new complimentary branch (zero on fit, leave full
+// price + surface remainingSeats on shortfall).
+// ---------------------------------------------------------------------------
+
 describe("calculatePricing — complimentary code", () => {
   it("zeros the order when remaining seats >= requested quantity", async () => {
-    seedComplimentaryPromo(/* maxUses */ 5, /* usedCount */ 0);
+    seedPromo({ maxUses: 5, usedCount: 0 });
     const result = await calculatePricing("single", 3, "FREEPASS");
-    // 3 × £199 = £597 base. Comp covers it entirely → subtotal 0, VAT 0, total 0.
     expect(result.baseSubtotal).toBe(597);
     expect(result.promoDiscountAmount).toBe(597);
     expect(result.subtotalAfterDiscounts).toBe(0);
-    expect(result.vatAmount).toBe(0);
     expect(result.total).toBe(0);
     expect(result.promoDiscountType).toBe("complimentary");
     expect(result.promoRemainingSeats).toBe(5);
   });
 
   it("zeros the order when remaining seats == requested quantity (exact-fit)", async () => {
-    seedComplimentaryPromo(/* maxUses */ 4, /* usedCount */ 1); // 3 remaining
+    seedPromo({ maxUses: 4, usedCount: 1 });
     const result = await calculatePricing("single", 3, "FREEPASS");
     expect(result.promoDiscountAmount).toBe(597);
     expect(result.total).toBe(0);
@@ -351,22 +347,18 @@ describe("calculatePricing — complimentary code", () => {
   });
 
   it("does NOT discount when remaining seats < requested quantity (shortfall)", async () => {
-    seedComplimentaryPromo(/* maxUses */ 5, /* usedCount */ 3); // only 2 remaining
+    seedPromo({ maxUses: 5, usedCount: 3 });
     const result = await calculatePricing("single", 3, "FREEPASS");
-    // 3 × £199 = £597 base. Shortfall → no discount → full price + 20% VAT.
-    expect(result.baseSubtotal).toBe(597);
     expect(result.promoDiscountAmount).toBe(0);
     expect(result.subtotalAfterDiscounts).toBe(597);
     expect(result.vatAmount).toBeCloseTo(119.4, 2);
     expect(result.total).toBeCloseTo(716.4, 2);
-    // Critically — surface remaining seats so the UI can show the amber
-    // prompt with "Reduce to N tickets".
     expect(result.promoDiscountType).toBe("complimentary");
     expect(result.promoRemainingSeats).toBe(2);
   });
 
-  it("does NOT discount when remaining seats == 0 (fully redeemed)", async () => {
-    seedComplimentaryPromo(/* maxUses */ 2, /* usedCount */ 2);
+  it("does NOT discount when remaining seats == 0", async () => {
+    seedPromo({ maxUses: 2, usedCount: 2 });
     const result = await calculatePricing("single", 1, "FREEPASS");
     expect(result.promoDiscountAmount).toBe(0);
     expect(result.promoRemainingSeats).toBe(0);
@@ -374,9 +366,7 @@ describe("calculatePricing — complimentary code", () => {
   });
 
   it("treats null maxUses as unlimited and always covers the order", async () => {
-    seedComplimentaryPromo(/* maxUses */ 0, /* usedCount */ 0);
-    // Override maxUses to null after seeding so the helper signature stays simple.
-    dbState.promos[0].maxUses = null;
+    seedPromo({ maxUses: null, usedCount: 0 });
     const result = await calculatePricing("single", 10, "FREEPASS");
     expect(result.promoDiscountAmount).toBe(result.baseSubtotal);
     expect(result.total).toBe(0);

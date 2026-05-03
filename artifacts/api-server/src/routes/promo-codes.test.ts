@@ -26,11 +26,7 @@ function resetPromos(...rows: PromoRow[]): void {
 
 vi.mock("@workspace/db", () => {
   const db = {
-    select: () => ({
-      from: () => ({
-        where: async () => promos,
-      }),
-    }),
+    select: () => ({ from: () => ({ where: async () => promos }) }),
   };
   return {
     db,
@@ -82,7 +78,7 @@ function makeRes(): FakeRes {
     },
   } as unknown as Response;
   return new Proxy({} as FakeRes, {
-    get(_target, prop) {
+    get(_t, prop) {
       if (prop === "res") return res;
       if (prop === "status") return captured.status;
       if (prop === "body") return captured.body;
@@ -91,7 +87,7 @@ function makeRes(): FakeRes {
   });
 }
 
-function basePromo(overrides: Partial<PromoRow> = {}): PromoRow {
+function basePromo(over: Partial<PromoRow> = {}): PromoRow {
   return {
     code: "FREEPASS",
     discountType: "complimentary",
@@ -106,7 +102,7 @@ function basePromo(overrides: Partial<PromoRow> = {}): PromoRow {
     minQuantity: null,
     oncePerCustomer: false,
     description: null,
-    ...overrides,
+    ...over,
   };
 }
 
@@ -122,18 +118,16 @@ describe("POST /api/promo-codes/validate — complimentary code shortfall", () =
       makeReq({ code: "freepass", passType: "single", quantity: 3 }),
       r.res,
     );
-    expect(r.status).toBeUndefined(); // default 200
+    expect(r.status).toBeUndefined();
     const body = r.body as Record<string, unknown>;
     expect(body.valid).toBe(true);
     expect(body.code).toBe("FREEPASS");
     expect(body.discountType).toBe("complimentary");
     expect(body.remainingSeats).toBe(5);
-    // Comp = 100% off. 3 × £199 = £597.
     expect(body.discountAmount).toBe(597);
   });
 
-  it("returns valid + the *true* remaining count when requested qty exceeds remaining (shortfall)", async () => {
-    // 5 max, 3 used → only 2 remaining. User asks for 4.
+  it("returns valid + true remaining count when requested qty exceeds remaining (shortfall)", async () => {
     resetPromos(basePromo({ maxUses: 5, usedCount: 3 }));
     const r = makeRes();
     await validatePromoCodeHandler(
@@ -144,13 +138,10 @@ describe("POST /api/promo-codes/validate — complimentary code shortfall", () =
     const body = r.body as Record<string, unknown>;
     expect(body.valid).toBe(true);
     expect(body.remainingSeats).toBe(2);
-    // The validate endpoint surfaces the full discountAmount (100% off the
-    // base) so the UI can compute the prompt; the actual zeroing only kicks
-    // in inside calculatePricing once qty <= remainingSeats.
     expect(body.discountAmount).toBe(199 * 4);
   });
 
-  it("rejects with the new shortfall message when the comp code is fully redeemed (remainingSeats == 0)", async () => {
+  it("rejects with the new shortfall message when comp code is fully redeemed", async () => {
     resetPromos(basePromo({ maxUses: 5, usedCount: 5 }));
     const r = makeRes();
     await validatePromoCodeHandler(
@@ -158,12 +149,12 @@ describe("POST /api/promo-codes/validate — complimentary code shortfall", () =
       r.res,
     );
     expect(r.status).toBe(400);
-    const body = r.body as Record<string, unknown>;
-    expect(body.error).toMatch(/complimentary code has been fully redeemed/i);
+    expect((r.body as Record<string, unknown>).error).toMatch(
+      /complimentary code has been fully redeemed/i,
+    );
   });
 
-  it("rejects with the comp-specific copy via the maxUses-reached short-circuit", async () => {
-    // usedCount > maxUses (admin lowered the cap) → still hits the early-out.
+  it("uses the comp-specific copy via the maxUses-reached short-circuit", async () => {
     resetPromos(basePromo({ maxUses: 2, usedCount: 5 }));
     const r = makeRes();
     await validatePromoCodeHandler(
@@ -171,10 +162,9 @@ describe("POST /api/promo-codes/validate — complimentary code shortfall", () =
       r.res,
     );
     expect(r.status).toBe(400);
-    const body = r.body as Record<string, unknown>;
-    expect(body.error).toMatch(/complimentary code has been fully redeemed/i);
-    // Crucially: not the generic "already been used up" copy.
-    expect(body.error).not.toMatch(/used up/i);
+    const error = (r.body as Record<string, unknown>).error as string;
+    expect(error).toMatch(/complimentary code has been fully redeemed/i);
+    expect(error).not.toMatch(/used up/i);
   });
 
   it("uses the generic 'used up' copy when a NON-complimentary capped code is exhausted", async () => {
@@ -187,9 +177,9 @@ describe("POST /api/promo-codes/validate — complimentary code shortfall", () =
       r.res,
     );
     expect(r.status).toBe(400);
-    const body = r.body as Record<string, unknown>;
-    expect(body.error).toMatch(/already been used up/i);
-    expect(body.error).not.toMatch(/complimentary/i);
+    const error = (r.body as Record<string, unknown>).error as string;
+    expect(error).toMatch(/already been used up/i);
+    expect(error).not.toMatch(/complimentary/i);
   });
 
   it("returns null remainingSeats when the comp code has no cap (maxUses null)", async () => {
