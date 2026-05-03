@@ -1037,13 +1037,10 @@ export async function sendOrganiserNotification(bookingId: number): Promise<bool
     .from(notificationEmailsTable)
     .orderBy(notificationEmailsTable.createdAt);
 
-  const recipients: string[] = storedEmails.filter((e) => e.notifyComplete).map((e) => e.email);
-  if (
-    process.env.ORGANISER_EMAIL &&
-    !recipients.includes(process.env.ORGANISER_EMAIL.toLowerCase())
-  ) {
-    recipients.push(process.env.ORGANISER_EMAIL);
-  }
+  const recipients = sanitizeRecipients([
+    ...storedEmails.filter((e) => e.notifyComplete).map((e) => e.email),
+    process.env.ORGANISER_EMAIL,
+  ]);
 
   if (recipients.length === 0) {
     logger.info(
@@ -1285,13 +1282,10 @@ export async function sendBillingEditNotification(
     .from(notificationEmailsTable)
     .orderBy(notificationEmailsTable.createdAt);
 
-  const recipients: string[] = storedEmails.filter((e) => e.notifyBillingEdit).map((e) => e.email);
-  if (
-    process.env.ORGANISER_EMAIL &&
-    !recipients.includes(process.env.ORGANISER_EMAIL.toLowerCase())
-  ) {
-    recipients.push(process.env.ORGANISER_EMAIL);
-  }
+  const recipients = sanitizeRecipients([
+    ...storedEmails.filter((e) => e.notifyBillingEdit).map((e) => e.email),
+    process.env.ORGANISER_EMAIL,
+  ]);
 
   if (recipients.length === 0) {
     logger.info(
@@ -1411,13 +1405,10 @@ export async function sendIncompleteFormNotification(bookingId: number): Promise
     .from(notificationEmailsTable)
     .orderBy(notificationEmailsTable.createdAt);
 
-  const recipients: string[] = storedEmails.filter((e) => e.notifyIncomplete).map((e) => e.email);
-  if (
-    process.env.ORGANISER_EMAIL &&
-    !recipients.includes(process.env.ORGANISER_EMAIL.toLowerCase())
-  ) {
-    recipients.push(process.env.ORGANISER_EMAIL);
-  }
+  const recipients = sanitizeRecipients([
+    ...storedEmails.filter((e) => e.notifyIncomplete).map((e) => e.email),
+    process.env.ORGANISER_EMAIL,
+  ]);
 
   if (recipients.length === 0) {
     logger.info(
@@ -1577,19 +1568,37 @@ export async function sendIncompleteFormNotification(bookingId: number): Promise
   );
 }
 
+/**
+ * Drop empty / whitespace / invalid (no `@`) entries and trim. Without this,
+ * a stray blank row in `notification_emails` (or an empty ORGANISER_EMAIL env
+ * var) would make nodemailer throw EENVELOPE "No recipients defined" on every
+ * delivery, leaving the organiserNotified flag stuck at false and the booking
+ * permanently flagged as "needs attention" in the admin panel.
+ */
+function sanitizeRecipients(raw: (string | null | undefined)[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const r of raw) {
+    if (!r) continue;
+    const trimmed = r.trim();
+    if (!trimmed || !trimmed.includes("@")) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+  }
+  return out;
+}
+
 async function getOrganiserEmails(): Promise<string[]> {
   const storedEmails = await db
     .select()
     .from(notificationEmailsTable)
     .orderBy(notificationEmailsTable.createdAt);
-  const recipients: string[] = storedEmails.filter((e) => e.notifyComplete).map((e) => e.email);
-  if (
-    process.env.ORGANISER_EMAIL &&
-    !recipients.includes(process.env.ORGANISER_EMAIL.toLowerCase())
-  ) {
-    recipients.push(process.env.ORGANISER_EMAIL);
-  }
-  return recipients;
+  return sanitizeRecipients([
+    ...storedEmails.filter((e) => e.notifyComplete).map((e) => e.email),
+    process.env.ORGANISER_EMAIL,
+  ]);
 }
 
 function formatCalendarRangeLabel(start: Date, end: Date, tz: string): string {
