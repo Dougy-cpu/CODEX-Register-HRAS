@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   useUpdateBooking,
-  useCalculatePricing,
+  calculatePricing,
   useListDiscountTiers,
   customFetch,
   type PricingRequestPassType,
   type DiscountTier,
+  type PricingBreakdown,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ import { CompShortfallPrompt } from "./CompShortfallPrompt";
 
 interface Step2PassesProps {
   booking: BookingWithAttendees;
+  onAdvance?: (step: number) => void;
 }
 
 const DEFAULT_SINGLE_BENEFITS = [
@@ -300,7 +302,7 @@ function UpsellNudge({ tiers, passType, quantity, unitLabel }: UpsellNudgeProps)
   );
 }
 
-export default function Step2Passes({ booking }: Step2PassesProps) {
+export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
   const updateBooking = useUpdateBooking();
   const isHR = booking.attendeeType === "hr_professional";
   const isVendor = booking.attendeeType === "consultant_vendor";
@@ -339,10 +341,18 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
   const [hearOptions, setHearOptions] = useState<string[]>(FALLBACK_HEAR_OPTIONS);
   const hauFetched = useRef(false);
 
-  const calculatePricingMutation = useCalculatePricing();
   const queryClient = useQueryClient();
 
   const { data: allTiers = [] } = useListDiscountTiers();
+
+  // Pricing fetch: trailing-debounced + abortable. We tag every request with
+  // a monotonically-increasing reqId and only commit the response when it
+  // matches the latest request — this drops out-of-order responses caused by
+  // rapid quantity changes (which would otherwise leave the order summary
+  // showing a price for the wrong quantity).
+  const [currentPricing, setCurrentPricing] = useState<PricingBreakdown | null>(null);
+  const [pricingLoading, setPricingLoading] = useState(false);
+  const pricingReqIdRef = useRef(0);
 
   useEffect(() => {
     fetch("/api/passes/inventory")
@@ -367,13 +377,32 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
   }, []);
 
   useEffect(() => {
-    calculatePricingMutation.mutate({
-      data: { passType: selectedPass, quantity, promoCode: appliedPromoCode ?? undefined },
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const reqId = ++pricingReqIdRef.current;
+    const ac = new AbortController();
+    setPricingLoading(true);
+    const timer = setTimeout(() => {
+      calculatePricing(
+        { passType: selectedPass, quantity, promoCode: appliedPromoCode ?? undefined },
+        { signal: ac.signal },
+      )
+        .then((data) => {
+          // Drop the response if a newer request has been issued in the meantime
+          if (reqId === pricingReqIdRef.current) {
+            setCurrentPricing(data);
+            setPricingLoading(false);
+          }
+        })
+        .catch(() => {
+          // Aborted or transient error — next debounced call will retry.
+          // Only clear the loading flag if this was the latest request.
+          if (reqId === pricingReqIdRef.current) setPricingLoading(false);
+        });
+    }, 300);
+    return () => {
+      clearTimeout(timer);
+      ac.abort();
+    };
   }, [selectedPass, quantity, appliedPromoCode]);
-
-  const currentPricing = calculatePricingMutation.data;
 
   // Complimentary codes are capped by ticket count, not booking count. When
   // the requested quantity exceeds the seats remaining on the comp code, the
@@ -478,6 +507,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
   }, [selectedPass, quantity, leadEmail]);
 
   const handleContinue = async () => {
+    onAdvance?.(3);
     await updateBooking.mutateAsync({
       id: booking.id,
       data: {
@@ -1034,7 +1064,7 @@ export default function Step2Passes({ booking }: Step2PassesProps) {
           size="lg"
           className="px-10 h-14 text-lg bg-primary hover:bg-primary/90 text-white border-none"
           onClick={handleContinue}
-          disabled={calculatePricingMutation.isPending || !booking.id || compShortfall}
+          disabled={pricingLoading || !booking.id || compShortfall}
         >
           Continue to Attendees
         </Button>

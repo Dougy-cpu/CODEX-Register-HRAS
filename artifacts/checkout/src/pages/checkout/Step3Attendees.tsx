@@ -15,7 +15,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Checkbox } from "@/components/ui/checkbox";
-import { User, Clock, Info } from "lucide-react";
+import { User, Clock, Info, AlertTriangle } from "lucide-react";
 import type { BookingWithAttendees } from "@/types/booking";
 
 const attendeeSchema = z.object({
@@ -44,9 +44,10 @@ interface AttendeeFormData {
 
 interface Step3AttendeesProps {
   booking: BookingWithAttendees;
+  onAdvance?: (step: number) => void;
 }
 
-export default function Step3Attendees({ booking }: Step3AttendeesProps) {
+export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesProps) {
   const updateBooking = useUpdateBooking();
   const createAttendee = useCreateAttendee();
   const updateAttendee = useUpdateAttendee();
@@ -114,10 +115,45 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
 
   const autosaveIdsRef = useRef<(number | undefined)[]>(formsData.map((f) => f.id));
 
+  // Autosave status surfacing. The previous implementation swallowed every
+  // network/server error silently — buyers could fill in 10 attendees and
+  // click Continue without realising none of it had been persisted. We now
+  // track an explicit status and surface failures via an inline banner +
+  // disable the Continue button until the next autosave cycle succeeds.
+  // Each user keystroke retriggers the effect, providing implicit retry.
+  const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "error">("idle");
+  const [autosaveAttempt, setAutosaveAttempt] = useState(0); // bump to force-retry
+
   useEffect(() => {
     if (formsData.length === 0) return;
+    let cancelled = false;
     const timer = setTimeout(async () => {
+      // Decide whether anything is actually pending a save this cycle. If no
+      // attendee row has the minimum fields needed for a save, stay idle so
+      // the Continue button isn't gated for empty rows.
+      let anyEligible = false;
       for (let i = 0; i < formsData.length; i++) {
+        const form = formsData[i];
+        const isTbc = tbcFlags[i];
+        if (isTbc) {
+          // TBC rows only need a save if they don't yet have a server id
+          if (!(form.id ?? autosaveIdsRef.current[i])) anyEligible = true;
+          else anyEligible = true; // re-saving isTbc=true is cheap and safe
+        } else if (form.firstName && form.workEmail) {
+          anyEligible = true;
+        }
+        if (anyEligible) break;
+      }
+      if (!anyEligible) {
+        setAutosaveStatus("idle");
+        return;
+      }
+
+      setAutosaveStatus("saving");
+      let hadError = false;
+
+      for (let i = 0; i < formsData.length; i++) {
+        if (cancelled) return;
         const form = formsData[i];
         const isTbc = tbcFlags[i];
 
@@ -140,8 +176,9 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
                   gdprConsent: form.gdprConsent,
                 },
               });
-            } catch {
-              /* silent */
+            } catch (e) {
+              hadError = true;
+              console.warn("autosave: lead attendee update failed", e);
             }
           }
         } else {
@@ -192,15 +229,22 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
               });
               autosaveIdsRef.current[i] = created.id;
             }
-          } catch {
-            /* silent */
+          } catch (e) {
+            hadError = true;
+            console.warn(`autosave: attendee ${i} save failed`, e);
           }
         }
       }
+
+      if (cancelled) return;
+      setAutosaveStatus(hadError ? "error" : "idle");
     }, 1500);
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formsData, tbcFlags]);
+  }, [formsData, tbcFlags, autosaveAttempt]);
 
   const handleForMeToggle = (index: number, checked: boolean) => {
     const newFlags = [...forMeFlags];
@@ -371,6 +415,7 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
         }
       }
 
+      onAdvance?.(4);
       await updateBooking.mutateAsync({
         id: booking.id,
         data: { currentStep: 4 },
@@ -614,6 +659,26 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
         })}
       </Accordion>
 
+      {autosaveStatus === "error" && (
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded p-4 text-sm text-amber-800">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-semibold">We couldn't save your last change</p>
+            <p>
+              Please check your connection. We'll retry automatically as you keep typing, or you can{" "}
+              <button
+                type="button"
+                onClick={() => setAutosaveAttempt((n) => n + 1)}
+                className="underline font-semibold hover:text-amber-900"
+              >
+                retry now
+              </button>
+              .
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between pt-4">
         <Button
           variant="outline"
@@ -630,9 +695,15 @@ export default function Step3Attendees({ booking }: Step3AttendeesProps) {
           size="lg"
           className="px-10 h-14 text-lg bg-primary hover:bg-primary/90 text-white border-none"
           onClick={handleContinue}
-          disabled={isSubmitting}
+          disabled={isSubmitting || autosaveStatus === "saving" || autosaveStatus === "error"}
         >
-          {isSubmitting ? "Saving..." : "Continue to Payment"}
+          {isSubmitting
+            ? "Saving..."
+            : autosaveStatus === "saving"
+              ? "Saving changes..."
+              : autosaveStatus === "error"
+                ? "Save failed — retrying"
+                : "Continue to Payment"}
         </Button>
       </div>
     </div>

@@ -185,13 +185,20 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
   // Two triggers: (1) beforeunload via sendBeacon for tab close / navigation away,
   // (2) a 20-minute setTimeout as a fallback for users who stay but then leave.
   // Both are no-ops if the booking has already been paid/invoiced.
+  // The beforeunload beacon is gated on the user having stayed on this step
+  // for at least PING_DWELL_MS so quick bounces (loaded → immediately closed)
+  // don't flood the incomplete-booking notification logic. Reaching Step 4
+  // already implies the user has progressed past Step 1.
   useEffect(() => {
     if (booking.status !== "partial") return;
 
+    const PING_DWELL_MS = 10_000;
     const pingUrl = `/api/bookings/${booking.id}/incomplete-ping`;
+    const mountedAt = Date.now();
 
     const handleBeforeUnload = () => {
       if (isSubmittingPaymentRef.current) return;
+      if (Date.now() - mountedAt < PING_DWELL_MS) return;
       navigator.sendBeacon(pingUrl, "");
     };
 

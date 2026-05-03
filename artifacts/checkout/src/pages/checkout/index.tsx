@@ -6,15 +6,51 @@ import { useQueryClient } from "@tanstack/react-query";
 import { v4 as uuidv4 } from "uuid";
 
 // Hooks
+// Persist the booking session token to localStorage so accidental tab closes
+// or browser restarts can resume the booking. Falls back to (and migrates
+// from) sessionStorage for in-flight users on the previous deploy. Both
+// stores are kept in sync so legacy code paths (e.g. the x-booking-session
+// header in custom-fetch) continue to work.
+const BOOKING_SESSION_KEY = "booking_session";
+
+function readBookingSessionToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const fromLocal = window.localStorage?.getItem(BOOKING_SESSION_KEY);
+    if (fromLocal) return fromLocal;
+  } catch {
+    /* localStorage may be blocked (private mode, quota) */
+  }
+  try {
+    return window.sessionStorage?.getItem(BOOKING_SESSION_KEY) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function writeBookingSessionToken(token: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage?.setItem(BOOKING_SESSION_KEY, token);
+  } catch {
+    /* fall through to sessionStorage */
+  }
+  try {
+    window.sessionStorage?.setItem(BOOKING_SESSION_KEY, token);
+  } catch {
+    /* ignore */
+  }
+}
+
 function useBookingSession() {
   const [sessionToken, setSessionToken] = useState<string>("");
 
   useEffect(() => {
-    let token = sessionStorage.getItem("booking_session");
+    let token = readBookingSessionToken();
     if (!token) {
       token = uuidv4();
-      sessionStorage.setItem("booking_session", token);
     }
+    writeBookingSessionToken(token);
     setSessionToken(token);
   }, []);
 
@@ -39,6 +75,16 @@ export default function CheckoutFlow() {
   const [optimisticStep, setOptimisticStep] = useState<number | null>(null);
   const [optimisticBooking, setOptimisticBooking] = useState<BookingWithAttendees | null>(null);
   const [step1Error, setStep1Error] = useState<string | null>(null);
+  // viewBackStep lets the user view an earlier step via the browser back
+  // button without mutating the server-side currentStep. It overrides the
+  // server step ONLY when set by popstate (or restored from history.state on
+  // refresh). Any forward navigation (optimisticStep being set, server
+  // advancing beyond viewBackStep, or the user clicking Continue) clears it.
+  const [viewBackStep, setViewBackStep] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null;
+    const s = (window.history.state as { checkoutStep?: number } | null)?.checkoutStep;
+    return typeof s === "number" && s >= 1 && s <= 5 ? s : null;
+  });
 
   const isStripeReturn =
     typeof window !== "undefined" &&
@@ -119,8 +165,72 @@ export default function CheckoutFlow() {
     if (optimisticStep !== null && booking?.currentStep && booking.currentStep >= optimisticStep) {
       setOptimisticStep(null);
       setOptimisticBooking(null);
+      // Any successful advance also discards a back-view override.
+      setViewBackStep(null);
     }
   }, [booking?.currentStep, optimisticStep]);
+
+  const serverStep = booking?.currentStep ?? 1;
+
+  // If the server step ever advances past viewBackStep, the user has clearly
+  // moved forward (e.g. a Continue handler succeeded) — drop the back view
+  // so we render the latest server step. Also clamp stale history entries
+  // that point past the booking's actual progress.
+  useEffect(() => {
+    if (viewBackStep !== null && viewBackStep > serverStep) {
+      setViewBackStep(null);
+    }
+  }, [serverStep, viewBackStep]);
+
+  const currentStep = optimisticStep ?? viewBackStep ?? serverStep;
+
+  // Mirror currentStep into the browser history stack so the back button
+  // walks the user through the checkout instead of leaving the site.
+  // The first render uses replaceState (so we don't add a phantom entry);
+  // subsequent changes use pushState. We also avoid pushing when the
+  // current state already matches (e.g. immediately after popstate).
+  const historyInitRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !booking) return;
+    const stateStep = (window.history.state as { checkoutStep?: number } | null)?.checkoutStep;
+    if (stateStep === currentStep) {
+      historyInitRef.current = true;
+      return;
+    }
+    const nextState = { ...(window.history.state ?? {}), checkoutStep: currentStep };
+    if (!historyInitRef.current || stateStep == null) {
+      window.history.replaceState(nextState, "");
+      historyInitRef.current = true;
+    } else {
+      window.history.pushState(nextState, "");
+    }
+  }, [currentStep, booking]);
+
+  // popstate listener: when the user presses back, jump to whatever step the
+  // popped history entry refers to. When they run out of in-checkout entries,
+  // the browser falls through to the previous site (default behaviour).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = (e: PopStateEvent) => {
+      const popped = (e.state as { checkoutStep?: number } | null)?.checkoutStep;
+      if (typeof popped === "number" && popped >= 1 && popped <= 5) {
+        setOptimisticStep(null);
+        setOptimisticBooking(null);
+        setViewBackStep(popped);
+      }
+    };
+    window.addEventListener("popstate", handler);
+    return () => window.removeEventListener("popstate", handler);
+  }, []);
+
+  // Wrapper passed to all step components so any forward Continue click also
+  // clears a back-view override (otherwise the no-op PATCH after going back
+  // wouldn't update the server step and the UI would remain stuck on the
+  // back-viewed step).
+  const advanceTo = (step: number) => {
+    setViewBackStep(null);
+    setOptimisticStep(step);
+  };
 
   const onAdvance = (
     step: number | null,
@@ -195,7 +305,6 @@ export default function CheckoutFlow() {
     );
   }
 
-  const currentStep = optimisticStep ?? booking?.currentStep ?? 1;
   const effectiveBooking = booking ?? optimisticBooking ?? undefined;
 
   const renderStep = () => {
@@ -211,9 +320,13 @@ export default function CheckoutFlow() {
           />
         );
       case 2:
-        return effectiveBooking ? <Step2Passes booking={effectiveBooking} /> : null;
+        return effectiveBooking ? (
+          <Step2Passes booking={effectiveBooking} onAdvance={advanceTo} />
+        ) : null;
       case 3:
-        return effectiveBooking ? <Step3Attendees booking={effectiveBooking} /> : null;
+        return effectiveBooking ? (
+          <Step3Attendees booking={effectiveBooking} onAdvance={advanceTo} />
+        ) : null;
       case 4:
         return effectiveBooking ? <Step4Payment booking={effectiveBooking} /> : null;
       case 5:
