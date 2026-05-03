@@ -682,6 +682,79 @@ export const SendInvoiceReminderResponse = zod.object({
 });
 
 /**
+ * @summary Aging-bucket summary of unpaid invoices for the admin dashboard
+ */
+export const GetUnpaidInvoicesSummaryResponse = zod.object({
+  totalUnpaid: zod.number(),
+  totalOutstanding: zod.number(),
+  buckets: zod.object({
+    "0-7": zod.object({
+      count: zod.number(),
+      totalAmount: zod.number(),
+    }),
+    "8-14": zod.object({
+      count: zod.number(),
+      totalAmount: zod.number(),
+    }),
+    "15+": zod.object({
+      count: zod.number(),
+      totalAmount: zod.number(),
+    }),
+  }),
+});
+
+/**
+ * @summary List unpaid invoice bookings, optionally filtered by aging bucket
+ */
+export const ListUnpaidInvoicesQueryParams = zod.object({
+  bucket: zod.enum(["0-7", "8-14", "15+"]).optional(),
+  page: zod.coerce.number().optional(),
+  limit: zod.coerce.number().optional(),
+});
+
+export const ListUnpaidInvoicesResponse = zod.object({
+  rows: zod.array(
+    zod.object({
+      id: zod.number(),
+      orderReference: zod.string().nullish(),
+      leadName: zod.string().nullish(),
+      billingEmail: zod.string().nullish(),
+      totalAmount: zod.number(),
+      daysOutstanding: zod.number(),
+      bucket: zod.enum(["0-7", "8-14", "15+"]),
+      invoiceDueDate: zod.coerce.date().nullish(),
+      lastInvoiceReminderSentAt: zod.coerce.date().nullish(),
+      invoiceBadgeStatus: zod.enum(["paid", "voided", "overdue", "sent", "pending"]),
+    }),
+  ),
+  total: zod.number(),
+  page: zod.number(),
+  limit: zod.number(),
+});
+
+/**
+ * @summary Send invoice reminder emails to every booking in the 15+ days bucket
+ */
+export const BulkRemindUnpaidInvoicesBody = zod.object({
+  bucket: zod.enum(["15+"]),
+});
+
+export const BulkRemindUnpaidInvoicesResponse = zod.object({
+  success: zod.boolean(),
+  attempted: zod.number(),
+  sent: zod.number(),
+  failed: zod.number(),
+  failures: zod
+    .array(
+      zod.object({
+        bookingId: zod.number(),
+        error: zod.string(),
+      }),
+    )
+    .optional(),
+});
+
+/**
  * @summary Admin login — validate password and return session token
  */
 export const AdminLoginBody = zod.object({

@@ -67,6 +67,9 @@ function formatBooking(b: typeof bookingsTable.$inferSelect) {
     stripeInvoiceStatusSyncedAt: b.stripeInvoiceStatusSyncedAt
       ? b.stripeInvoiceStatusSyncedAt.toISOString()
       : null,
+    lastInvoiceReminderSentAt: b.lastInvoiceReminderSentAt
+      ? b.lastInvoiceReminderSentAt.toISOString()
+      : null,
     invoiceBadgeStatus: deriveInvoiceBadge({
       status: b.status,
       paymentMethod: b.paymentMethod,

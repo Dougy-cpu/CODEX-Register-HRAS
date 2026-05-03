@@ -2034,6 +2034,19 @@ export async function sendInvoiceReminder(bookingId: number): Promise<void> {
       contentType: "application/pdf",
     });
 
-  await sendMail({ to, subject, html, attachments });
+  const ok = await sendMail({ to, subject, html, attachments });
+  if (!ok) {
+    // sendMail swallows transport errors and returns false; surface as a thrown
+    // error so callers (single-send route + bulk-remind loop) can classify the
+    // failure and so we do NOT mark the timestamp as if it succeeded.
+    throw new Error("Failed to send invoice reminder email");
+  }
+  // Record successful send so the admin dashboard can show "last reminder sent"
+  // and so the unpaid-invoices widget aging info is fresh after a manual send.
+  await db
+    .update(bookingsTable)
+    .set({ lastInvoiceReminderSentAt: new Date() })
+    .where(eq(bookingsTable.id, bookingId));
+
   logger.info({ bookingId, to, orderRef, isOverdue }, "Invoice reminder email sent");
 }

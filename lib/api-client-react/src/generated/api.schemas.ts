@@ -705,6 +705,91 @@ export interface RegistrationList {
   limit: number;
 }
 
+export interface UnpaidInvoiceBucket {
+  count: number;
+  totalAmount: number;
+}
+
+export type UnpaidInvoicesSummaryBuckets = {
+  "0-7": UnpaidInvoiceBucket;
+  "8-14": UnpaidInvoiceBucket;
+  "15+": UnpaidInvoiceBucket;
+};
+
+export interface UnpaidInvoicesSummary {
+  totalUnpaid: number;
+  totalOutstanding: number;
+  buckets: UnpaidInvoicesSummaryBuckets;
+}
+
+export type UnpaidInvoiceRowBucket =
+  (typeof UnpaidInvoiceRowBucket)[keyof typeof UnpaidInvoiceRowBucket];
+
+export const UnpaidInvoiceRowBucket = {
+  "0-7": "0-7",
+  "8-14": "8-14",
+  "15+": "15+",
+} as const;
+
+export type UnpaidInvoiceRowInvoiceBadgeStatus =
+  (typeof UnpaidInvoiceRowInvoiceBadgeStatus)[keyof typeof UnpaidInvoiceRowInvoiceBadgeStatus];
+
+export const UnpaidInvoiceRowInvoiceBadgeStatus = {
+  paid: "paid",
+  voided: "voided",
+  overdue: "overdue",
+  sent: "sent",
+  pending: "pending",
+} as const;
+
+export interface UnpaidInvoiceRow {
+  id: number;
+  /** @nullable */
+  orderReference?: string | null;
+  /** @nullable */
+  leadName?: string | null;
+  /** @nullable */
+  billingEmail?: string | null;
+  totalAmount: number;
+  daysOutstanding: number;
+  bucket: UnpaidInvoiceRowBucket;
+  /** @nullable */
+  invoiceDueDate?: string | null;
+  /** @nullable */
+  lastInvoiceReminderSentAt?: string | null;
+  invoiceBadgeStatus: UnpaidInvoiceRowInvoiceBadgeStatus;
+}
+
+export interface UnpaidInvoiceList {
+  rows: UnpaidInvoiceRow[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export type BulkRemindBodyBucket = (typeof BulkRemindBodyBucket)[keyof typeof BulkRemindBodyBucket];
+
+export const BulkRemindBodyBucket = {
+  "15+": "15+",
+} as const;
+
+export interface BulkRemindBody {
+  bucket: BulkRemindBodyBucket;
+}
+
+export type BulkRemindResultFailuresItem = {
+  bookingId: number;
+  error: string;
+};
+
+export interface BulkRemindResult {
+  success: boolean;
+  attempted: number;
+  sent: number;
+  failed: number;
+  failures?: BulkRemindResultFailuresItem[];
+}
+
 /**
  * Configurable per-event branding, scheduling and contact details.
  */
@@ -814,6 +899,21 @@ export type ListEmailLogsParams = {
   page?: number;
   limit?: number;
 };
+
+export type ListUnpaidInvoicesParams = {
+  bucket?: ListUnpaidInvoicesBucket;
+  page?: number;
+  limit?: number;
+};
+
+export type ListUnpaidInvoicesBucket =
+  (typeof ListUnpaidInvoicesBucket)[keyof typeof ListUnpaidInvoicesBucket];
+
+export const ListUnpaidInvoicesBucket = {
+  "0-7": "0-7",
+  "8-14": "8-14",
+  "15+": "15+",
+} as const;
 
 export type ListRegistrationsParams = {
   status?: string;

@@ -739,6 +739,81 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  # ==================== UNPAID INVOICES WIDGET ====================
+  /admin/unpaid-invoices/summary:
+    get:
+      operationId: getUnpaidInvoicesSummary
+      tags: [admin]
+      summary: Aging-bucket summary of unpaid invoices for the admin dashboard
+      security:
+        - AdminToken: []
+      responses:
+        "200":
+          description: Bucket counts and totals
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnpaidInvoicesSummary"
+
+  /admin/unpaid-invoices:
+    get:
+      operationId: listUnpaidInvoices
+      tags: [admin]
+      summary: List unpaid invoice bookings, optionally filtered by aging bucket
+      security:
+        - AdminToken: []
+      parameters:
+        - name: bucket
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ["0-7", "8-14", "15+"]
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Page of unpaid invoice rows
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnpaidInvoiceList"
+
+  /admin/unpaid-invoices/bulk-remind:
+    post:
+      operationId: bulkRemindUnpaidInvoices
+      tags: [admin]
+      summary: Send invoice reminder emails to every booking in the 15+ days bucket
+      security:
+        - AdminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkRemindBody"
+      responses:
+        "200":
+          description: Bulk send result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkRemindResult"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   # ==================== ADMIN ====================
   /admin/login:
     post:
@@ -1810,6 +1885,133 @@ components:
         - total
         - page
         - limit
+
+    UnpaidInvoiceBucket:
+      type: object
+      properties:
+        count:
+          type: integer
+        totalAmount:
+          type: number
+      required:
+        - count
+        - totalAmount
+
+    UnpaidInvoicesSummary:
+      type: object
+      properties:
+        totalUnpaid:
+          type: integer
+        totalOutstanding:
+          type: number
+        buckets:
+          type: object
+          properties:
+            "0-7":
+              $ref: "#/components/schemas/UnpaidInvoiceBucket"
+            "8-14":
+              $ref: "#/components/schemas/UnpaidInvoiceBucket"
+            "15+":
+              $ref: "#/components/schemas/UnpaidInvoiceBucket"
+          required:
+            - "0-7"
+            - "8-14"
+            - "15+"
+      required:
+        - totalUnpaid
+        - totalOutstanding
+        - buckets
+
+    UnpaidInvoiceRow:
+      type: object
+      properties:
+        id:
+          type: integer
+        orderReference:
+          type: ["string", "null"]
+        leadName:
+          type: ["string", "null"]
+        billingEmail:
+          type: ["string", "null"]
+        totalAmount:
+          type: number
+        daysOutstanding:
+          type: integer
+        bucket:
+          type: string
+          enum: ["0-7", "8-14", "15+"]
+        invoiceDueDate:
+          type: ["string", "null"]
+          format: date-time
+        lastInvoiceReminderSentAt:
+          type: ["string", "null"]
+          format: date-time
+        invoiceBadgeStatus:
+          type: string
+          enum: [paid, voided, overdue, sent, pending]
+      required:
+        - id
+        - totalAmount
+        - daysOutstanding
+        - bucket
+        - invoiceBadgeStatus
+
+    UnpaidInvoiceList:
+      type: object
+      properties:
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnpaidInvoiceRow"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required:
+        - rows
+        - total
+        - page
+        - limit
+
+    BulkRemindBody:
+      type: object
+      properties:
+        bucket:
+          type: string
+          enum: ["15+"]
+      required:
+        - bucket
+
+    BulkRemindResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        attempted:
+          type: integer
+        sent:
+          type: integer
+        failed:
+          type: integer
+        failures:
+          type: array
+          items:
+            type: object
+            properties:
+              bookingId:
+                type: integer
+              error:
+                type: string
+            required:
+              - bookingId
+              - error
+      required:
+        - success
+        - attempted
+        - sent
+        - failed
 
     EventSettings:
       type: object

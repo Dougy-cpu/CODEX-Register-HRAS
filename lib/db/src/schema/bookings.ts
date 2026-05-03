@@ -70,6 +70,9 @@ export const bookingsTable = pgTable("bookings", {
   paidConfirmationEmailSentAt: timestamp("paid_confirmation_email_sent_at", {
     withTimezone: true,
   }),
+  lastInvoiceReminderSentAt: timestamp("last_invoice_reminder_sent_at", {
+    withTimezone: true,
+  }),
   hearAboutUs: text("hear_about_us"),
   managementToken: text("management_token").unique(),
   partialNotificationSent: boolean("partial_notification_sent").notNull().default(false),

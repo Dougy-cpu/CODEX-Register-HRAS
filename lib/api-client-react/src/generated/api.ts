@@ -23,6 +23,8 @@ import type {
   Attendee,
   Booking,
   BookingWithAttendees,
+  BulkRemindBody,
+  BulkRemindResult,
   ConfirmCardPaymentBody,
   ConfirmCardPaymentResponse,
   CreateAttendeeBody,
@@ -42,6 +44,7 @@ import type {
   InvoiceResponse,
   ListEmailLogsParams,
   ListRegistrationsParams,
+  ListUnpaidInvoicesParams,
   PricingBreakdown,
   PricingRequest,
   PromoCode,
@@ -50,6 +53,8 @@ import type {
   StripeSessionResponse,
   SuccessResponse,
   TestEmailBody,
+  UnpaidInvoiceList,
+  UnpaidInvoicesSummary,
   UpdateAttendeeBody,
   UpdateBookingBody,
   UpdateDiscountTiersBody,
@@ -2202,6 +2207,238 @@ export const useSendInvoiceReminder = <
   TContext
 > => {
   return useMutation(getSendInvoiceReminderMutationOptions(options));
+};
+
+/**
+ * @summary Aging-bucket summary of unpaid invoices for the admin dashboard
+ */
+export const getGetUnpaidInvoicesSummaryUrl = () => {
+  return `/api/admin/unpaid-invoices/summary`;
+};
+
+export const getUnpaidInvoicesSummary = async (
+  options?: RequestInit,
+): Promise<UnpaidInvoicesSummary> => {
+  return customFetch<UnpaidInvoicesSummary>(getGetUnpaidInvoicesSummaryUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetUnpaidInvoicesSummaryQueryKey = () => {
+  return [`/api/admin/unpaid-invoices/summary`] as const;
+};
+
+export const getGetUnpaidInvoicesSummaryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getUnpaidInvoicesSummary>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof getUnpaidInvoicesSummary>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetUnpaidInvoicesSummaryQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnpaidInvoicesSummary>>> = ({
+    signal,
+  }) => getUnpaidInvoicesSummary({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getUnpaidInvoicesSummary>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetUnpaidInvoicesSummaryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getUnpaidInvoicesSummary>>
+>;
+export type GetUnpaidInvoicesSummaryQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Aging-bucket summary of unpaid invoices for the admin dashboard
+ */
+
+export function useGetUnpaidInvoicesSummary<
+  TData = Awaited<ReturnType<typeof getUnpaidInvoicesSummary>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof getUnpaidInvoicesSummary>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetUnpaidInvoicesSummaryQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List unpaid invoice bookings, optionally filtered by aging bucket
+ */
+export const getListUnpaidInvoicesUrl = (params?: ListUnpaidInvoicesParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/unpaid-invoices?${stringifiedParams}`
+    : `/api/admin/unpaid-invoices`;
+};
+
+export const listUnpaidInvoices = async (
+  params?: ListUnpaidInvoicesParams,
+  options?: RequestInit,
+): Promise<UnpaidInvoiceList> => {
+  return customFetch<UnpaidInvoiceList>(getListUnpaidInvoicesUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListUnpaidInvoicesQueryKey = (params?: ListUnpaidInvoicesParams) => {
+  return [`/api/admin/unpaid-invoices`, ...(params ? [params] : [])] as const;
+};
+
+export const getListUnpaidInvoicesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listUnpaidInvoices>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListUnpaidInvoicesParams,
+  options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof listUnpaidInvoices>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListUnpaidInvoicesQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listUnpaidInvoices>>> = ({ signal }) =>
+    listUnpaidInvoices(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listUnpaidInvoices>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListUnpaidInvoicesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listUnpaidInvoices>>
+>;
+export type ListUnpaidInvoicesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List unpaid invoice bookings, optionally filtered by aging bucket
+ */
+
+export function useListUnpaidInvoices<
+  TData = Awaited<ReturnType<typeof listUnpaidInvoices>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListUnpaidInvoicesParams,
+  options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof listUnpaidInvoices>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListUnpaidInvoicesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Send invoice reminder emails to every booking in the 15+ days bucket
+ */
+export const getBulkRemindUnpaidInvoicesUrl = () => {
+  return `/api/admin/unpaid-invoices/bulk-remind`;
+};
+
+export const bulkRemindUnpaidInvoices = async (
+  bulkRemindBody: BulkRemindBody,
+  options?: RequestInit,
+): Promise<BulkRemindResult> => {
+  return customFetch<BulkRemindResult>(getBulkRemindUnpaidInvoicesUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(bulkRemindBody),
+  });
+};
+
+export const getBulkRemindUnpaidInvoicesMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkRemindUnpaidInvoices>>,
+    TError,
+    { data: BodyType<BulkRemindBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof bulkRemindUnpaidInvoices>>,
+  TError,
+  { data: BodyType<BulkRemindBody> },
+  TContext
+> => {
+  const mutationKey = ["bulkRemindUnpaidInvoices"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof bulkRemindUnpaidInvoices>>,
+    { data: BodyType<BulkRemindBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return bulkRemindUnpaidInvoices(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type BulkRemindUnpaidInvoicesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof bulkRemindUnpaidInvoices>>
+>;
+export type BulkRemindUnpaidInvoicesMutationBody = BodyType<BulkRemindBody>;
+export type BulkRemindUnpaidInvoicesMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Send invoice reminder emails to every booking in the 15+ days bucket
+ */
+export const useBulkRemindUnpaidInvoices = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkRemindUnpaidInvoices>>,
+    TError,
+    { data: BodyType<BulkRemindBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof bulkRemindUnpaidInvoices>>,
+  TError,
+  { data: BodyType<BulkRemindBody> },
+  TContext
+> => {
+  return useMutation(getBulkRemindUnpaidInvoicesMutationOptions(options));
 };
 
 /**

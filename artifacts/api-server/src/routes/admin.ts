@@ -54,6 +54,9 @@ function formatBooking(b: typeof bookingsTable.$inferSelect) {
     stripeInvoiceStatusSyncedAt: b.stripeInvoiceStatusSyncedAt
       ? b.stripeInvoiceStatusSyncedAt.toISOString()
       : null,
+    lastInvoiceReminderSentAt: b.lastInvoiceReminderSentAt
+      ? b.lastInvoiceReminderSentAt.toISOString()
+      : null,
     invoiceBadgeStatus: deriveInvoiceBadge({
       status: b.status,
       paymentMethod: b.paymentMethod,
@@ -1151,6 +1154,187 @@ router.get("/admin/activity", adminAuth, async (req, res): Promise<void> => {
       partialCheckouts: partialBookings.length,
     },
     unpaidInvoiceList: unpaidInvoiceList.map(formatBooking),
+  });
+});
+
+// ==================== UNPAID INVOICES DASHBOARD WIDGET ====================
+//
+// Aging buckets for the admin dashboard "Unpaid Invoices" widget. We measure
+// "days outstanding" from the booking's createdAt — close enough to the actual
+// invoice issue time for chasing purposes (a Stripe invoice is created within
+// seconds of the booking flipping to `invoiced`).
+//
+// Buckets:
+//   0-7   : freshly issued, no chasing needed yet
+//   8-14  : approaching due date, gentle reminder appropriate
+//   15+   : overdue (assumes standard 14-day terms) — bulk reminder allowed
+
+type AgingBucket = "0-7" | "8-14" | "15+";
+
+function bucketForDaysOutstanding(daysOutstanding: number): AgingBucket {
+  if (daysOutstanding <= 7) return "0-7";
+  if (daysOutstanding <= 14) return "8-14";
+  return "15+";
+}
+
+function isUnpaidInvoiceBooking(b: typeof bookingsTable.$inferSelect): boolean {
+  if (b.paymentMethod !== "invoice") return false;
+  if (b.status !== "invoiced") return false;
+  // Stripe-cached terminal states are excluded so paid/voided/uncollectible
+  // invoices never reappear in the widget even if booking.status hasn't been
+  // refreshed yet.
+  const cached = b.stripeInvoiceStatus;
+  if (cached === "paid" || cached === "void" || cached === "uncollectible") return false;
+  return true;
+}
+
+function daysBetween(a: Date, b: Date): number {
+  return Math.max(0, Math.floor((a.getTime() - b.getTime()) / (24 * 60 * 60 * 1000)));
+}
+
+router.get("/admin/unpaid-invoices/summary", adminAuth, async (_req, res): Promise<void> => {
+  const all = await db.select().from(bookingsTable);
+  const unpaid = all.filter(isUnpaidInvoiceBooking);
+  const now = new Date();
+
+  const buckets: Record<AgingBucket, { count: number; totalAmount: number }> = {
+    "0-7": { count: 0, totalAmount: 0 },
+    "8-14": { count: 0, totalAmount: 0 },
+    "15+": { count: 0, totalAmount: 0 },
+  };
+
+  for (const b of unpaid) {
+    const days = daysBetween(now, b.createdAt);
+    const bucket = bucketForDaysOutstanding(days);
+    buckets[bucket].count += 1;
+    buckets[bucket].totalAmount += parseFloat(b.totalAmount?.toString() || "0");
+  }
+
+  res.json({
+    totalUnpaid: unpaid.length,
+    totalOutstanding: unpaid.reduce(
+      (sum, b) => sum + parseFloat(b.totalAmount?.toString() || "0"),
+      0,
+    ),
+    buckets: {
+      "0-7": {
+        count: buckets["0-7"].count,
+        totalAmount: parseFloat(buckets["0-7"].totalAmount.toFixed(2)),
+      },
+      "8-14": {
+        count: buckets["8-14"].count,
+        totalAmount: parseFloat(buckets["8-14"].totalAmount.toFixed(2)),
+      },
+      "15+": {
+        count: buckets["15+"].count,
+        totalAmount: parseFloat(buckets["15+"].totalAmount.toFixed(2)),
+      },
+    },
+  });
+});
+
+router.get("/admin/unpaid-invoices", adminAuth, async (req, res): Promise<void> => {
+  const bucketFilter = req.query.bucket as AgingBucket | undefined;
+  const page = Math.max(1, parseInt((req.query.page as string) || "1", 10));
+  const limit = Math.min(100, Math.max(1, parseInt((req.query.limit as string) || "50", 10)));
+
+  if (bucketFilter && !["0-7", "8-14", "15+"].includes(bucketFilter)) {
+    res.status(400).json({ error: "Invalid bucket — must be one of 0-7, 8-14, 15+" });
+    return;
+  }
+
+  const all = await db
+    .select()
+    .from(bookingsTable)
+    .where(and(eq(bookingsTable.paymentMethod, "invoice"), eq(bookingsTable.status, "invoiced")));
+  const allAttendees = await db.select().from(attendeesTable);
+  const now = new Date();
+
+  const rows = all
+    .filter(isUnpaidInvoiceBooking)
+    .map((b) => {
+      const daysOutstanding = daysBetween(now, b.createdAt);
+      const bucket = bucketForDaysOutstanding(daysOutstanding);
+      const lead = allAttendees.find((a) => a.bookingId === b.id && a.isLead);
+      return {
+        id: b.id,
+        orderReference: b.orderReference,
+        leadName: lead ? `${lead.firstName} ${lead.lastName}` : null,
+        billingEmail: b.billingEmail || lead?.workEmail || null,
+        totalAmount: parseFloat(b.totalAmount?.toString() || "0"),
+        daysOutstanding,
+        bucket,
+        invoiceDueDate: b.invoiceDueDate ? b.invoiceDueDate.toISOString() : null,
+        lastInvoiceReminderSentAt: b.lastInvoiceReminderSentAt
+          ? b.lastInvoiceReminderSentAt.toISOString()
+          : null,
+        invoiceBadgeStatus: deriveInvoiceBadge({
+          status: b.status,
+          paymentMethod: b.paymentMethod,
+          stripeInvoiceId: b.stripeInvoiceId,
+          stripeInvoiceStatus: b.stripeInvoiceStatus,
+          invoiceDueDate: b.invoiceDueDate,
+          paidAt: b.paidAt,
+        }),
+      };
+    })
+    .filter((r) => !bucketFilter || r.bucket === bucketFilter)
+    .sort((a, b) => b.daysOutstanding - a.daysOutstanding);
+
+  const total = rows.length;
+  const offset = (page - 1) * limit;
+  res.json({
+    rows: rows.slice(offset, offset + limit),
+    total,
+    page,
+    limit,
+  });
+});
+
+router.post("/admin/unpaid-invoices/bulk-remind", adminAuth, async (req, res): Promise<void> => {
+  const bucket = req.body?.bucket as AgingBucket | undefined;
+  // Only the 15+ bucket can be bulk-reminded — to avoid spamming customers who
+  // just received their invoice. The UI enforces this too, but the backend is
+  // the source of truth.
+  if (bucket !== "15+") {
+    res.status(400).json({ error: "Bulk reminders are only allowed for the 15+ days bucket" });
+    return;
+  }
+
+  const all = await db.select().from(bookingsTable);
+  const now = new Date();
+  const targets = all.filter(
+    (b) =>
+      isUnpaidInvoiceBooking(b) &&
+      bucketForDaysOutstanding(daysBetween(now, b.createdAt)) === "15+",
+  );
+
+  const { sendInvoiceReminder } = await import("../lib/email");
+  let sent = 0;
+  const failures: Array<{ bookingId: number; error: string }> = [];
+  for (const b of targets) {
+    try {
+      await sendInvoiceReminder(b.id);
+      sent += 1;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "unknown error";
+      failures.push({ bookingId: b.id, error: message });
+      logger.error({ err, bookingId: b.id }, "bulk-remind: failed to send reminder");
+    }
+  }
+
+  await logAdminAction({
+    type: "admin_invoice_reminder_sent",
+    summary: `Bulk-sent invoice reminders to ${sent} of ${targets.length} 15+day overdue bookings`,
+    meta: { bucket, attempted: targets.length, sent, failed: failures.length },
+  });
+
+  res.json({
+    success: true,
+    attempted: targets.length,
+    sent,
+    failed: failures.length,
+    failures,
   });
 });
 

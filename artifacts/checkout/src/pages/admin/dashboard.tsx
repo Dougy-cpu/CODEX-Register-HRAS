@@ -2,6 +2,7 @@ import { useGetAdminStats } from "@workspace/api-client-react";
 import AdminLayout from "@/components/layout/AdminLayout";
 import { Card } from "@/components/ui/card";
 import { Users, CreditCard, Receipt, TrendingUp, Clock } from "lucide-react";
+import UnpaidInvoicesWidget from "@/components/admin/UnpaidInvoicesWidget";
 
 type RegRow = {
   id: number;
@@ -257,6 +258,10 @@ export default function AdminDashboard() {
             </div>
           </div>
         </Card>
+      </div>
+
+      <div className="mb-8">
+        <UnpaidInvoicesWidget />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
