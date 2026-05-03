@@ -20,6 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { customFetch } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { InvoiceBadge } from "@/components/InvoiceBadge";
+import InvoiceActions from "@/components/manage/InvoiceActions";
 import type { Attendee, BookingWithAttendees } from "@/types/booking";
 
 const attendeeSchema = z.object({
@@ -487,6 +488,21 @@ export default function ManageAttendees() {
                 You can still update any attendee's details by expanding their card below.
               </p>
             </div>
+          </div>
+        )}
+
+        {(booking.status === "invoiced" || booking.status === "paid") && (
+          <div className="mb-6">
+            <InvoiceActions
+              token={token}
+              paymentMethod={booking.paymentMethod ?? null}
+              recipientHint={
+                booking.billingEmail ||
+                attendees.find((a) => a.isLead)?.workEmail ||
+                attendees[0]?.workEmail ||
+                null
+              }
+            />
           </div>
         )}
 

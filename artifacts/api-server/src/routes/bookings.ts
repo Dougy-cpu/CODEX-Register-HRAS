@@ -14,6 +14,8 @@ import {
   sendOrganiserNotification,
   sendReissuedInvoiceEmail,
   getEventSettings,
+  resolveLatestBookingPdf,
+  resendConfirmationAndReceipt,
 } from "../lib/email";
 import { logger } from "../lib/logger";
 import {
@@ -21,6 +23,7 @@ import {
   applyReissueInvoiceResultTx,
   getStripeInvoiceStatus,
   refreshStripeInvoiceStatusIfStale,
+  refreshStripeInvoiceUrls,
 } from "../lib/invoice";
 import { deriveInvoiceBadge } from "../lib/invoice-status";
 import { getStripe } from "./stripe";
@@ -729,6 +732,108 @@ router.post("/bookings/by-management-token/:token/billing", async (req, res): Pr
     stripeInvoicePdfUrl: refreshed.stripeInvoicePdfUrl,
   });
 });
+
+// ----- Self-serve invoice/receipt download + email re-send (token-authed) -----
+
+// Per-token in-memory rate limit: at most 1 re-send per RESEND_WINDOW_MS.
+// In-memory is fine here because (a) management tokens are stable per booking
+// and (b) the worst case of a process restart bypassing the limit is a
+// single extra email, which is acceptable spam protection for a self-serve
+// action.
+const RESEND_WINDOW_MS = 60_000;
+const resendLastSentAt = new Map<string, number>();
+
+router.get("/bookings/by-management-token/:token/invoice-pdf", async (req, res): Promise<void> => {
+  const { token } = req.params;
+  const [booking] = await db
+    .select()
+    .from(bookingsTable)
+    .where(eq(bookingsTable.managementToken, token));
+  if (!booking) {
+    res.status(404).json({ error: "Booking not found" });
+    return;
+  }
+  if (booking.status !== "invoiced" && booking.status !== "paid") {
+    res.status(409).json({ error: "No invoice available yet for this booking" });
+    return;
+  }
+  // Refresh Stripe-cached fields so we always serve the latest PDF (e.g.
+  // immediately after a re-issue) without waiting for the webhook.
+  if (booking.stripeInvoiceId) {
+    await refreshStripeInvoiceUrls(getStripe(), booking.id);
+  }
+
+  const pdf = await resolveLatestBookingPdf(booking.id);
+  if (!pdf) {
+    res.status(500).json({ error: "Could not generate invoice PDF" });
+    return;
+  }
+  const safeName = pdf.filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
+  res.setHeader("Content-Length", pdf.buffer.length.toString());
+  res.setHeader("Cache-Control", "private, no-store");
+  res.send(pdf.buffer);
+});
+
+router.post(
+  "/bookings/by-management-token/:token/resend-email",
+  async (req, res): Promise<void> => {
+    const { token } = req.params;
+    const [booking] = await db
+      .select()
+      .from(bookingsTable)
+      .where(eq(bookingsTable.managementToken, token));
+    if (!booking) {
+      res.status(404).json({ error: "Booking not found" });
+      return;
+    }
+    if (booking.status !== "invoiced" && booking.status !== "paid") {
+      res.status(409).json({ error: "No confirmation email available yet for this booking" });
+      return;
+    }
+
+    const now = Date.now();
+    const last = resendLastSentAt.get(token) ?? 0;
+    const elapsed = now - last;
+    if (elapsed < RESEND_WINDOW_MS) {
+      const retryAfter = Math.ceil((RESEND_WINDOW_MS - elapsed) / 1000);
+      res.setHeader("Retry-After", retryAfter.toString());
+      res.status(429).json({
+        error: `Please wait ${retryAfter}s before requesting another email.`,
+        retryAfter,
+      });
+      return;
+    }
+    // Set the timestamp BEFORE awaiting send so concurrent requests are
+    // throttled even if the send is slow. If the send ultimately fails we
+    // clear the entry below so the customer isn't punished for our error.
+    resendLastSentAt.set(token, now);
+
+    // Make sure any freshly re-issued Stripe invoice URL/status is reflected
+    // before the email is built, so the attachment matches what /invoice-pdf
+    // would serve.
+    if (booking.stripeInvoiceId) {
+      await refreshStripeInvoiceUrls(getStripe(), booking.id);
+    }
+
+    try {
+      const result = await resendConfirmationAndReceipt(booking.id);
+      if (!result) {
+        // Send failed (SMTP not configured or rejected). Allow immediate retry
+        // by clearing the throttle entry.
+        resendLastSentAt.delete(token);
+        res.status(500).json({ error: "Failed to send email — please try again shortly." });
+        return;
+      }
+      res.json({ ok: true, recipient: result.recipient });
+    } catch (err) {
+      logger.error({ err, bookingId: booking.id }, "Self-serve resend email failed");
+      resendLastSentAt.delete(token);
+      res.status(500).json({ error: "Failed to send email — please try again shortly." });
+    }
+  },
+);
 
 // Fire-and-forget endpoint called by the frontend via sendBeacon or setTimeout when the
 // user leaves Step 4 without completing payment. Uses the same atomic partialNotificationSent

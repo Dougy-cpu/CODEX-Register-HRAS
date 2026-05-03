@@ -729,12 +729,14 @@ export async function sendReissuedInvoiceEmail(bookingId: number): Promise<void>
   );
 }
 
-export async function resendConfirmationAndReceipt(bookingId: number): Promise<void> {
+export async function resendConfirmationAndReceipt(
+  bookingId: number,
+): Promise<{ recipient: string } | null> {
   const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
 
   if (!booking) {
     logger.warn({ bookingId }, "Booking not found for email resend");
-    return;
+    return null;
   }
 
   const settings = await getEventSettings();
@@ -747,7 +749,7 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
   const lead = attendees.find((a) => a.isLead) || attendees[0];
   if (!lead) {
     logger.warn({ bookingId }, "No lead attendee found for email resend");
-    return;
+    return null;
   }
 
   const { html: confirmationHtml, subject: confirmationSubject } = await buildConfirmationEmailHtml(
@@ -809,8 +811,9 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
     });
   }
 
+  const recipient = booking.billingEmail || lead.workEmail;
   const sent = await sendMail({
-    to: lead.workEmail,
+    to: recipient,
     subject: confirmationSubject,
     html: confirmationHtml,
     attachments,
@@ -820,14 +823,15 @@ export async function resendConfirmationAndReceipt(bookingId: number): Promise<v
 
   await logEmail(
     bookingId,
-    lead.workEmail,
+    recipient,
     "confirmation",
     sent ? "sent" : "failed",
     sent ? undefined : "SMTP not configured or send failed",
   );
   if (pdfBuffer) {
-    await logEmail(bookingId, lead.workEmail, "receipt", sent ? "sent" : "failed");
+    await logEmail(bookingId, recipient, "receipt", sent ? "sent" : "failed");
   }
+  return sent ? { recipient } : null;
 }
 
 export async function sendOrganiserNotification(bookingId: number): Promise<void> {
@@ -2049,4 +2053,48 @@ export async function sendInvoiceReminder(bookingId: number): Promise<void> {
     .where(eq(bookingsTable.id, bookingId));
 
   logger.info({ bookingId, to, orderRef, isOverdue }, "Invoice reminder email sent");
+}
+
+/**
+ * Resolve the latest invoice/receipt PDF for a booking.
+ * Prefers the Stripe-hosted invoice PDF (always reflects the most recent
+ * re-issue) and falls back to our own generated receipt PDF when Stripe is
+ * unavailable or the booking has no Stripe invoice (e.g. card payments).
+ */
+export async function resolveLatestBookingPdf(
+  bookingId: number,
+): Promise<{ buffer: Buffer; filename: string; source: "stripe" | "custom" } | null> {
+  const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
+  if (!booking) return null;
+
+  const attendees = await db
+    .select()
+    .from(attendeesTable)
+    .where(eq(attendeesTable.bookingId, bookingId));
+
+  const ref = booking.orderReference || String(bookingId);
+  let buffer: Buffer | null = null;
+  let filename = `receipt-${ref}.pdf`;
+  let source: "stripe" | "custom" = "custom";
+
+  if (booking.stripeInvoicePdfUrl) {
+    try {
+      buffer = await downloadHttpsPdf(booking.stripeInvoicePdfUrl);
+      if (buffer) {
+        filename = `invoice-${ref}.pdf`;
+        source = "stripe";
+      }
+    } catch (err) {
+      logger.warn({ err, bookingId }, "Failed to fetch Stripe PDF — falling back to custom");
+    }
+  }
+  if (!buffer) {
+    try {
+      buffer = await generatePdfReceipt(booking, attendees);
+    } catch (err) {
+      logger.error({ err, bookingId }, "Failed to generate fallback PDF receipt");
+      return null;
+    }
+  }
+  return buffer ? { buffer, filename, source } : null;
 }

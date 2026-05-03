@@ -5,6 +5,7 @@ import { CheckCircle2, Loader2, AlertCircle, Calendar, MapPin, FileText, Lock } 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { customFetch } from "@workspace/api-client-react";
+import InvoiceActions from "@/components/manage/InvoiceActions";
 
 interface BillingResponse {
   id: number;
@@ -171,6 +172,16 @@ export default function EditBilling() {
             </span>
           </p>
         </div>
+
+        {(data.status === "invoiced" || data.status === "paid") && (
+          <div className="mb-6">
+            <InvoiceActions
+              token={token}
+              paymentMethod={data.paymentMethod}
+              recipientHint={data.billingEmail || null}
+            />
+          </div>
+        )}
 
         {!isInvoice ? (
           <div className="border border-border bg-muted/40 rounded-sm p-6 flex items-start gap-4">

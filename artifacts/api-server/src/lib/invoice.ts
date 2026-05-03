@@ -79,6 +79,39 @@ const STALE_INVOICE_STATUS_MS = 5 * 60 * 1000;
  * the live status from Stripe and persist it. Caller-safe: errors are
  * swallowed so the parent request never fails because of a stale-poll.
  */
+/**
+ * Fetch the live Stripe invoice and refresh our cached PDF URL, hosted
+ * payment URL, and status. Unlike the staleness-gated status helper, this
+ * always pulls fresh data — call it from user-facing download/resend paths
+ * where serving a stale PDF URL is unacceptable. Errors are swallowed.
+ */
+export async function refreshStripeInvoiceUrls(
+  stripe: Stripe | null,
+  bookingId: number,
+): Promise<void> {
+  if (!stripe) return;
+  try {
+    const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
+    if (!booking || !booking.stripeInvoiceId) return;
+    const inv = await stripe.invoices.retrieve(booking.stripeInvoiceId);
+    const updates: Record<string, unknown> = {
+      stripeInvoiceStatus: inv.status ?? null,
+      stripeInvoiceStatusSyncedAt: new Date(),
+    };
+    if (inv.invoice_pdf) updates.stripeInvoicePdfUrl = inv.invoice_pdf;
+    if (inv.hosted_invoice_url) updates.stripeInvoicePaymentUrl = inv.hosted_invoice_url;
+    if (inv.status === "paid" && booking.status !== "paid") {
+      updates.status = "paid";
+      updates.paidAt = booking.paidAt ?? new Date();
+    } else if (inv.status === "void" && booking.status !== "cancelled") {
+      updates.status = "cancelled";
+    }
+    await db.update(bookingsTable).set(updates).where(eq(bookingsTable.id, bookingId));
+  } catch (err) {
+    logger.warn({ err, bookingId }, "refreshStripeInvoiceUrls failed");
+  }
+}
+
 export async function refreshStripeInvoiceStatusIfStale(
   stripe: Stripe | null,
   bookingId: number,
