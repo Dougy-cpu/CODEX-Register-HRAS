@@ -849,15 +849,39 @@ Every package has `composite: true` in its `tsconfig.json`. Root `tsconfig.json`
 
 ## 18. GitHub Sync
 
-The script `scripts/sync-to-github.sh` pushes the workspace to the private GitHub repository `Dougy-cpu/CODEX-Register-HRAS` automatically.
+The GitHub connection uses **manual branches and pull requests** — there is no automatic push to `main`. All syncing is triggered explicitly by running the scripts below.
 
-- Authenticates using the `GITHUB_TOKEN` Replit secret (PAT with `repo` scope)
-- Force-pushes the `main` branch
-- Runs automatically every 5 minutes via the `Sync to GitHub` workflow
-- Run manually at any time:
-  ```bash
-  bash scripts/sync-to-github.sh
-  ```
+Authenticates using the `GITHUB_TOKEN` Replit secret (PAT with `repo` scope).
+
+### Push to a branch
+
+```bash
+# Auto-named branch (sync/YYYY-MM-DD-HHMMSS)
+bash scripts/push-branch.sh
+
+# Custom branch name
+bash scripts/push-branch.sh my-feature-branch
+```
+
+Pushes the current workspace state to the named branch on GitHub. Never touches `main` directly.
+
+### Open a Pull Request
+
+```bash
+BRANCH_NAME="my-feature-branch" bash scripts/create-pr.sh
+
+# With a custom PR title and body
+PR_TITLE="My change" PR_BODY="Details here" BRANCH_NAME="my-feature-branch" bash scripts/create-pr.sh
+```
+
+Creates a PR from the branch to `main` via the GitHub API. Prints the PR URL on success.
+
+### Typical workflow
+
+1. Make changes in Replit
+2. `bash scripts/push-branch.sh my-branch-name`
+3. `BRANCH_NAME="my-branch-name" bash scripts/create-pr.sh`
+4. Review and merge the PR on GitHub
 
 ---
 
@@ -938,4 +962,4 @@ The offset `6541` ensures all references are 4+ digits and avoids `HRAS26-1` loo
 
 ---
 
-*Built and maintained on Replit. Auto-synced to GitHub (`Dougy-cpu/CODEX-Register-HRAS`) every 5 minutes.*
+*Built and maintained on Replit. Synced to GitHub (`Dougy-cpu/CODEX-Register-HRAS`) via manual branch + PR workflow.*
