@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "UhELZpMAO4nrwjPj1xMg8"
+uri = "file://README.md"
+type = "text"
+title = "CODEX-Register-HRAS — Full README"
