@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { createHmac, timingSafeEqual, randomBytes } from "crypto";
+import { getAdminPasswordEnv, getAdminTokenSecretEnv } from "../lib/env";
 import { logger } from "../lib/logger";
 
 const HMAC_SALT = "hrs-admin-token-v1";
@@ -22,7 +23,7 @@ export const ADMIN_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 let cachedSigningKey: Buffer | null = null;
 function getSigningKey(): Buffer {
   if (cachedSigningKey) return cachedSigningKey;
-  const fromEnv = process.env.ADMIN_TOKEN_SECRET;
+  const fromEnv = getAdminTokenSecretEnv();
   if (fromEnv && fromEnv.length >= 32) {
     cachedSigningKey = Buffer.from(fromEnv, "utf8");
   } else {
@@ -99,7 +100,7 @@ export function timingSafeStringEqual(a: string, b: string): boolean {
 }
 
 export function getAdminPassword(): string | null {
-  const pw = process.env.ADMIN_PASSWORD;
+  const pw = getAdminPasswordEnv();
   if (!pw) return null;
   if (BLOCKED_PASSWORDS.has(pw)) return null;
   return pw;

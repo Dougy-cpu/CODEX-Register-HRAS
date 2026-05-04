@@ -194,7 +194,16 @@ export default function Confirmation({ booking }: ConfirmationProps) {
             size="sm"
             className="border-dashed border-muted-foreground/50 text-muted-foreground hover:text-foreground"
             onClick={() => {
-              sessionStorage.removeItem("booking_session");
+              try {
+                sessionStorage.removeItem("booking_session");
+              } catch {
+                /* ignore */
+              }
+              try {
+                localStorage.removeItem("booking_session");
+              } catch {
+                /* ignore */
+              }
               window.location.href = "/";
             }}
           >

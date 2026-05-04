@@ -47,6 +47,10 @@ import {
   Link,
 } from "lucide-react";
 import { InvoiceBadge } from "@/components/InvoiceBadge";
+import {
+  RegistrationQuickViews,
+  type RegistrationQuickView,
+} from "@/components/admin/RegistrationQuickViews";
 
 const STATUS_OPTIONS = [
   { value: "paid", label: "Paid" },
@@ -1351,6 +1355,25 @@ export default function AdminRegistrations() {
 
   const queryClient = useQueryClient();
 
+  const activeQuickView = needsAttentionOnly
+    ? "needs_attention"
+    : status === "partial"
+      ? "incomplete"
+      : status === "invoiced"
+        ? "invoiced"
+        : status === "paid"
+          ? "paid"
+          : status === "all"
+            ? "all"
+            : "custom";
+
+  const applyQuickView = (view: RegistrationQuickView) => {
+    setStatus(view.status);
+    setNeedsAttentionOnly(view.needsAttention);
+    setPage(1);
+    setSelected(new Set());
+  };
+
   const queryKey = ["registrations", search, status, passType, needsAttentionOnly, page];
 
   const { data, isLoading } = useListRegistrations(
@@ -1471,6 +1494,8 @@ export default function AdminRegistrations() {
           </div>
         </div>
       )}
+
+      <RegistrationQuickViews activeView={activeQuickView} onSelect={applyQuickView} />
 
       {/* Filters bar */}
       <div className="bg-white p-6 border border-border shadow-sm mb-4 flex flex-col md:flex-row gap-4 items-end">
@@ -1710,7 +1735,7 @@ export default function AdminRegistrations() {
               {registrations.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
-                    No registrations found.
+                    No registrations found for the current view.
                   </TableCell>
                 </TableRow>
               )}

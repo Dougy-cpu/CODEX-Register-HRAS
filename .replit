@@ -24,10 +24,6 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "typecheck"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "lint"
 
 [[workflows.workflow.tasks]]
@@ -38,16 +34,9 @@ args = "test"
 task = "workflow.run"
 args = "format"
 
-[[workflows.workflow]]
-name = "typecheck"
-author = "agent"
-
 [[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "pnpm --filter @workspace/db tsc --build && pnpm --filter @workspace/api-server tsc --noEmit"
-
-[workflows.workflow.metadata]
-isValidation = true
+task = "workflow.run"
+args = "typecheck"
 
 [[workflows.workflow]]
 name = "lint"
@@ -81,6 +70,17 @@ args = "pnpm run format"
 
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow]]
+name = "typecheck"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm run typecheck"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [agent]
 stack = "PNPM_WORKSPACE"

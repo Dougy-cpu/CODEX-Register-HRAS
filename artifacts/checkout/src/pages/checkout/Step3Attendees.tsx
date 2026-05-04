@@ -345,6 +345,37 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
     }
   };
 
+  const copyLeadCompanyToAdditionalAttendees = () => {
+    if (!leadDefaults.company) return;
+    setFormsData((current) =>
+      current.map((form, index) =>
+        index === 0 || tbcFlags[index] ? form : { ...form, company: leadDefaults.company },
+      ),
+    );
+  };
+
+  const markAdditionalAttendeesTbc = () => {
+    setTbcFlags((current) => current.map((flag, index) => (index === 0 ? false : true)));
+    setFormsData((current) =>
+      current.map((form, index) =>
+        index === 0
+          ? form
+          : {
+              ...form,
+              firstName: "",
+              lastName: "",
+              jobTitle: "",
+              company: leadDefaults.company,
+              workEmail: "",
+              phone: "",
+              dietaryAccessibility: "",
+              gdprConsent: false,
+            },
+      ),
+    );
+    setErrors(Array(totalSeats).fill(null));
+  };
+
   const updateFormData = <K extends keyof AttendeeFormData>(
     index: number,
     field: K,
@@ -470,6 +501,11 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
     }
   };
 
+  const readySeatCount = formsData.reduce((count, form, index) => {
+    if (tbcFlags[index]) return count + 1;
+    return attendeeSchema.safeParse(form).success ? count + 1 : count;
+  }, 0);
+
   return (
     <div className="max-w-3xl mx-auto space-y-8">
       <div>
@@ -491,6 +527,55 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
           </p>
         </div>
       )}
+
+      <div className="bg-white border border-border p-4 md:p-5 space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="border border-border p-3">
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              Seats
+            </p>
+            <p className="text-xl font-bold mt-1">{totalSeats}</p>
+          </div>
+          <div className="border border-border p-3">
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              Ready
+            </p>
+            <p className="text-xl font-bold mt-1">
+              {readySeatCount}/{totalSeats}
+            </p>
+          </div>
+          <div className="border border-border p-3">
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              Lead company
+            </p>
+            <p className="text-sm font-semibold mt-1 truncate">
+              {leadDefaults.company || "Not set"}
+            </p>
+          </div>
+        </div>
+
+        {totalSeats > 1 && (
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={copyLeadCompanyToAdditionalAttendees}
+              disabled={!leadDefaults.company}
+              className="justify-center"
+            >
+              Copy company to all
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={markAdditionalAttendeesTbc}
+              className="justify-center"
+            >
+              Mark additional seats TBC
+            </Button>
+          </div>
+        )}
+      </div>
 
       <Accordion type="single" value={openItem} onValueChange={setOpenItem} className="space-y-4">
         {formsData.map((data, index) => {

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import Stripe from "stripe";
+import type Stripe from "stripe";
 import { eq } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { bookingsTable, attendeesTable, promoCodesTable } from "@workspace/db";
@@ -16,6 +16,7 @@ import { logger } from "../lib/logger";
 import { reissueBookingInvoice, applyReissueInvoiceResultTx } from "../lib/invoice";
 import { claimBookingConfirmation, runConfirmationSideEffects } from "../lib/booking-confirmation";
 import { defaultOrderRef } from "../lib/order-reference";
+import { getStripe } from "../lib/stripe-client";
 
 const DECLINE_CODE_LABELS: Record<string, string> = {
   authentication_required: "Strong customer authentication required — please retry your payment",
@@ -156,12 +157,6 @@ async function isPromoOncePerCustomerViolation(
   const email = (leadAttendee?.workEmail || "").trim().toLowerCase();
   if (!email) return false;
   return await isCodeUsedByEmail(promoCode, email, bookingId);
-}
-
-export function getStripe() {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) return null;
-  return new Stripe(key);
 }
 
 router.post("/stripe/create-checkout-session", async (req, res): Promise<void> => {
