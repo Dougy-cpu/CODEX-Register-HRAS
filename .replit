@@ -4,6 +4,9 @@ modules = ["nodejs-24", "postgresql-16", "python-3.11"]
 id = "artifacts/api-server"
 
 [[artifacts]]
+id = "artifacts/checkout"
+
+[[artifacts]]
 id = "artifacts/mockup-sandbox"
 
 [deployment]
@@ -44,7 +47,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "pnpm --filter @workspace/db tsc --build && pnpm --filter @workspace/api-server tsc --noEmit"
+args = "pnpm run typecheck"
 
 [workflows.workflow.metadata]
 isValidation = true
@@ -85,7 +88,6 @@ isValidation = true
 [agent]
 stack = "PNPM_WORKSPACE"
 expertMode = true
-integrations = ["github:1.0.0"]
 
 [postMerge]
 path = "scripts/post-merge.sh"

@@ -556,6 +556,9 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
     businessCfg && businessCfg.extraBenefits.length > 0
       ? businessCfg.extraBenefits
       : DEFAULT_BUSINESS_EXTRA_BENEFITS;
+  const audienceLabel = isVendor ? "Consultant / Vendor" : "HR Professional";
+  const passLabel = isVendor ? "Business Pass" : "HR Professional Pass";
+  const unitLabel = isVendor ? "pass" : "ticket";
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -567,6 +570,35 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
             : "Choose how many tickets you need. Group discounts apply automatically."}
         </p>
       </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="bg-white border border-border p-4">
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            Booking type
+          </p>
+          <p className="text-lg font-bold mt-1">{audienceLabel}</p>
+        </div>
+        <div className="bg-white border border-border p-4">
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            Selected pass
+          </p>
+          <p className="text-lg font-bold mt-1">
+            {quantity} {unitLabel}
+            {quantity !== 1 ? "s" : ""}
+          </p>
+          <p className="text-sm text-muted-foreground">{passLabel}</p>
+        </div>
+        <div className="bg-white border border-border p-4">
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            Current total
+          </p>
+          <p className="text-lg font-bold mt-1">
+            {currentPricing ? `£${currentPricing.total.toFixed(2)}` : "Calculating"}
+          </p>
+          <p className="text-sm text-muted-foreground">Including VAT</p>
+        </div>
+      </div>
+
       {/* HR: Single pass with quantity picker */}
       {isHR && (
         <Card className="relative border-2 border-primary overflow-hidden p-0 shadow-lg">

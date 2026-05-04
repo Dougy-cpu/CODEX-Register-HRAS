@@ -21,7 +21,16 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Check, Link2, Link2Off, ChevronDown, ChevronRight, HelpCircle } from "lucide-react";
+import {
+  Check,
+  Link2,
+  Link2Off,
+  ChevronDown,
+  ChevronRight,
+  HelpCircle,
+  CreditCard,
+  FileText,
+} from "lucide-react";
 import type { BookingWithAttendees } from "@/types/booking";
 
 // Fields on the billing form that can be auto-linked to the lead attendee.
@@ -132,6 +141,23 @@ interface Step4PaymentProps {
   booking: BookingWithAttendees;
 }
 
+function readBookingSessionToken(): string | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const fromSession = window.sessionStorage?.getItem("booking_session");
+    if (fromSession) return fromSession;
+  } catch {
+    /* sessionStorage may be blocked */
+  }
+
+  try {
+    return window.localStorage?.getItem("booking_session") ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export default function Step4Payment({ booking }: Step4PaymentProps) {
   const queryClient = useQueryClient();
   const updateBooking = useUpdateBooking();
@@ -195,18 +221,39 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
     const PING_DWELL_MS = 10_000;
     const pingUrl = `/api/bookings/${booking.id}/incomplete-ping`;
     const mountedAt = Date.now();
+    const bookingSessionToken = readBookingSessionToken();
+
+    const sendIncompletePing = () => {
+      if (!bookingSessionToken) return;
+
+      const payload = JSON.stringify({ sessionToken: bookingSessionToken });
+      const blob = new Blob([payload], { type: "application/json" });
+
+      if (navigator.sendBeacon?.(pingUrl, blob)) {
+        return;
+      }
+
+      void fetch(pingUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+        keepalive: true,
+      }).catch(() => {
+        /* best-effort notification only */
+      });
+    };
 
     const handleBeforeUnload = () => {
       if (isSubmittingPaymentRef.current) return;
       if (Date.now() - mountedAt < PING_DWELL_MS) return;
-      navigator.sendBeacon(pingUrl, "");
+      sendIncompletePing();
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
 
     const timer = setTimeout(
       () => {
-        void fetch(pingUrl, { method: "POST" });
+        sendIncompletePing();
       },
       20 * 60 * 1000,
     );
@@ -486,6 +533,33 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
           <p className="text-lg text-muted-foreground">Choose your preferred payment method.</p>
         </div>
 
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="bg-white border border-border p-4">
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              Booking
+            </p>
+            <p className="text-lg font-bold mt-1">
+              {booking.quantity} {booking.quantity === 1 ? "seat" : "seats"}
+            </p>
+          </div>
+          <div className="bg-white border border-border p-4">
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              Payment choice
+            </p>
+            <p className="text-lg font-bold mt-1">
+              {paymentMethod === "card" ? "Card" : "Invoice"}
+            </p>
+          </div>
+          <div className="bg-white border border-border p-4">
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              Total
+            </p>
+            <p className="text-lg font-bold mt-1">
+              {currentPricing ? `£${currentPricing.total.toFixed(2)}` : "Calculating"}
+            </p>
+          </div>
+        </div>
+
         <div className="bg-white p-6 md:p-8 border border-border">
           <RadioGroup
             value={paymentMethod}
@@ -493,23 +567,39 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
             className="space-y-4"
           >
             <div
-              className={`border-2 p-6 transition-all cursor-pointer ${paymentMethod === "card" ? "border-primary bg-primary/5" : "border-border"}`}
+              className={`border-2 p-6 transition-all cursor-pointer ${paymentMethod === "card" ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"}`}
               onClick={() => setPaymentMethod("card")}
             >
-              <div className="flex items-center gap-3">
-                <RadioGroupItem value="card" />
-                <span className="font-bold text-xl">Credit or Debit Card</span>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <RadioGroupItem value="card" />
+                  <CreditCard className="w-5 h-5 text-primary" />
+                  <span className="font-bold text-xl">Credit or Debit Card</span>
+                </div>
+                {paymentMethod === "card" && (
+                  <span className="text-xs font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-1">
+                    Selected
+                  </span>
+                )}
               </div>
               <p className="ml-7 mt-2 text-muted-foreground">Pay securely now via Stripe.</p>
             </div>
 
             <div
-              className={`border-2 p-6 transition-all cursor-pointer ${paymentMethod === "invoice" ? "border-primary bg-primary/5" : "border-border"}`}
+              className={`border-2 p-6 transition-all cursor-pointer ${paymentMethod === "invoice" ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"}`}
               onClick={() => setPaymentMethod("invoice")}
             >
-              <div className="flex items-center gap-3">
-                <RadioGroupItem value="invoice" />
-                <span className="font-bold text-xl">Pay by Invoice</span>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <RadioGroupItem value="invoice" />
+                  <FileText className="w-5 h-5 text-primary" />
+                  <span className="font-bold text-xl">Pay by Invoice</span>
+                </div>
+                {paymentMethod === "invoice" && (
+                  <span className="text-xs font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-1">
+                    Selected
+                  </span>
+                )}
               </div>
               <p className="ml-7 mt-2 text-muted-foreground">
                 We'll email you an invoice to pay by card or bank transfer within 14 days.

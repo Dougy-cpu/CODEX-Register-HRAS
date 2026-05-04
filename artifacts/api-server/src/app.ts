@@ -7,6 +7,7 @@ import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
 import pinoHttp from "pino-http";
 import router from "./routes";
+import { getOptionalEnv, isProductionEnv } from "./lib/env";
 import { logger } from "./lib/logger";
 import { adminLoginThrottle } from "./middleware/admin-login-throttle";
 
@@ -14,7 +15,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app: Express = express();
 
-const isProduction = process.env.NODE_ENV === "production";
+const isProduction = isProductionEnv();
+app.disable("x-powered-by");
 
 // Trust the first proxy hop so that express-rate-limit reads the real client
 // IP from X-Forwarded-For rather than the proxy address. On Replit autoscale,
@@ -61,9 +63,18 @@ app.use(
 // ---------------------------------------------------------------------------
 const PRODUCTION_ORIGIN = "https://register.hranalyticssummit.com";
 
+function productionOrigin(): string {
+  const raw = getOptionalEnv("APP_BASE_URL") ?? PRODUCTION_ORIGIN;
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return PRODUCTION_ORIGIN;
+  }
+}
+
 const corsOptions: cors.CorsOptions = isProduction
   ? {
-      origin: PRODUCTION_ORIGIN,
+      origin: productionOrigin(),
       credentials: true,
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       allowedHeaders: [

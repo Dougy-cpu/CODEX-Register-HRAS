@@ -1,7 +1,7 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-if [ -z "$GITHUB_TOKEN" ]; then
+if [ -z "${GITHUB_TOKEN:-}" ]; then
   echo "ERROR: GITHUB_TOKEN secret is not set."
   exit 1
 fi
@@ -9,12 +9,13 @@ fi
 BRANCH_NAME="${1:-sync/$(date +%Y-%m-%d-%H%M%S)}"
 REMOTE_URL="https://Dougy-cpu:${GITHUB_TOKEN}@github.com/Dougy-cpu/CODEX-Register-HRAS.git"
 
-echo "Pushing current state to branch: $BRANCH_NAME"
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo "ERROR: There are uncommitted changes."
+  echo "Commit your changes first, then run this script again."
+  exit 1
+fi
 
-GIT_AUTHOR_NAME="Replit Sync" \
-GIT_AUTHOR_EMAIL="replit-sync@noreply.github.com" \
-GIT_COMMITTER_NAME="Replit Sync" \
-GIT_COMMITTER_EMAIL="replit-sync@noreply.github.com" \
+echo "Pushing current committed state to branch: $BRANCH_NAME"
 git push "$REMOTE_URL" "HEAD:refs/heads/$BRANCH_NAME"
 
 echo ""

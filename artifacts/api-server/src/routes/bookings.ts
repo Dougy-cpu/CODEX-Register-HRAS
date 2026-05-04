@@ -28,7 +28,7 @@ import {
   refreshStripeInvoiceUrls,
 } from "../lib/invoice";
 import { deriveInvoiceBadge } from "../lib/invoice-status";
-import { getStripe } from "./stripe";
+import { getStripe } from "../lib/stripe-client";
 
 function isAdminRequest(req: import("express").Request): boolean {
   const token = req.headers["x-admin-token"] as string | undefined;
@@ -889,6 +889,15 @@ router.post("/bookings/:id/incomplete-ping", async (req, res): Promise<void> => 
   try {
     const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, id));
     if (!booking || booking.status !== "partial" || booking.partialNotificationSent) return;
+
+    const sessionToken =
+      (req.headers["x-booking-session"] as string | undefined) ||
+      (typeof req.body?.sessionToken === "string" ? req.body.sessionToken : undefined);
+
+    if (!sessionToken || sessionToken !== booking.sessionToken) {
+      logger.warn({ bookingId: id }, "Rejected incomplete-ping with invalid booking session");
+      return;
+    }
 
     const claimed = await db
       .update(bookingsTable)
