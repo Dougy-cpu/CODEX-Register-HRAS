@@ -38,6 +38,10 @@ args = "test"
 task = "workflow.run"
 args = "format"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Sync to GitHub"
+
 [[workflows.workflow]]
 name = "typecheck"
 author = "agent"
@@ -81,6 +85,17 @@ args = "pnpm run format"
 
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow]]
+name = "Sync to GitHub"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "while true; do bash scripts/sync-to-github.sh; sleep 300; done"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [agent]
 stack = "PNPM_WORKSPACE"
