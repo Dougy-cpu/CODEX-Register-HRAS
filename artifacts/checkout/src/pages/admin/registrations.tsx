@@ -1734,7 +1734,7 @@ export default function AdminRegistrations() {
               ))}
               {registrations.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
+          <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
                     No registrations found for the current view.
                   </TableCell>
                 </TableRow>
