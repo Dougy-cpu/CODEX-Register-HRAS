@@ -52,7 +52,7 @@ import { Trash2, Plus, Pencil, Link2, Check } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 function CopyLinkButton({ code }: { code: string }) {
-  const base = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}`;
+  const base = "https://register.hranalyticssummit.com";
   const url = `${base}/?promo=${encodeURIComponent(code)}`;
   const [copied, setCopied] = useState(false);
   const handleCopy = () => {
