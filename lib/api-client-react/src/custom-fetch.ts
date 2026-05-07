@@ -148,6 +148,47 @@ function truncate(text: string, maxLength = 300): string {
   return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
 }
 
+function getBrowserStorageItem(storageName: "localStorage" | "sessionStorage", key: string) {
+  if (typeof window === "undefined") return null;
+
+  try {
+    return window[storageName]?.getItem(key) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function setBrowserStorageItem(
+  storageName: "localStorage" | "sessionStorage",
+  key: string,
+  value: string,
+) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window[storageName]?.setItem(key, value);
+  } catch {
+    /* storage may be blocked */
+  }
+}
+
+function readBookingSessionForHeader() {
+  const fromLocal = getBrowserStorageItem("localStorage", "booking_session");
+  const fromSession = getBrowserStorageItem("sessionStorage", "booking_session");
+
+  // Checkout restoration treats localStorage as the durable source of truth.
+  // Keep API ownership checks aligned with that same token; otherwise a stale
+  // sessionStorage value can make booking updates fail with a session mismatch.
+  if (fromLocal) {
+    if (fromSession !== fromLocal) {
+      setBrowserStorageItem("sessionStorage", "booking_session", fromLocal);
+    }
+    return fromLocal;
+  }
+
+  return fromSession;
+}
+
 function buildErrorMessage(response: Response, data: unknown): string {
   const prefix = `HTTP ${response.status} ${response.statusText}`;
 
@@ -350,19 +391,15 @@ export async function customFetch<T = unknown>(
   }
 
   // Support for admin_token from localStorage
-  if (typeof window !== "undefined" && window.localStorage) {
-    const adminToken = window.localStorage.getItem("admin_token");
-    if (adminToken && !headers.has("x-admin-token")) {
-      headers.set("x-admin-token", adminToken);
-    }
+  const adminToken = getBrowserStorageItem("localStorage", "admin_token");
+  if (adminToken && !headers.has("x-admin-token")) {
+    headers.set("x-admin-token", adminToken);
   }
 
-  // Forward booking session token for ownership verification on booking mutations
-  if (typeof window !== "undefined" && window.sessionStorage) {
-    const bookingSession = window.sessionStorage.getItem("booking_session");
-    if (bookingSession && !headers.has("x-booking-session")) {
-      headers.set("x-booking-session", bookingSession);
-    }
+  // Forward booking session token for ownership verification on booking mutations.
+  const bookingSession = readBookingSessionForHeader();
+  if (bookingSession && !headers.has("x-booking-session")) {
+    headers.set("x-booking-session", bookingSession);
   }
 
   const requestInfo = { method, url: resolveUrl(input) };

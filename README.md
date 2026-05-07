@@ -82,28 +82,28 @@ workspace/
 
 ## 3. Technology Stack
 
-| Layer | Technology |
-|---|---|
-| **Monorepo** | pnpm workspaces |
-| **Language** | TypeScript 5.9 (strict, composite) |
-| **Node.js** | 24 |
-| **API Framework** | Express 5 |
-| **Database** | PostgreSQL + Drizzle ORM |
-| **Validation** | Zod v4 (`zod/v4`), `drizzle-zod` |
-| **API Contract** | OpenAPI 3.1 (Orval codegen) |
-| **Frontend** | React, Vite, Tailwind CSS, shadcn/ui |
-| **Routing (FE)** | Wouter |
-| **Data Fetching** | TanStack React Query v5 |
-| **Payments** | Stripe (Checkout Sessions + Invoicing) |
-| **Email** | Nodemailer (SMTP) + PDFKit (receipts) |
-| **PDF** | PDFKit |
-| **Google Sheets** | `googleapis` (service account) |
-| **Logging** | Pino |
-| **Build (API)** | esbuild (CJS bundle) |
-| **Build (FE)** | Vite |
-| **Testing** | Vitest |
-| **Linting** | ESLint 10 + typescript-eslint |
-| **Formatting** | Prettier |
+| Layer             | Technology                             |
+| ----------------- | -------------------------------------- |
+| **Monorepo**      | pnpm workspaces                        |
+| **Language**      | TypeScript 5.9 (strict, composite)     |
+| **Node.js**       | 24                                     |
+| **API Framework** | Express 5                              |
+| **Database**      | PostgreSQL + Drizzle ORM               |
+| **Validation**    | Zod v4 (`zod/v4`), `drizzle-zod`       |
+| **API Contract**  | OpenAPI 3.1 (Orval codegen)            |
+| **Frontend**      | React, Vite, Tailwind CSS, shadcn/ui   |
+| **Routing (FE)**  | Wouter                                 |
+| **Data Fetching** | TanStack React Query v5                |
+| **Payments**      | Stripe (Checkout Sessions + Invoicing) |
+| **Email**         | Nodemailer (SMTP) + PDFKit (receipts)  |
+| **PDF**           | PDFKit                                 |
+| **Google Sheets** | `googleapis` (service account)         |
+| **Logging**       | Pino                                   |
+| **Build (API)**   | esbuild (CJS bundle)                   |
+| **Build (FE)**    | Vite                                   |
+| **Testing**       | Vitest                                 |
+| **Linting**       | ESLint 10 + typescript-eslint          |
+| **Formatting**    | Prettier                               |
 
 ---
 
@@ -168,42 +168,42 @@ All tables use PostgreSQL via Drizzle ORM. The connection string is read from `D
 
 Core registration record. One row per checkout session.
 
-| Column | Type | Notes |
-|---|---|---|
-| `id` | serial PK | |
-| `session_token` | text UNIQUE | Browser session identifier |
-| `status` | enum | `partial`, `pending_payment`, `paid`, `invoiced`, `cancelled`, `refunded`, `disputed` |
-| `pass_type` | enum | `single`, `business` |
-| `attendee_type` | enum | `hr_professional`, `consultant_vendor` |
-| `quantity` | integer | Number of passes |
-| `promo_code` | text | Applied promo code (uppercase) |
-| `promo_discount_amount` | numeric(10,2) | |
-| `group_discount_amount` | numeric(10,2) | |
-| `subtotal_amount` | numeric(10,2) | After discounts, excl. VAT |
-| `vat_amount` | numeric(10,2) | 20% UK VAT |
-| `total_amount` | numeric(10,2) | Including VAT |
-| `payment_method` | enum | `card`, `invoice` |
-| `stripe_session_id` | text UNIQUE | Stripe Checkout Session ID |
-| `stripe_payment_intent_id` | text | |
-| `stripe_invoice_id` | text | |
-| `stripe_invoice_pdf_url` | text | |
-| `stripe_invoice_payment_url` | text | |
-| `stripe_invoice_status` | text | Cached from Stripe |
-| `stripe_invoice_status_synced_at` | timestamptz | Cache freshness marker |
-| `order_reference` | text UNIQUE | `HRAS26-{6541+id}` |
-| `current_step` | integer | Step 1–4 (checkout progress) |
-| `billing_*` | text | Full billing address fields |
-| `po_number` | text | Purchase order number |
-| `invoice_due_date` | timestamptz | 14 days from invoice creation |
-| `paid_at` | timestamptz | |
-| `management_token` | text UNIQUE | Token for self-service URL |
-| `hear_about_us` | text | How registrant heard about the event |
-| `confirmation_email_sent` | boolean | Per-side-effect delivery flag |
-| `welcome_emails_sent` | boolean | Per-side-effect delivery flag |
-| `organiser_notified` | boolean | Per-side-effect delivery flag |
-| `sheets_synced` | boolean | Per-side-effect delivery flag |
-| `partial_notification_sent` | boolean | Abandoned checkout flag |
-| `created_at` / `updated_at` | timestamptz | |
+| Column                            | Type          | Notes                                                                                 |
+| --------------------------------- | ------------- | ------------------------------------------------------------------------------------- |
+| `id`                              | serial PK     |                                                                                       |
+| `session_token`                   | text UNIQUE   | Browser session identifier                                                            |
+| `status`                          | enum          | `partial`, `pending_payment`, `paid`, `invoiced`, `cancelled`, `refunded`, `disputed` |
+| `pass_type`                       | enum          | `single`, `business`                                                                  |
+| `attendee_type`                   | enum          | `hr_professional`, `consultant_vendor`                                                |
+| `quantity`                        | integer       | Number of passes                                                                      |
+| `promo_code`                      | text          | Applied promo code (uppercase)                                                        |
+| `promo_discount_amount`           | numeric(10,2) |                                                                                       |
+| `group_discount_amount`           | numeric(10,2) |                                                                                       |
+| `subtotal_amount`                 | numeric(10,2) | After discounts, excl. VAT                                                            |
+| `vat_amount`                      | numeric(10,2) | 20% UK VAT                                                                            |
+| `total_amount`                    | numeric(10,2) | Including VAT                                                                         |
+| `payment_method`                  | enum          | `card`, `invoice`                                                                     |
+| `stripe_session_id`               | text UNIQUE   | Stripe Checkout Session ID                                                            |
+| `stripe_payment_intent_id`        | text          |                                                                                       |
+| `stripe_invoice_id`               | text          |                                                                                       |
+| `stripe_invoice_pdf_url`          | text          |                                                                                       |
+| `stripe_invoice_payment_url`      | text          |                                                                                       |
+| `stripe_invoice_status`           | text          | Cached from Stripe                                                                    |
+| `stripe_invoice_status_synced_at` | timestamptz   | Cache freshness marker                                                                |
+| `order_reference`                 | text UNIQUE   | `HRAS26-{6541+id}`                                                                    |
+| `current_step`                    | integer       | Step 1–4 (checkout progress)                                                          |
+| `billing_*`                       | text          | Full billing address fields                                                           |
+| `po_number`                       | text          | Purchase order number                                                                 |
+| `invoice_due_date`                | timestamptz   | 14 days from invoice creation                                                         |
+| `paid_at`                         | timestamptz   |                                                                                       |
+| `management_token`                | text UNIQUE   | Token for self-service URL                                                            |
+| `hear_about_us`                   | text          | How registrant heard about the event                                                  |
+| `confirmation_email_sent`         | boolean       | Per-side-effect delivery flag                                                         |
+| `welcome_emails_sent`             | boolean       | Per-side-effect delivery flag                                                         |
+| `organiser_notified`              | boolean       | Per-side-effect delivery flag                                                         |
+| `sheets_synced`                   | boolean       | Per-side-effect delivery flag                                                         |
+| `partial_notification_sent`       | boolean       | Abandoned checkout flag                                                               |
+| `created_at` / `updated_at`       | timestamptz   |                                                                                       |
 
 **Indexes**: `stripe_session_id` (unique), `stripe_payment_intent_id`, `stripe_invoice_id`, `order_reference` (unique), `promo_code`
 
@@ -211,49 +211,50 @@ Core registration record. One row per checkout session.
 
 One row per person attending. Linked to `bookings` by `booking_id`.
 
-| Column | Type | Notes |
-|---|---|---|
-| `id` | serial PK | |
-| `booking_id` | integer FK | References `bookings.id` |
-| `is_lead` | boolean | Lead/primary contact |
-| `first_name` / `last_name` | text | |
-| `job_title` / `company` | text | |
-| `work_email` | text | |
-| `phone` | text | |
-| `dietary_requirements` | text | |
-| `accessibility_needs` | text | |
-| `linkedin_url` | text | |
-| `gdpr_consent` | boolean | |
-| `gdpr_consent_at` | timestamptz | |
+| Column                     | Type        | Notes                    |
+| -------------------------- | ----------- | ------------------------ |
+| `id`                       | serial PK   |                          |
+| `booking_id`               | integer FK  | References `bookings.id` |
+| `is_lead`                  | boolean     | Lead/primary contact     |
+| `first_name` / `last_name` | text        |                          |
+| `job_title` / `company`    | text        |                          |
+| `work_email`               | text        |                          |
+| `phone`                    | text        |                          |
+| `dietary_requirements`     | text        |                          |
+| `accessibility_needs`      | text        |                          |
+| `linkedin_url`             | text        |                          |
+| `gdpr_consent`             | boolean     |                          |
+| `gdpr_consent_at`          | timestamptz |                          |
 
 ### `promo_codes`
 
-| Column | Type | Notes |
-|---|---|---|
-| `id` | serial PK | |
-| `code` | text UNIQUE | Always stored uppercase |
-| `discount_type` | enum | `percentage`, `fixed`, `per_ticket`, `complimentary` |
-| `discount_value` | numeric(10,2) | Percentage or £ amount |
-| `max_discount_amount` | numeric(10,2) | Cap for percentage codes |
-| `max_uses` | integer | Null = unlimited |
-| `used_count` | integer | Atomically incremented |
-| `is_active` | boolean | |
-| `valid_from` / `valid_until` | timestamptz | Date-range gating |
-| `description` | text | Internal label |
+| Column                       | Type          | Notes                                                |
+| ---------------------------- | ------------- | ---------------------------------------------------- |
+| `id`                         | serial PK     |                                                      |
+| `code`                       | text UNIQUE   | Always stored uppercase                              |
+| `discount_type`              | enum          | `percentage`, `fixed`, `per_ticket`, `complimentary` |
+| `discount_value`             | numeric(10,2) | Percentage or £ amount                               |
+| `max_discount_amount`        | numeric(10,2) | Cap for percentage codes                             |
+| `max_uses`                   | integer       | Null = unlimited                                     |
+| `used_count`                 | integer       | Atomically incremented                               |
+| `is_active`                  | boolean       |                                                      |
+| `valid_from` / `valid_until` | timestamptz   | Date-range gating                                    |
+| `description`                | text          | Internal label                                       |
 
 ### `discount_tiers`
 
 Group discount tiers per pass type (e.g. 4+ Single passes → 10% off).
 
-| Column | Type |
-|---|---|
-| `id` | serial PK |
-| `pass_type` | enum (`single`, `team`, `business`) |
-| `min_quantity` | integer |
-| `discount_percent` | numeric(5,2) |
-| `label` | text |
+| Column             | Type                                |
+| ------------------ | ----------------------------------- |
+| `id`               | serial PK                           |
+| `pass_type`        | enum (`single`, `team`, `business`) |
+| `min_quantity`     | integer                             |
+| `discount_percent` | numeric(5,2)                        |
+| `label`            | text                                |
 
 **Default tiers** (seeded on first start):
+
 - Single: 4+ → 10%, 8+ → 15%, 12+ → 20%
 - Business: 2+ → 10%, 5+ → 15%
 
@@ -297,113 +298,113 @@ All routes are prefixed `/api`. The full contract is in `lib/api-spec/openapi.ya
 
 ### Health
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/healthz` | Health check — returns `{ status: "ok" }` |
+| Method | Path           | Description                               |
+| ------ | -------------- | ----------------------------------------- |
+| `GET`  | `/api/healthz` | Health check — returns `{ status: "ok" }` |
 
 ### Bookings
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/bookings` | Create or upsert booking by session token |
-| `GET` | `/api/bookings/:sessionToken` | Get booking by session token |
-| `PATCH` | `/api/bookings/:id` | Update booking fields |
+| Method  | Path                          | Description                               |
+| ------- | ----------------------------- | ----------------------------------------- |
+| `POST`  | `/api/bookings`               | Create or upsert booking by session token |
+| `GET`   | `/api/bookings/:sessionToken` | Get booking by session token              |
+| `PATCH` | `/api/bookings/:id`           | Update booking fields                     |
 
 ### Attendees
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/attendees` | Create attendee(s) for a booking |
-| `GET` | `/api/attendees/:bookingId` | List attendees for a booking |
-| `PATCH` | `/api/attendees/:id` | Update a single attendee |
+| Method  | Path                        | Description                      |
+| ------- | --------------------------- | -------------------------------- |
+| `POST`  | `/api/attendees`            | Create attendee(s) for a booking |
+| `GET`   | `/api/attendees/:bookingId` | List attendees for a booking     |
+| `PATCH` | `/api/attendees/:id`        | Update a single attendee         |
 
 ### Pricing
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/pricing` | Calculate pricing (passType, quantity, promoCode query params) |
-| `POST` | `/api/pricing/validate-promo` | Validate a promo code |
+| Method | Path                          | Description                                                    |
+| ------ | ----------------------------- | -------------------------------------------------------------- |
+| `GET`  | `/api/pricing`                | Calculate pricing (passType, quantity, promoCode query params) |
+| `POST` | `/api/pricing/validate-promo` | Validate a promo code                                          |
 
 ### Promo Codes (public validate)
 
-| Method | Path | Description |
-|---|---|---|
+| Method | Path                        | Description               |
+| ------ | --------------------------- | ------------------------- |
 | `POST` | `/api/promo-codes/validate` | Validate code eligibility |
 
 ### Stripe
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/stripe/create-checkout-session` | Create Stripe Checkout Session (card payment) |
-| `POST` | `/api/stripe/create-invoice` | Create and send Stripe Invoice (invoice payment) |
-| `POST` | `/api/stripe/webhook` | Stripe webhook handler (raw body required) |
-| `GET` | `/api/stripe/session-status` | Poll checkout session status |
+| Method | Path                                  | Description                                      |
+| ------ | ------------------------------------- | ------------------------------------------------ |
+| `POST` | `/api/stripe/create-checkout-session` | Create Stripe Checkout Session (card payment)    |
+| `POST` | `/api/stripe/create-invoice`          | Create and send Stripe Invoice (invoice payment) |
+| `POST` | `/api/stripe/webhook`                 | Stripe webhook handler (raw body required)       |
+| `GET`  | `/api/stripe/session-status`          | Poll checkout session status                     |
 
 ### Email
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/email/templates` | List all email templates |
-| `GET` | `/api/email/templates/:type` | Get a single template |
-| `PATCH` | `/api/email/templates/:type` | Update template (admin) |
-| `POST` | `/api/email/templates/:type/test` | Send test email |
-| `GET` | `/api/email/logs` | List email send logs |
+| Method  | Path                              | Description              |
+| ------- | --------------------------------- | ------------------------ |
+| `GET`   | `/api/email/templates`            | List all email templates |
+| `GET`   | `/api/email/templates/:type`      | Get a single template    |
+| `PATCH` | `/api/email/templates/:type`      | Update template (admin)  |
+| `POST`  | `/api/email/templates/:type/test` | Send test email          |
+| `GET`   | `/api/email/logs`                 | List email send logs     |
 
 ### Admin (all require `x-admin-token` header)
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/admin/login` | Authenticate with `ADMIN_PASSWORD` — rate-limited |
-| `GET` | `/api/admin/stats` | Dashboard summary stats |
-| `GET` | `/api/admin/registrations` | Paginated registrations list (filter by status, search, promo) |
-| `GET` | `/api/admin/registrations/export` | CSV export of all registrations |
-| `GET` | `/api/admin/registrations/:id` | Get single registration detail |
-| `POST` | `/api/admin/registrations/:id/redeliver` | Retry failed post-confirmation side effects |
-| `PATCH` | `/api/admin/registrations/:id/status` | Update booking status |
-| `DELETE` | `/api/admin/registrations` | Bulk-delete bookings |
-| `GET` | `/api/admin/promo-codes` | List all promo codes |
-| `POST` | `/api/admin/promo-codes` | Create promo code |
-| `PATCH` | `/api/admin/promo-codes/:id` | Update promo code |
-| `DELETE` | `/api/admin/promo-codes/:id` | Delete promo code |
-| `PUT` | `/api/admin/discount-tiers` | Replace all discount tiers for a pass type |
-| `GET` | `/api/admin/passes/inventory` | Get pass inventory |
-| `PUT` | `/api/admin/passes/inventory/:passType` | Update pass inventory |
-| `GET` | `/api/admin/passes/config` | Get pass pricing config |
-| `PUT` | `/api/admin/passes/config/:passType` | Update pass pricing and benefits |
-| `GET` | `/api/admin/notification-emails` | List organiser notification recipients |
-| `POST` | `/api/admin/notification-emails` | Add notification recipient |
-| `PATCH` | `/api/admin/notification-emails/:id` | Update recipient |
-| `DELETE` | `/api/admin/notification-emails/:id` | Remove recipient |
-| `GET` | `/api/admin/activity` | Audit log (filterable by type, actor, date) |
-| `GET` | `/api/admin/unpaid-invoices` | List open/overdue invoices |
-| `GET` | `/api/admin/unpaid-invoices/summary` | Count and total of unpaid invoices |
-| `POST` | `/api/admin/unpaid-invoices/bulk-remind` | Send invoice reminder emails in bulk |
-| `POST` | `/api/admin/bookings/:id/send-invoice-reminder` | Send reminder for a single invoice |
+| Method   | Path                                            | Description                                                    |
+| -------- | ----------------------------------------------- | -------------------------------------------------------------- |
+| `POST`   | `/api/admin/login`                              | Authenticate with `ADMIN_PASSWORD` — rate-limited              |
+| `GET`    | `/api/admin/stats`                              | Dashboard summary stats                                        |
+| `GET`    | `/api/admin/registrations`                      | Paginated registrations list (filter by status, search, promo) |
+| `GET`    | `/api/admin/registrations/export`               | CSV export of all registrations                                |
+| `GET`    | `/api/admin/registrations/:id`                  | Get single registration detail                                 |
+| `POST`   | `/api/admin/registrations/:id/redeliver`        | Retry failed post-confirmation side effects                    |
+| `PATCH`  | `/api/admin/registrations/:id/status`           | Update booking status                                          |
+| `DELETE` | `/api/admin/registrations`                      | Bulk-delete bookings                                           |
+| `GET`    | `/api/admin/promo-codes`                        | List all promo codes                                           |
+| `POST`   | `/api/admin/promo-codes`                        | Create promo code                                              |
+| `PATCH`  | `/api/admin/promo-codes/:id`                    | Update promo code                                              |
+| `DELETE` | `/api/admin/promo-codes/:id`                    | Delete promo code                                              |
+| `PUT`    | `/api/admin/discount-tiers`                     | Replace all discount tiers for a pass type                     |
+| `GET`    | `/api/admin/passes/inventory`                   | Get pass inventory                                             |
+| `PUT`    | `/api/admin/passes/inventory/:passType`         | Update pass inventory                                          |
+| `GET`    | `/api/admin/passes/config`                      | Get pass pricing config                                        |
+| `PUT`    | `/api/admin/passes/config/:passType`            | Update pass pricing and benefits                               |
+| `GET`    | `/api/admin/notification-emails`                | List organiser notification recipients                         |
+| `POST`   | `/api/admin/notification-emails`                | Add notification recipient                                     |
+| `PATCH`  | `/api/admin/notification-emails/:id`            | Update recipient                                               |
+| `DELETE` | `/api/admin/notification-emails/:id`            | Remove recipient                                               |
+| `GET`    | `/api/admin/activity`                           | Audit log (filterable by type, actor, date)                    |
+| `GET`    | `/api/admin/unpaid-invoices`                    | List open/overdue invoices                                     |
+| `GET`    | `/api/admin/unpaid-invoices/summary`            | Count and total of unpaid invoices                             |
+| `POST`   | `/api/admin/unpaid-invoices/bulk-remind`        | Send invoice reminder emails in bulk                           |
+| `POST`   | `/api/admin/bookings/:id/send-invoice-reminder` | Send reminder for a single invoice                             |
 
 ### Calendar
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/calendar/main.ics` | iCalendar file for the main summit (public) |
-| `GET` | `/api/calendar/social.ics` | iCalendar file for the pre-event social (public) |
+| Method | Path                       | Description                                      |
+| ------ | -------------------------- | ------------------------------------------------ |
+| `GET`  | `/api/calendar/main.ics`   | iCalendar file for the main summit (public)      |
+| `GET`  | `/api/calendar/social.ics` | iCalendar file for the pre-event social (public) |
 
 ### Hear About Us
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/hear-about-us` | List active options |
-| `POST` | `/api/hear-about-us` | Add option (admin) |
-| `DELETE` | `/api/hear-about-us/:id` | Remove option (admin) |
-| `PATCH` | `/api/hear-about-us/reorder` | Reorder options (admin) |
+| Method   | Path                         | Description             |
+| -------- | ---------------------------- | ----------------------- |
+| `GET`    | `/api/hear-about-us`         | List active options     |
+| `POST`   | `/api/hear-about-us`         | Add option (admin)      |
+| `DELETE` | `/api/hear-about-us/:id`     | Remove option (admin)   |
+| `PATCH`  | `/api/hear-about-us/reorder` | Reorder options (admin) |
 
 ### Manage (self-service, token-gated)
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/manage/:token` | Get booking + attendees by management token |
-| `PATCH` | `/api/manage/:token/attendees/:id` | Update an attendee via management token |
-| `GET` | `/api/manage/:token/billing` | Get billing details |
-| `PATCH` | `/api/manage/:token/billing` | Update billing details |
+| Method  | Path                               | Description                                 |
+| ------- | ---------------------------------- | ------------------------------------------- |
+| `GET`   | `/api/manage/:token`               | Get booking + attendees by management token |
+| `PATCH` | `/api/manage/:token/attendees/:id` | Update an attendee via management token     |
+| `GET`   | `/api/manage/:token/billing`       | Get billing details                         |
+| `PATCH` | `/api/manage/:token/billing`       | Update billing details                      |
 
 ---
 
@@ -413,21 +414,21 @@ The checkout frontend is a React SPA served at the root path `/`.
 
 ### Routes
 
-| Path | Component | Description |
-|---|---|---|
-| `/` | `CheckoutFlow` | Main multi-step checkout |
-| `/admin/login` | `AdminLogin` | Admin password entry |
-| `/admin` | `AdminDashboard` | Stats overview |
-| `/admin/registrations` | `AdminRegistrations` | Registrations list + management |
-| `/admin/promo-codes` | `AdminPromoCodes` | Promo code CRUD |
-| `/admin/discount-tiers` | `AdminDiscountTiers` | Group discount configuration |
-| `/admin/emails` | `AdminEmails` | Email logs + template editor |
-| `/admin/notifications` | `AdminNotifications` | Organiser notification recipients |
-| `/admin/passes` | `AdminPasses` | Pass pricing, benefits, and inventory |
-| `/admin/settings` | `AdminSettings` | Event settings (date, venue, social) |
-| `/admin/activity` | `AdminActivity` | Audit trail |
-| `/manage/:token` | `ManageAttendees` | Self-service attendee editing |
-| `/manage/:token/billing` | `EditBilling` | Self-service billing address edit |
+| Path                     | Component            | Description                           |
+| ------------------------ | -------------------- | ------------------------------------- |
+| `/`                      | `CheckoutFlow`       | Main multi-step checkout              |
+| `/admin/login`           | `AdminLogin`         | Admin password entry                  |
+| `/admin`                 | `AdminDashboard`     | Stats overview                        |
+| `/admin/registrations`   | `AdminRegistrations` | Registrations list + management       |
+| `/admin/promo-codes`     | `AdminPromoCodes`    | Promo code CRUD                       |
+| `/admin/discount-tiers`  | `AdminDiscountTiers` | Group discount configuration          |
+| `/admin/emails`          | `AdminEmails`        | Email logs + template editor          |
+| `/admin/notifications`   | `AdminNotifications` | Organiser notification recipients     |
+| `/admin/passes`          | `AdminPasses`        | Pass pricing, benefits, and inventory |
+| `/admin/settings`        | `AdminSettings`      | Event settings (date, venue, social)  |
+| `/admin/activity`        | `AdminActivity`      | Audit trail                           |
+| `/manage/:token`         | `ManageAttendees`    | Self-service attendee editing         |
+| `/manage/:token/billing` | `EditBilling`        | Self-service billing address edit     |
 
 ### Checkout Flow Steps
 
@@ -498,21 +499,22 @@ Access at `/admin`. Protected by password + HMAC-signed token.
 
 ### Admin Pages
 
-| Page | URL | Features |
-|---|---|---|
-| Dashboard | `/admin` | Total bookings, revenue, attendees, recent activity |
-| Registrations | `/admin/registrations` | Search, filter by status, Stripe invoice links, overdue badges, Send Reminder, redeliver side effects, CSV export, bulk delete |
-| Promo Codes | `/admin/promo-codes` | Create/edit/delete codes, usage tracking, date gating |
-| Discount Tiers | `/admin/discount-tiers` | Configure group discount thresholds per pass type |
-| Emails | `/admin/emails` | View send log, edit confirmation/welcome templates, send test emails |
-| Notifications | `/admin/notifications` | Add/remove organiser notification email addresses |
-| Passes | `/admin/passes` | Edit prices, original prices, benefits list, inventory (capacity/sold/reserved, sold-out override) |
-| Settings | `/admin/settings` | Event date/time, venue, pre-event social config, Google Sheets spreadsheet ID |
-| Activity | `/admin/activity` | Full audit log with before/after diffs, filterable by type and actor |
+| Page           | URL                     | Features                                                                                                                       |
+| -------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Dashboard      | `/admin`                | Total bookings, revenue, attendees, recent activity                                                                            |
+| Registrations  | `/admin/registrations`  | Search, filter by status, Stripe invoice links, overdue badges, Send Reminder, redeliver side effects, CSV export, bulk delete |
+| Promo Codes    | `/admin/promo-codes`    | Create/edit/delete codes, usage tracking, date gating                                                                          |
+| Discount Tiers | `/admin/discount-tiers` | Configure group discount thresholds per pass type                                                                              |
+| Emails         | `/admin/emails`         | View send log, edit confirmation/welcome templates, send test emails                                                           |
+| Notifications  | `/admin/notifications`  | Add/remove organiser notification email addresses                                                                              |
+| Passes         | `/admin/passes`         | Edit prices, original prices, benefits list, inventory (capacity/sold/reserved, sold-out override)                             |
+| Settings       | `/admin/settings`       | Event date/time, venue, pre-event social config, Google Sheets spreadsheet ID                                                  |
+| Activity       | `/admin/activity`       | Full audit log with before/after diffs, filterable by type and actor                                                           |
 
 ### Audit Log
 
 Every admin action writes to `activity_log`:
+
 - Login success / failure (with source IP)
 - Booking status changes, edits, deletes
 - Promo code CRUD
@@ -535,11 +537,11 @@ All monetary values are computed in **integer pence** internally. Pounds appear 
 
 ### Pass Prices (defaults — overridable via admin pass config)
 
-| Pass | Type | Price (excl. VAT) | Was | Seats per unit |
-|---|---|---|---|---|
-| Single | HR Professional | £199 | £429 | 1 |
-| Team | HR Professional | £499 | £1,200 | 3 |
-| Business | Consultant / Vendor | £599 | £999 | 1 |
+| Pass     | Type                | Price (excl. VAT) | Was    | Seats per unit |
+| -------- | ------------------- | ----------------- | ------ | -------------- |
+| Single   | HR Professional     | £199              | £429   | 1              |
+| Team     | HR Professional     | £499              | £1,200 | 3              |
+| Business | Consultant / Vendor | £599              | £999   | 1              |
 
 > **Note**: The Team pass is a fixed-price bundle — 1 unit covers 3 seats.
 
@@ -615,33 +617,33 @@ Emails are sent via Nodemailer using SMTP credentials from environment variables
 
 ### Email Types
 
-| Type | Trigger | Recipients | Attachment |
-|---|---|---|---|
-| **Confirmation** | On booking payment/invoice | Lead attendee (or billing contact) | Stripe Invoice PDF (fallback: PDFKit receipt) |
-| **Welcome** | On booking payment/invoice | Every individual attendee | None |
-| **Organiser notification** | On new paid/invoiced booking | All addresses in `notification_emails` | None |
-| **Invoice reminder** | Admin-triggered or bulk send | Billing contact | Stripe Invoice PDF |
+| Type                       | Trigger                      | Recipients                             | Attachment                                    |
+| -------------------------- | ---------------------------- | -------------------------------------- | --------------------------------------------- |
+| **Confirmation**           | On booking payment/invoice   | Lead attendee (or billing contact)     | Stripe Invoice PDF (fallback: PDFKit receipt) |
+| **Welcome**                | On booking payment/invoice   | Every individual attendee              | None                                          |
+| **Organiser notification** | On new paid/invoiced booking | All addresses in `notification_emails` | None                                          |
+| **Invoice reminder**       | Admin-triggered or bulk send | Billing contact                        | Stripe Invoice PDF                            |
 
 ### Email Template Variables
 
 Templates use `{{placeholder}}` syntax. Available in confirmation/welcome:
 
-| Variable | Description |
-|---|---|
-| `{{firstName}}` | Lead attendee first name |
-| `{{orderReference}}` | `HRAS26-XXXXX` |
-| `{{passLabel}}` | Human-readable pass name |
-| `{{quantity}}` | Number of passes |
-| `{{quantityLabel}}` | "pass" or "passes" |
-| `{{attendeesTable}}` | HTML table of all attendees |
-| `{{priceSummary}}` | HTML price breakdown |
-| `{{poNumberSection}}` | PO number row (if set) |
-| `{{eventDate}}` | From event settings |
-| `{{eventVenue}}` | From event settings |
-| `{{eventVenuePostcode}}` | From event settings |
-| `{{eventCalendarLinks}}` | "Add to Calendar" links block |
-| `{{socialCalendarLinks}}` | Pre-event social calendar links (if enabled) |
-| `{{managementLink}}` | Self-service attendee management URL |
+| Variable                   | Description                                         |
+| -------------------------- | --------------------------------------------------- |
+| `{{firstName}}`            | Lead attendee first name                            |
+| `{{orderReference}}`       | `HRAS26-XXXXX`                                      |
+| `{{passLabel}}`            | Human-readable pass name                            |
+| `{{quantity}}`             | Number of passes                                    |
+| `{{quantityLabel}}`        | "pass" or "passes"                                  |
+| `{{attendeesTable}}`       | HTML table of all attendees                         |
+| `{{priceSummary}}`         | HTML price breakdown                                |
+| `{{poNumberSection}}`      | PO number row (if set)                              |
+| `{{eventDate}}`            | From event settings                                 |
+| `{{eventVenue}}`           | From event settings                                 |
+| `{{eventVenuePostcode}}`   | From event settings                                 |
+| `{{eventCalendarLinks}}`   | "Add to Calendar" links block                       |
+| `{{socialCalendarLinks}}`  | Pre-event social calendar links (if enabled)        |
+| `{{managementLink}}`       | Self-service attendee management URL                |
 | `{{invoicePaymentButton}}` | "Pay Invoice Online" button (invoice bookings only) |
 
 ### PDF Receipt Fallback
@@ -664,10 +666,10 @@ Headers are auto-created on first write if the sheet is empty.
 
 ### Required Secrets for Sheets
 
-| Variable | Value |
-|---|---|
-| `GOOGLE_SHEETS_SPREADSHEET_ID` | The ID from the Google Sheet URL |
-| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | Service account `client_email` |
+| Variable                             | Value                                                          |
+| ------------------------------------ | -------------------------------------------------------------- |
+| `GOOGLE_SHEETS_SPREADSHEET_ID`       | The ID from the Google Sheet URL                               |
+| `GOOGLE_SERVICE_ACCOUNT_EMAIL`       | Service account `client_email`                                 |
 | `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | Service account `private_key` (with literal `\n` for newlines) |
 
 ---
@@ -693,50 +695,50 @@ Set all secrets in the Replit Secrets panel (never in source code or `.env` file
 
 ### Required for Core Operation
 
-| Variable | Purpose |
-|---|---|
-| `DATABASE_URL` | PostgreSQL connection string (auto-provided by Replit PostgreSQL) |
-| `ADMIN_PASSWORD` | Admin panel password. Must not be a common weak value. |
+| Variable         | Purpose                                                           |
+| ---------------- | ----------------------------------------------------------------- |
+| `DATABASE_URL`   | PostgreSQL connection string (auto-provided by Replit PostgreSQL) |
+| `ADMIN_PASSWORD` | Admin panel password. Must not be a common weak value.            |
 
 ### Required for Stripe Payments
 
-| Variable | Purpose |
-|---|---|
-| `STRIPE_SECRET_KEY` | Stripe secret key (`sk_live_…` or `sk_test_…`) |
+| Variable                | Purpose                                                  |
+| ----------------------- | -------------------------------------------------------- |
+| `STRIPE_SECRET_KEY`     | Stripe secret key (`sk_live_…` or `sk_test_…`)           |
 | `STRIPE_WEBHOOK_SECRET` | Webhook signing secret from Stripe Dashboard (`whsec_…`) |
 
 ### Required for Email
 
-| Variable | Purpose | Default |
-|---|---|---|
-| `SMTP_HOST` | SMTP server hostname | — |
-| `SMTP_PORT` | SMTP port | `587` |
-| `SMTP_USER` | SMTP username | — |
-| `SMTP_PASS` | SMTP password | — |
-| `FROM_EMAIL` | Sender address shown in emails | — |
+| Variable     | Purpose                        | Default |
+| ------------ | ------------------------------ | ------- |
+| `SMTP_HOST`  | SMTP server hostname           | —       |
+| `SMTP_PORT`  | SMTP port                      | `587`   |
+| `SMTP_USER`  | SMTP username                  | —       |
+| `SMTP_PASS`  | SMTP password                  | —       |
+| `FROM_EMAIL` | Sender address shown in emails | —       |
 
 ### Required for Google Sheets (optional feature)
 
-| Variable | Purpose |
-|---|---|
-| `GOOGLE_SHEETS_SPREADSHEET_ID` | Target Google Sheet ID |
-| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | Service account email |
+| Variable                             | Purpose                     |
+| ------------------------------------ | --------------------------- |
+| `GOOGLE_SHEETS_SPREADSHEET_ID`       | Target Google Sheet ID      |
+| `GOOGLE_SERVICE_ACCOUNT_EMAIL`       | Service account email       |
 | `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | Service account private key |
 
 ### Optional / Recommended
 
-| Variable | Purpose | Default |
-|---|---|---|
+| Variable             | Purpose                                                                                                                                                | Default        |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------- |
 | `ADMIN_TOKEN_SECRET` | 32+ char random secret for signing admin session tokens. If absent, an ephemeral key is generated at startup — sessions won't survive server restarts. | auto-generated |
-| `GITHUB_TOKEN` | GitHub PAT (repo scope) used by the auto-sync script | — |
+| `GITHUB_TOKEN`       | GitHub PAT (repo scope) used by the auto-sync script                                                                                                   | —              |
 
 ### Legacy / Unused
 
-| Variable | Notes |
-|---|---|
-| `FREEAGENT_CLIENT_ID` | FreeAgent OAuth — replaced by Stripe Invoicing, kept for reference |
-| `FREEAGENT_CLIENT_SECRET` | As above |
-| `FREEAGENT_REFRESH_TOKEN` | As above |
+| Variable                  | Notes                                                              |
+| ------------------------- | ------------------------------------------------------------------ |
+| `FREEAGENT_CLIENT_ID`     | FreeAgent OAuth — replaced by Stripe Invoicing, kept for reference |
+| `FREEAGENT_CLIENT_SECRET` | As above                                                           |
+| `FREEAGENT_REFRESH_TOKEN` | As above                                                           |
 
 ---
 
@@ -765,11 +767,11 @@ pnpm --filter @workspace/db run migrate
 
 The project uses Replit Workflows to run services. In development, three processes run concurrently:
 
-| Service | Port | Command |
-|---|---|---|
-| API Server | 8080 | `pnpm --filter @workspace/api-server run dev` |
-| Checkout Frontend | `$PORT` | `pnpm --filter @workspace/checkout run dev` |
-| GitHub Sync | — | `bash scripts/sync-to-github.sh` (every 5 min) |
+| Service           | Port    | Command                                        |
+| ----------------- | ------- | ---------------------------------------------- |
+| API Server        | 8080    | `pnpm --filter @workspace/api-server run dev`  |
+| Checkout Frontend | `$PORT` | `pnpm --filter @workspace/checkout run dev`    |
+| GitHub Sync       | —       | `bash scripts/sync-to-github.sh` (every 5 min) |
 
 ### Production / Deployment
 
@@ -789,11 +791,11 @@ pnpm --filter @workspace/api-server run start
 
 Configured as Replit Workflows (long-running processes managed by the platform):
 
-| Workflow | Command | Purpose |
-|---|---|---|
-| `artifacts/api-server: API Server` | `pnpm --filter @workspace/api-server run dev` | Express dev server with hot-reload |
-| `artifacts/checkout: web` | `pnpm --filter @workspace/checkout run dev` | Vite dev server |
-| `Sync to GitHub` | `while true; do bash scripts/sync-to-github.sh; sleep 300; done` | Auto-push to GitHub every 5 minutes |
+| Workflow                           | Command                                                          | Purpose                             |
+| ---------------------------------- | ---------------------------------------------------------------- | ----------------------------------- |
+| `artifacts/api-server: API Server` | `pnpm --filter @workspace/api-server run dev`                    | Express dev server with hot-reload  |
+| `artifacts/checkout: web`          | `pnpm --filter @workspace/checkout run dev`                      | Vite dev server                     |
+| `Sync to GitHub`                   | `while true; do bash scripts/sync-to-github.sh; sleep 300; done` | Auto-push to GitHub every 5 minutes |
 
 ### One-off Commands
 
@@ -919,15 +921,15 @@ Creates a PR from the branch to `main` via the GitHub API. Prints the PR URL on 
 
 Defined in `artifacts/checkout/src/tokens.css`.
 
-| Token | Value |
-|---|---|
-| Primary colour | `#E74F3E` (red) |
-| Secondary colour | `#F48847` (orange) |
-| Background | `#FCFBFA` (off-white) |
-| Heading font | Clarkson |
-| Body font | Figtree |
-| Input border-radius | `0px` (square) |
-| Button border-radius | `300px` (pill) |
+| Token                | Value                 |
+| -------------------- | --------------------- |
+| Primary colour       | `#E74F3E` (red)       |
+| Secondary colour     | `#F48847` (orange)    |
+| Background           | `#FCFBFA` (off-white) |
+| Heading font         | Clarkson              |
+| Body font            | Figtree               |
+| Input border-radius  | `0px` (square)        |
+| Button border-radius | `300px` (pill)        |
 
 shadcn/ui components are used throughout the admin panel and checkout. Tailwind utility classes follow the token values.
 
@@ -962,4 +964,4 @@ The offset `6541` ensures all references are 4+ digits and avoids `HRAS26-1` loo
 
 ---
 
-*Built and maintained on Replit. Synced to GitHub (`Dougy-cpu/CODEX-Register-HRAS`) via manual branch + PR workflow.*
+_Built and maintained on Replit. Synced to GitHub (`Dougy-cpu/CODEX-Register-HRAS`) via manual branch + PR workflow._

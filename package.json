@@ -23,7 +23,6 @@
     "vitest": "^4.1.4"
   },
   "dependencies": {
-    "@replit/connectors-sdk": "^0.4.0",
     "@swc/helpers": "^0.5.20"
   }
 }

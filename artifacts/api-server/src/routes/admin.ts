@@ -1,5 +1,4 @@
 import { Router, type IRouter } from "express";
-import Stripe from "stripe";
 import { eq, desc, asc, or, and, sql, count, notInArray, isNull } from "drizzle-orm";
 import ExcelJS from "exceljs";
 import { db } from "@workspace/db";
@@ -29,14 +28,9 @@ import { logger } from "../lib/logger";
 import { refreshStripeInvoiceStatusIfStale } from "../lib/invoice";
 import { deriveInvoiceBadge } from "../lib/invoice-status";
 import { deliveryStatusForBooking, runConfirmationSideEffects } from "../lib/booking-confirmation";
+import { getStripe } from "../lib/stripe-client";
 
 const router: IRouter = Router();
-
-function getStripe(): Stripe | null {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) return null;
-  return new Stripe(key);
-}
 
 function formatBooking(b: typeof bookingsTable.$inferSelect) {
   return {
@@ -505,7 +499,7 @@ router.patch("/admin/registrations/:id/status", adminAuth, async (req, res): Pro
 
     if (!stripe && (needsInvoiceVoid || needsCardRefund)) {
       stripeAction = "failed";
-      console.error(
+      logger.error(
         { bookingId: id },
         "Stripe not configured — cannot void invoice or issue refund on cancellation",
       );
@@ -514,7 +508,7 @@ router.patch("/admin/registrations/:id/status", adminAuth, async (req, res): Pro
         await stripe.invoices.voidInvoice(existing.stripeInvoiceId!);
         stripeAction = "invoice_voided";
       } catch (err) {
-        console.error({ err, bookingId: id }, "Failed to void Stripe invoice on cancellation");
+        logger.error({ err, bookingId: id }, "Failed to void Stripe invoice on cancellation");
         stripeAction = "failed";
       }
     } else if (stripe && needsCardRefund) {
@@ -523,7 +517,7 @@ router.patch("/admin/registrations/:id/status", adminAuth, async (req, res): Pro
         finalStatus = "refunded";
         stripeAction = "refund_issued";
       } catch (err) {
-        console.error({ err, bookingId: id }, "Failed to issue Stripe refund on cancellation");
+        logger.error({ err, bookingId: id }, "Failed to issue Stripe refund on cancellation");
         stripeAction = "failed";
       }
     }

@@ -13,6 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import SaveAndReturnButton from "@/components/checkout/SaveAndReturnButton";
 import {
   Check,
   Minus,
@@ -332,6 +333,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
   const [appliedViaLink, setAppliedViaLink] = useState<boolean>(false);
   const [promoError, setPromoError] = useState<string | null>(null);
   const [promoValidating, setPromoValidating] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const leadEmail = booking.attendees?.find((a) => a.isLead)?.workEmail ?? null;
 
@@ -506,8 +508,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPass, quantity, leadEmail]);
 
-  const handleContinue = async () => {
-    onAdvance?.(3);
+  const savePassSelection = async (currentStep: number) => {
     await updateBooking.mutateAsync({
       id: booking.id,
       data: {
@@ -515,10 +516,24 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
         quantity,
         promoCode: appliedPromoCode ?? undefined,
         hearAboutUs: hearAboutUs || undefined,
-        currentStep: 3,
+        currentStep,
       } as Parameters<typeof updateBooking.mutateAsync>[0]["data"],
     });
     queryClient.invalidateQueries({ queryKey: ["booking"] });
+  };
+
+  const handleContinue = async () => {
+    setSaveError(null);
+    try {
+      await savePassSelection(3);
+      onAdvance?.(3);
+    } catch {
+      setSaveError("We could not save your pass selection. Please try again.");
+    }
+  };
+
+  const handleSaveAndReturn = async () => {
+    await savePassSelection(2);
   };
 
   const activeTier = getActiveTier(allTiers, selectedPass, quantity);
@@ -556,6 +571,9 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
     businessCfg && businessCfg.extraBenefits.length > 0
       ? businessCfg.extraBenefits
       : DEFAULT_BUSINESS_EXTRA_BENEFITS;
+  const audienceLabel = isVendor ? "Consultant / Vendor" : "HR Professional";
+  const passLabel = isVendor ? "Business Pass" : "HR Professional Pass";
+  const unitLabel = isVendor ? "pass" : "ticket";
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -567,6 +585,35 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
             : "Choose how many tickets you need. Group discounts apply automatically."}
         </p>
       </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="bg-white border border-border p-4">
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            Booking type
+          </p>
+          <p className="text-lg font-bold mt-1">{audienceLabel}</p>
+        </div>
+        <div className="bg-white border border-border p-4">
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            Selected pass
+          </p>
+          <p className="text-lg font-bold mt-1">
+            {quantity} {unitLabel}
+            {quantity !== 1 ? "s" : ""}
+          </p>
+          <p className="text-sm text-muted-foreground">{passLabel}</p>
+        </div>
+        <div className="bg-white border border-border p-4">
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            Current total
+          </p>
+          <p className="text-lg font-bold mt-1">
+            {currentPricing ? `£${currentPricing.total.toFixed(2)}` : "Calculating"}
+          </p>
+          <p className="text-sm text-muted-foreground">Including VAT</p>
+        </div>
+      </div>
+
       {/* HR: Single pass with quantity picker */}
       {isHR && (
         <Card className="relative border-2 border-primary overflow-hidden p-0 shadow-lg">
@@ -1048,26 +1095,38 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
           )}
         </div>
       </div>
-      <div className="flex justify-between pt-4">
-        <Button
-          variant="outline"
-          size="lg"
-          className="px-8 h-14 text-lg border-border"
-          onClick={async () => {
-            await updateBooking.mutateAsync({ id: booking.id, data: { currentStep: 1 } });
-            queryClient.invalidateQueries({ queryKey: ["booking"] });
-          }}
-        >
-          Back
-        </Button>
-        <Button
-          size="lg"
-          className="px-10 h-14 text-lg bg-primary hover:bg-primary/90 text-white border-none"
-          onClick={handleContinue}
-          disabled={pricingLoading || !booking.id || compShortfall}
-        >
-          Continue to Attendees
-        </Button>
+      {saveError && (
+        <div className="text-sm text-destructive border border-destructive/30 bg-destructive/5 rounded p-3">
+          {saveError}
+        </div>
+      )}
+
+      <div className="space-y-3 pt-4">
+        <div className="flex justify-between">
+          <Button
+            variant="outline"
+            size="lg"
+            className="px-8 h-14 text-lg border-border"
+            onClick={async () => {
+              await updateBooking.mutateAsync({ id: booking.id, data: { currentStep: 1 } });
+              queryClient.invalidateQueries({ queryKey: ["booking"] });
+            }}
+          >
+            Back
+          </Button>
+          <Button
+            size="lg"
+            className="px-10 h-14 text-lg bg-primary hover:bg-primary/90 text-white border-none"
+            onClick={handleContinue}
+            disabled={pricingLoading || !booking.id || compShortfall || updateBooking.isPending}
+          >
+            Continue to Attendees
+          </Button>
+        </div>
+        <SaveAndReturnButton
+          onSave={handleSaveAndReturn}
+          disabled={pricingLoading || !booking.id || compShortfall || updateBooking.isPending}
+        />
       </div>
     </div>
   );
