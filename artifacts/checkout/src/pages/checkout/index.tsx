@@ -74,6 +74,7 @@ import Confirmation from "./Confirmation";
 import CheckoutLayout from "@/components/layout/CheckoutLayout";
 
 const STRIPE_RETURN_PARAM = "session_id";
+const COMPLETION_STEP_PARAM = "step";
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 60000;
 
@@ -97,6 +98,9 @@ export default function CheckoutFlow() {
   const isStripeReturn =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).has(STRIPE_RETURN_PARAM);
+  const isCompletionReturn =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get(COMPLETION_STEP_PARAM) === "5";
 
   const [pollingForPayment, setPollingForPayment] = useState(isStripeReturn);
   const [pollTimedOut, setPollTimedOut] = useState(false);
@@ -179,13 +183,21 @@ export default function CheckoutFlow() {
   const sessionRotatedRef = useRef(false);
   useEffect(() => {
     if (sessionRotatedRef.current) return;
-    if (!booking || isStripeReturn || pollingForPayment) return;
+    if (!booking || isStripeReturn || isCompletionReturn || pollingForPayment) return;
     if (booking.status === "paid" || booking.status === "invoiced") {
       sessionRotatedRef.current = true;
       queryClient.removeQueries({ queryKey: ["booking", sessionToken] });
       rotateSessionToken();
     }
-  }, [booking, isStripeReturn, pollingForPayment, queryClient, rotateSessionToken, sessionToken]);
+  }, [
+    booking,
+    isStripeReturn,
+    isCompletionReturn,
+    pollingForPayment,
+    queryClient,
+    rotateSessionToken,
+    sessionToken,
+  ]);
 
   useEffect(() => {
     if (optimisticStep !== null && booking?.currentStep && booking.currentStep >= optimisticStep) {

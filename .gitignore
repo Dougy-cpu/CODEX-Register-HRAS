@@ -15,6 +15,7 @@ node_modules
 .env
 .env.*
 !.env.example
+.replit
 
 # IDEs and editors
 /.idea
@@ -52,3 +53,6 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Local recovery copy containing Replit environment values.
+RESTORE_REPLIT_SECRETS_ONLY/

@@ -13,6 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import SaveAndReturnButton from "@/components/checkout/SaveAndReturnButton";
 import {
   Check,
   Minus,
@@ -226,7 +227,7 @@ function InventoryBadge({
   if (remaining <= 5) {
     return (
       <div
-        className={`flex items-center gap-1.5 text-xs font-bold text-red-700 bg-red-50 border border-red-200 px-2.5 py-1 rounded-sm ${className}`}
+        className={`flex items-center gap-1.5 text-xs font-bold text-red-700 bg-red-50 border border-red-200 px-2.5 py-1 rounded-md ${className}`}
       >
         <Flame className="w-3.5 h-3.5" />
         Only {remaining} {remaining === 1 ? "spot" : "spots"} left!
@@ -236,7 +237,7 @@ function InventoryBadge({
   if (remaining <= 20) {
     return (
       <div
-        className={`flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-sm ${className}`}
+        className={`flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-md ${className}`}
       >
         <AlertCircle className="w-3.5 h-3.5" />
         {remaining} spots remaining — selling fast
@@ -245,7 +246,7 @@ function InventoryBadge({
   }
   return (
     <div
-      className={`flex items-center gap-1.5 text-xs font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-sm ${className}`}
+      className={`flex items-center gap-1.5 text-xs font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-md ${className}`}
     >
       <AlertCircle className="w-3.5 h-3.5" />
       {remaining} spots remaining
@@ -332,6 +333,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
   const [appliedViaLink, setAppliedViaLink] = useState<boolean>(false);
   const [promoError, setPromoError] = useState<string | null>(null);
   const [promoValidating, setPromoValidating] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const leadEmail = booking.attendees?.find((a) => a.isLead)?.workEmail ?? null;
 
@@ -506,8 +508,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPass, quantity, leadEmail]);
 
-  const handleContinue = async () => {
-    onAdvance?.(3);
+  const savePassSelection = async (currentStep: number) => {
     await updateBooking.mutateAsync({
       id: booking.id,
       data: {
@@ -515,10 +516,24 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
         quantity,
         promoCode: appliedPromoCode ?? undefined,
         hearAboutUs: hearAboutUs || undefined,
-        currentStep: 3,
+        currentStep,
       } as Parameters<typeof updateBooking.mutateAsync>[0]["data"],
     });
     queryClient.invalidateQueries({ queryKey: ["booking"] });
+  };
+
+  const handleContinue = async () => {
+    setSaveError(null);
+    try {
+      await savePassSelection(3);
+      onAdvance?.(3);
+    } catch {
+      setSaveError("We could not save your pass selection. Please try again.");
+    }
+  };
+
+  const handleSaveAndReturn = async () => {
+    await savePassSelection(2);
   };
 
   const activeTier = getActiveTier(allTiers, selectedPass, quantity);
@@ -954,7 +969,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
                   <span className="flex-1">
                     Code <span className="font-mono">{appliedPromoCode}</span> applied
                     {appliedViaLink && (
-                      <span className="ml-2 inline-block text-[10px] uppercase tracking-wider font-bold bg-green-200 text-green-900 px-1.5 py-0.5 rounded-sm">
+                      <span className="ml-2 inline-block text-[10px] uppercase tracking-wider font-bold bg-green-200 text-green-900 px-1.5 py-0.5 rounded-md">
                         Applied via link
                       </span>
                     )}
@@ -1080,23 +1095,36 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
           )}
         </div>
       </div>
-      <div className="flex justify-between pt-4">
+      {saveError && (
+        <div className="text-sm text-destructive border border-destructive/30 bg-destructive/5 rounded-md p-3">
+          {saveError}
+        </div>
+      )}
+
+      <div className="grid gap-3 border-t border-border pt-6 md:grid-cols-[auto_minmax(260px,1fr)_minmax(260px,320px)] md:items-start">
         <Button
           variant="outline"
           size="lg"
-          className="px-8 h-14 text-lg border-border"
+          className="order-3 h-14 w-full px-8 text-lg border-border md:order-1 md:w-auto"
           onClick={async () => {
             await updateBooking.mutateAsync({ id: booking.id, data: { currentStep: 1 } });
             queryClient.invalidateQueries({ queryKey: ["booking"] });
           }}
+          disabled={updateBooking.isPending}
         >
           Back
         </Button>
+        <SaveAndReturnButton
+          onSave={handleSaveAndReturn}
+          disabled={pricingLoading || !booking.id || compShortfall || updateBooking.isPending}
+          className="order-2 items-stretch md:order-2 md:items-center"
+          buttonClassName="h-14 w-full md:w-auto md:min-w-[260px]"
+        />
         <Button
           size="lg"
-          className="px-10 h-14 text-lg bg-primary hover:bg-primary/90 text-white border-none"
+          className="order-1 h-14 w-full px-10 text-lg bg-primary hover:bg-primary/90 text-white border-none md:order-3"
           onClick={handleContinue}
-          disabled={pricingLoading || !booking.id || compShortfall}
+          disabled={pricingLoading || !booking.id || compShortfall || updateBooking.isPending}
         >
           Continue to Attendees
         </Button>
