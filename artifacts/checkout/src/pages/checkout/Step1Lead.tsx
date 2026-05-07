@@ -20,6 +20,7 @@ import {
 } from "@workspace/api-client-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useQueryClient } from "@tanstack/react-query";
+import SaveAndReturnButton from "@/components/checkout/SaveAndReturnButton";
 import type { BookingWithAttendees } from "@/types/booking";
 
 const formSchema = z.object({
@@ -36,6 +37,17 @@ const formSchema = z.object({
 });
 
 type FormValues = z.infer<typeof formSchema>;
+
+function bookingSaveErrorMessage(error: unknown) {
+  const candidate = error as { data?: { error?: string }; message?: string } | null;
+  const apiMessage = candidate?.data?.error || candidate?.message;
+
+  if (apiMessage?.toLowerCase().includes("session token")) {
+    return "We could not verify this booking session. Please refresh the page and try again.";
+  }
+
+  return apiMessage || "Something went wrong saving your details. Please try again.";
+}
 
 export default function Step1Lead({
   sessionToken,
@@ -79,19 +91,36 @@ export default function Step1Lead({
   const createAttendee = useCreateAttendee();
   const updateAttendee = useUpdateAttendee();
 
-  const onSubmit = async (data: FormValues) => {
-    onSubmitError(null);
-    onAdvance(2, { attendeeType: data.attendeeType, sessionToken });
+  const saveLeadDetails = async (data: FormValues, currentStep: 1 | 2) => {
+    if (!booking) {
+      await customFetch("/api/bookings/start", {
+        method: "POST",
+        body: JSON.stringify({
+          sessionToken,
+          attendeeType: data.attendeeType,
+          passType: "single",
+          quantity: 1,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          jobTitle: data.jobTitle,
+          company: data.company,
+          workEmail: data.workEmail,
+          phone: data.phone || null,
+          gdprConsent: data.gdprConsent,
+          currentStep,
+        }),
+      });
+    } else {
+      await updateBooking.mutateAsync({
+        id: booking.id,
+        data: { attendeeType: data.attendeeType, currentStep },
+      });
 
-    try {
-      if (!booking) {
-        await customFetch("/api/bookings/start", {
-          method: "POST",
-          body: JSON.stringify({
-            sessionToken,
-            attendeeType: data.attendeeType,
-            passType: "single",
-            quantity: 1,
+      if (!leadAttendee) {
+        await createAttendee.mutateAsync({
+          bookingId: booking.id,
+          data: {
+            isLead: true,
             firstName: data.firstName,
             lastName: data.lastName,
             jobTitle: data.jobTitle,
@@ -99,51 +128,55 @@ export default function Step1Lead({
             workEmail: data.workEmail,
             phone: data.phone || null,
             gdprConsent: data.gdprConsent,
-          }),
+            seatIndex: 0,
+          },
         });
       } else {
-        await updateBooking.mutateAsync({
-          id: booking.id,
-          data: { attendeeType: data.attendeeType, currentStep: 2 },
+        await updateAttendee.mutateAsync({
+          bookingId: booking.id,
+          attendeeId: leadAttendee.id,
+          data: {
+            firstName: data.firstName,
+            lastName: data.lastName,
+            jobTitle: data.jobTitle,
+            company: data.company,
+            workEmail: data.workEmail,
+            phone: data.phone || null,
+            gdprConsent: data.gdprConsent,
+          },
         });
-
-        if (!leadAttendee) {
-          await createAttendee.mutateAsync({
-            bookingId: booking.id,
-            data: {
-              isLead: true,
-              firstName: data.firstName,
-              lastName: data.lastName,
-              jobTitle: data.jobTitle,
-              company: data.company,
-              workEmail: data.workEmail,
-              phone: data.phone || null,
-              gdprConsent: data.gdprConsent,
-              seatIndex: 0,
-            },
-          });
-        } else {
-          await updateAttendee.mutateAsync({
-            bookingId: booking.id,
-            attendeeId: leadAttendee.id,
-            data: {
-              firstName: data.firstName,
-              lastName: data.lastName,
-              jobTitle: data.jobTitle,
-              company: data.company,
-              workEmail: data.workEmail,
-              phone: data.phone || null,
-              gdprConsent: data.gdprConsent,
-            },
-          });
-        }
       }
-
-      queryClient.invalidateQueries({ queryKey: ["booking", sessionToken] });
-    } catch {
-      onAdvance(null);
-      onSubmitError("Something went wrong saving your details. Please try again.");
     }
+
+    queryClient.invalidateQueries({ queryKey: ["booking", sessionToken] });
+  };
+
+  const onSubmit = async (data: FormValues) => {
+    onSubmitError(null);
+
+    try {
+      await saveLeadDetails(data, 2);
+      onAdvance(2, { attendeeType: data.attendeeType, sessionToken });
+    } catch (error) {
+      onAdvance(null);
+      onSubmitError(bookingSaveErrorMessage(error));
+    }
+  };
+
+  const handleSaveAndReturn = async () => {
+    await form.handleSubmit(
+      async (data) => {
+        onSubmitError(null);
+        try {
+          await saveLeadDetails(data, 1);
+        } catch (error) {
+          throw new Error(bookingSaveErrorMessage(error), { cause: error });
+        }
+      },
+      async () => {
+        throw new Error("Please complete the required fields before saving.");
+      },
+    )();
   };
 
   return (
@@ -359,7 +392,8 @@ export default function Step1Lead({
             </div>
           )}
 
-          <div className="flex justify-end pt-4">
+          <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-4">
+            <SaveAndReturnButton onSave={handleSaveAndReturn} className="sm:items-start" />
             <Button
               type="submit"
               size="lg"

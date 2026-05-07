@@ -11,6 +11,7 @@ import {
   customFetch,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
+import SaveAndReturnButton from "@/components/checkout/SaveAndReturnButton";
 import {
   Form,
   FormControl,
@@ -136,6 +137,7 @@ const invoiceSchema = z.object({
   billingVatNumber: z.string().optional(),
   poNumber: z.string().optional(),
 });
+type InvoiceFormValues = z.infer<typeof invoiceSchema>;
 
 interface Step4PaymentProps {
   booking: BookingWithAttendees;
@@ -265,6 +267,8 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
   }, [booking.id, booking.status]);
 
   const currentPricing = calculatePricingMutation.data;
+  const bookingPassLabel = booking.passType === "single" ? "HR Professional Pass" : "Business Pass";
+  const bookingPassSummary = booking.quantity === 1 ? bookingPassLabel : `${bookingPassLabel}es`;
 
   const billingLead =
     booking.attendees?.find((a) => a.isLead && !a.isTbc) ??
@@ -427,6 +431,45 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
     }
   };
 
+  const invoiceSaveData = (data: InvoiceFormValues) => ({
+    billingName: data.billingName || null,
+    billingCompany: data.billingCompany || null,
+    billingEmail: data.billingEmail || null,
+    billingAddressLine1: data.billingAddressLine1 || null,
+    billingAddressLine2: data.billingAddressLine2 || null,
+    billingTown: data.billingTown || null,
+    billingRegion: data.billingRegion || null,
+    billingPostcode: data.billingPostcode || null,
+    billingCountry: data.billingCountry || null,
+    billingPhone: data.billingPhone || null,
+    billingVatNumber: data.billingVatNumber || null,
+    poNumber: data.poNumber || null,
+  });
+
+  const savePaymentProgress = async () => {
+    setPaymentError(null);
+    await updateBooking.mutateAsync({
+      id: booking.id,
+      data: {
+        paymentMethod,
+        currentStep: 4,
+        ...(paymentMethod === "invoice" ? invoiceSaveData(form.getValues()) : {}),
+      },
+    });
+    queryClient.invalidateQueries({ queryKey: ["booking"] });
+    isSubmittingPaymentRef.current = true;
+  };
+
+  const saveFreeProgress = async () => {
+    setPaymentError(null);
+    await updateBooking.mutateAsync({
+      id: booking.id,
+      data: { currentStep: 4 },
+    });
+    queryClient.invalidateQueries({ queryKey: ["booking"] });
+    isSubmittingPaymentRef.current = true;
+  };
+
   const isFreeBooking = currentPricing !== undefined && currentPricing.total === 0;
 
   if (isFreeBooking) {
@@ -460,26 +503,29 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
             </div>
           )}
 
-          <div className="flex justify-between pt-4">
-            <Button
-              variant="outline"
-              size="lg"
-              className="px-8 h-14 text-lg border-border"
-              onClick={async () => {
-                await updateBooking.mutateAsync({ id: booking.id, data: { currentStep: 3 } });
-                queryClient.invalidateQueries({ queryKey: ["booking"] });
-              }}
-            >
-              Back
-            </Button>
-            <Button
-              size="lg"
-              className="px-10 h-14 text-lg bg-primary hover:bg-primary/90 text-white border-none"
-              onClick={handleConfirmFree}
-              disabled={isFreeConfirming}
-            >
-              {isFreeConfirming ? "Confirming…" : "Confirm Registration"}
-            </Button>
+          <div className="space-y-3 pt-4">
+            <div className="flex justify-between">
+              <Button
+                variant="outline"
+                size="lg"
+                className="px-8 h-14 text-lg border-border"
+                onClick={async () => {
+                  await updateBooking.mutateAsync({ id: booking.id, data: { currentStep: 3 } });
+                  queryClient.invalidateQueries({ queryKey: ["booking"] });
+                }}
+              >
+                Back
+              </Button>
+              <Button
+                size="lg"
+                className="px-10 h-14 text-lg bg-primary hover:bg-primary/90 text-white border-none"
+                onClick={handleConfirmFree}
+                disabled={isFreeConfirming}
+              >
+                {isFreeConfirming ? "Confirming…" : "Confirm Registration"}
+              </Button>
+            </div>
+            <SaveAndReturnButton onSave={saveFreeProgress} disabled={isFreeConfirming} />
           </div>
         </div>
 
@@ -489,8 +535,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
             <div className="space-y-4">
               <div className="flex justify-between text-base">
                 <span>
-                  {booking.quantity} ×{" "}
-                  {booking.passType === "single" ? "Single Pass" : "Business Pass"}
+                  {booking.quantity} × {bookingPassLabel}
                 </span>
                 <span>£{currentPricing.baseSubtotal.toFixed(2)}</span>
               </div>
@@ -539,7 +584,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
               Booking
             </p>
             <p className="text-lg font-bold mt-1">
-              {booking.quantity} {booking.quantity === 1 ? "seat" : "seats"}
+              {booking.quantity} {bookingPassSummary}
             </p>
           </div>
           <div className="bg-white border border-border p-4">
@@ -913,36 +958,39 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
           </div>
         )}
 
-        <div className="flex justify-between pt-4">
-          <Button
-            variant="outline"
-            size="lg"
-            className="px-8 h-14 text-lg border-border"
-            onClick={async () => {
-              await updateBooking.mutateAsync({ id: booking.id, data: { currentStep: 3 } });
-              queryClient.invalidateQueries({ queryKey: ["booking"] });
-            }}
-          >
-            Back
-          </Button>
-          <Button
-            size="lg"
-            className="px-10 h-14 text-lg bg-primary hover:bg-primary/90 text-white border-none"
-            onClick={() =>
-              paymentMethod === "invoice"
-                ? document
-                    .getElementById("invoice-form")
-                    ?.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }))
-                : onSubmit()
-            }
-            disabled={isProcessing}
-          >
-            {isProcessing
-              ? "Processing..."
-              : paymentMethod === "card"
-                ? "Proceed to Checkout"
-                : "Complete Registration"}
-          </Button>
+        <div className="space-y-3 pt-4">
+          <div className="flex justify-between">
+            <Button
+              variant="outline"
+              size="lg"
+              className="px-8 h-14 text-lg border-border"
+              onClick={async () => {
+                await updateBooking.mutateAsync({ id: booking.id, data: { currentStep: 3 } });
+                queryClient.invalidateQueries({ queryKey: ["booking"] });
+              }}
+            >
+              Back
+            </Button>
+            <Button
+              size="lg"
+              className="px-10 h-14 text-lg bg-primary hover:bg-primary/90 text-white border-none"
+              onClick={() =>
+                paymentMethod === "invoice"
+                  ? document
+                      .getElementById("invoice-form")
+                      ?.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }))
+                  : onSubmit()
+              }
+              disabled={isProcessing}
+            >
+              {isProcessing
+                ? "Processing..."
+                : paymentMethod === "card"
+                  ? "Proceed to Checkout"
+                  : "Complete Registration"}
+            </Button>
+          </div>
+          <SaveAndReturnButton onSave={savePaymentProgress} disabled={isProcessing} />
         </div>
       </div>
 
@@ -953,8 +1001,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
             <div className="space-y-4">
               <div className="flex justify-between text-base">
                 <span>
-                  {booking.quantity} ×{" "}
-                  {booking.passType === "single" ? "Single Pass" : "Business Pass"}
+                  {booking.quantity} × {bookingPassLabel}
                 </span>
                 <span>£{currentPricing.baseSubtotal.toFixed(2)}</span>
               </div>

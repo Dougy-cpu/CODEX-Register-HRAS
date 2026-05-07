@@ -8,6 +8,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import SaveAndReturnButton from "@/components/checkout/SaveAndReturnButton";
 import {
   Accordion,
   AccordionContent,
@@ -123,6 +124,7 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
   // Each user keystroke retriggers the effect, providing implicit retry.
   const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "error">("idle");
   const [autosaveAttempt, setAutosaveAttempt] = useState(0); // bump to force-retry
+  const [submitError, setSubmitError] = useState<string | null>(null);
   // Bounded exponential backoff for transient autosave failures: if a save
   // cycle fails we automatically re-trigger the effect at 2s, then 6s, then
   // 18s before giving up and waiting for the user (banner / manual retry /
@@ -391,7 +393,120 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
     }
   };
 
+  const saveAttendeesProgress = async () => {
+    setAutosaveStatus("saving");
+
+    try {
+      for (let i = 0; i < totalSeats; i++) {
+        const data = formsData[i];
+        const isTbc = tbcFlags[i];
+        const existingId = data.id ?? autosaveIdsRef.current[i];
+        const hasRequiredFields =
+          !!data.firstName &&
+          !!data.lastName &&
+          !!data.jobTitle &&
+          !!data.company &&
+          !!data.workEmail;
+
+        if (i === 0) {
+          if (leadAttendee?.id) {
+            await updateAttendee.mutateAsync({
+              bookingId: booking.id,
+              attendeeId: leadAttendee.id,
+              data: {
+                firstName: data.firstName,
+                lastName: data.lastName,
+                jobTitle: data.jobTitle,
+                company: data.company,
+                workEmail: data.workEmail,
+                phone: data.phone || null,
+                dietaryAccessibility: data.dietaryAccessibility || null,
+                gdprConsent: data.gdprConsent,
+              },
+            });
+          } else if (hasRequiredFields) {
+            const created = await createAttendee.mutateAsync({
+              bookingId: booking.id,
+              data: {
+                isLead: true,
+                firstName: data.firstName,
+                lastName: data.lastName,
+                jobTitle: data.jobTitle,
+                company: data.company,
+                workEmail: data.workEmail,
+                phone: data.phone || null,
+                dietaryAccessibility: data.dietaryAccessibility || null,
+                gdprConsent: data.gdprConsent,
+                seatIndex: 0,
+              },
+            });
+            autosaveIdsRef.current[i] = created.id;
+          }
+          continue;
+        }
+
+        if (existingId) {
+          await updateAttendee.mutateAsync({
+            bookingId: booking.id,
+            attendeeId: existingId,
+            data: isTbc
+              ? { isTbc: true, company: leadDefaults.company }
+              : {
+                  isTbc: false,
+                  firstName: data.firstName,
+                  lastName: data.lastName,
+                  jobTitle: data.jobTitle,
+                  company: data.company,
+                  workEmail: data.workEmail,
+                  phone: data.phone || null,
+                  dietaryAccessibility: data.dietaryAccessibility || null,
+                  gdprConsent: data.gdprConsent,
+                },
+          });
+        } else if (isTbc || hasRequiredFields) {
+          const created = await createAttendee.mutateAsync({
+            bookingId: booking.id,
+            data: isTbc
+              ? {
+                  isLead: false,
+                  isTbc: true,
+                  gdprConsent: false,
+                  company: leadDefaults.company || "TBC",
+                  seatIndex: i,
+                }
+              : {
+                  isLead: false,
+                  isTbc: false,
+                  firstName: data.firstName,
+                  lastName: data.lastName,
+                  jobTitle: data.jobTitle,
+                  company: data.company,
+                  workEmail: data.workEmail,
+                  phone: data.phone || null,
+                  dietaryAccessibility: data.dietaryAccessibility || null,
+                  gdprConsent: data.gdprConsent,
+                  seatIndex: i,
+                },
+          });
+          autosaveIdsRef.current[i] = created.id;
+        }
+      }
+
+      await updateBooking.mutateAsync({
+        id: booking.id,
+        data: { currentStep: 3 },
+      });
+      queryClient.invalidateQueries({ queryKey: ["booking"] });
+      setAutosaveStatus("idle");
+    } catch (e) {
+      console.error(e);
+      setAutosaveStatus("error");
+      throw e;
+    }
+  };
+
   const handleContinue = async () => {
+    setSubmitError(null);
     let allValid = true;
     const newErrors: (Partial<Record<keyof AttendeeFormData, string>> | null)[] =
       Array(totalSeats).fill(null);
@@ -488,14 +603,15 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
         }
       }
 
-      onAdvance?.(4);
       await updateBooking.mutateAsync({
         id: booking.id,
         data: { currentStep: 4 },
       });
       queryClient.invalidateQueries({ queryKey: ["booking"] });
+      onAdvance?.(4);
     } catch (e) {
       console.error(e);
+      setSubmitError("We could not save attendee details. Please try again before continuing.");
     } finally {
       setIsSubmitting(false);
     }
@@ -806,32 +922,44 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
         </div>
       )}
 
-      <div className="flex justify-between pt-4">
-        <Button
-          variant="outline"
-          size="lg"
-          className="px-8 h-14 text-lg border-border"
-          onClick={async () => {
-            await updateBooking.mutateAsync({ id: booking.id, data: { currentStep: 2 } });
-            queryClient.invalidateQueries({ queryKey: ["booking"] });
-          }}
-        >
-          Back
-        </Button>
-        <Button
-          size="lg"
-          className="px-10 h-14 text-lg bg-primary hover:bg-primary/90 text-white border-none"
-          onClick={handleContinue}
-          disabled={isSubmitting || autosaveStatus === "saving" || autosaveStatus === "error"}
-        >
-          {isSubmitting
-            ? "Saving..."
-            : autosaveStatus === "saving"
-              ? "Saving changes..."
-              : autosaveStatus === "error"
-                ? "Save failed — retrying"
-                : "Continue to Payment"}
-        </Button>
+      {submitError && (
+        <div className="text-sm text-destructive border border-destructive/30 bg-destructive/5 rounded p-3">
+          {submitError}
+        </div>
+      )}
+
+      <div className="space-y-3 pt-4">
+        <div className="flex justify-between">
+          <Button
+            variant="outline"
+            size="lg"
+            className="px-8 h-14 text-lg border-border"
+            onClick={async () => {
+              await updateBooking.mutateAsync({ id: booking.id, data: { currentStep: 2 } });
+              queryClient.invalidateQueries({ queryKey: ["booking"] });
+            }}
+          >
+            Back
+          </Button>
+          <Button
+            size="lg"
+            className="px-10 h-14 text-lg bg-primary hover:bg-primary/90 text-white border-none"
+            onClick={handleContinue}
+            disabled={isSubmitting || autosaveStatus === "saving" || autosaveStatus === "error"}
+          >
+            {isSubmitting
+              ? "Saving..."
+              : autosaveStatus === "saving"
+                ? "Saving changes..."
+                : autosaveStatus === "error"
+                  ? "Save failed — retrying"
+                  : "Continue to Payment"}
+          </Button>
+        </div>
+        <SaveAndReturnButton
+          onSave={saveAttendeesProgress}
+          disabled={isSubmitting || autosaveStatus === "saving"}
+        />
       </div>
     </div>
   );

@@ -172,6 +172,7 @@ router.post("/bookings/start", async (req, res): Promise<void> => {
     workEmail,
     phone,
     gdprConsent,
+    currentStep = 2,
   } = req.body;
 
   if (
@@ -191,6 +192,9 @@ router.post("/bookings/start", async (req, res): Promise<void> => {
     res.status(400).json({ error: "quantity must be a positive integer" });
     return;
   }
+
+  const requestedCurrentStep =
+    Number.isInteger(currentStep) && currentStep >= 1 && currentStep <= 2 ? currentStep : 2;
 
   const [existing] = await db
     .select()
@@ -216,7 +220,7 @@ router.post("/bookings/start", async (req, res): Promise<void> => {
           totalAmount: pricing.total.toString(),
           groupDiscountAmount:
             pricing.groupDiscountAmount > 0 ? pricing.groupDiscountAmount.toString() : null,
-          currentStep: Math.max(2, existing.currentStep),
+          currentStep: Math.max(requestedCurrentStep, existing.currentStep),
         })
         .where(eq(bookingsTable.id, existing.id))
         .returning();
@@ -235,7 +239,7 @@ router.post("/bookings/start", async (req, res): Promise<void> => {
           totalAmount: pricing.total.toString(),
           groupDiscountAmount:
             pricing.groupDiscountAmount > 0 ? pricing.groupDiscountAmount.toString() : null,
-          currentStep: 2,
+          currentStep: requestedCurrentStep,
           managementToken,
         })
         .returning();
