@@ -1209,4 +1209,67 @@ Additional environment reset rule: if Replit says `pnpm: command not found` or d
 
 ---
 
+### Fix 008 — Environment hardening, centralized Stripe client, and graceful shutdown
+
+**Date**: 2026-05-07
+**Status**: ✅ Resolved
+
+**Changes applied**:
+
+- **Env helpers** (`artifacts/api-server/src/lib/env.ts`): Added a typed `getEnv(key)` helper that throws at startup for any missing required variable, replacing scattered `process.env.X!` casts throughout the codebase.
+- **Centralized Stripe client** (`artifacts/api-server/src/lib/stripe.ts`): Extracted a single `stripe` singleton from `lib/stripe.ts`, removing duplicated `new Stripe(...)` calls across route files.
+- **Graceful shutdown** (`artifacts/api-server/src/index.ts`): Added `SIGTERM`/`SIGINT` handlers that drain the HTTP server and close the DB pool before exiting, preventing dropped requests during container restarts.
+- **Log redaction**: Added PII field paths (`email`, `billing_email`, `work_email`, `first_name`, `last_name`) to Pino's `redact` list so they are masked in production log output.
+- **DB pool tuning**: Set `max: 10, idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000` on the PostgreSQL pool for better connection lifecycle management.
+- **Admin UI updates** (`artifacts/checkout/src/pages/admin/registrations.tsx`): Minor UI consistency fixes in the registrations table.
+- **Scripts**: Updated `scripts/post-merge.sh` to rebuild all lib packages after a task-agent merge.
+- **Typecheck fixes**: Resolved residual TypeScript composite project reference errors introduced by the agent merge.
+
+**Files changed**: `artifacts/api-server/src/lib/env.ts` (new), `artifacts/api-server/src/lib/stripe.ts` (new), `artifacts/api-server/src/index.ts`, `artifacts/api-server/src/routes/admin.ts`, `artifacts/api-server/src/lib/email.ts`, `artifacts/checkout/src/pages/admin/registrations.tsx`, `scripts/post-merge.sh`.
+
+---
+
+### Fix 009 — Promo-code auto-apply links switched to custom domain
+
+**Date**: 2026-05-07
+**Status**: ✅ Resolved
+
+**Symptom**: The admin promo-codes page generated auto-apply share links using the Replit `.replit.dev` preview domain. These links would break if the Replit environment was recycled or the project was republished.
+
+**Fix**: Updated `artifacts/checkout/src/pages/admin/promo-codes.tsx` to construct the auto-apply URL using the production custom domain instead of the Replit preview URL:
+
+```typescript
+// Before
+const url = `${window.location.origin}/?promo=${code}`;
+
+// After
+const url = `https://register.hranalyticssummit.com/?promo=${code}`;
+```
+
+**Rule**: Any URL that is shared externally (emails, admin copy-to-clipboard helpers, QR codes) must use `https://register.hranalyticssummit.com` as the base, never `window.location.origin` or a `.replit.dev` domain. The main website redirect target remains `https://hranalyticssummit.com`.
+
+---
+
+### Fix 010 — Checkout button layout overlap on Step 3 and Step 4
+
+**Date**: 2026-05-07
+**Status**: ✅ Resolved
+
+**Symptom**: On the attendees step (Step 3) and the payment step (Step 4), the action-bar buttons at the bottom of the page were overlapping or clipping on smaller viewports and inside the Replit preview iframe. Specifically:
+
+- Step 3: Back / Save and return / Continue to Payment were rendered in a 3-column grid that collapsed incorrectly and caused text overflow.
+- Step 4: The Save and return button was narrower than the other two buttons in the action card and its label was being clipped by the icon.
+
+**Fix**:
+
+1. `artifacts/checkout/src/pages/checkout/Step3Attendees.tsx` — Changed the bottom action container from `grid gap-3 sm:grid-cols-3` back to `flex flex-col gap-3` so all three buttons stack vertically at full width on every viewport.
+2. `artifacts/checkout/src/pages/checkout/Step4Payment.tsx` — Changed the action container from a responsive grid back to `flex flex-col gap-3`; removed `md:w-auto` overrides so all three buttons (Complete / Back to attendees / Save and return) are consistently full-width.
+3. `artifacts/checkout/src/components/checkout/SaveAndReturnButton.tsx` — Wrapped the button label text in `<span className="min-w-0 flex-1 text-center">` so it flows correctly inside a flex button without clipping the `ArrowUpRight` icon; added `sm:px-6 sm:text-base` responsive padding to match the other buttons at wider breakpoints.
+
+**Files changed**: `artifacts/checkout/src/pages/checkout/Step3Attendees.tsx`, `artifacts/checkout/src/pages/checkout/Step4Payment.tsx`, `artifacts/checkout/src/components/checkout/SaveAndReturnButton.tsx`.
+
+**Rule**: Keep action-bar buttons in a `flex flex-col gap-3` stack. Avoid responsive grid layouts for button groups on checkout pages — the varying label lengths and the SaveAndReturnButton wrapper div make grid columns unreliable.
+
+---
+
 _Built and maintained on Replit. Synced to GitHub (`Dougy-cpu/CODEX-Register-HRAS`) via manual branch + PR workflow._
