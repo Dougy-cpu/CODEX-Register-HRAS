@@ -1183,10 +1183,10 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
             </section>
 
             <section className="rounded-md border border-border bg-white p-5">
-              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(280px,1fr)_minmax(0,1fr)] sm:items-start sm:gap-4">
+              <div className="flex flex-col gap-3">
                 <Button
                   size="lg"
-                  className="order-1 h-14 w-full min-w-0 px-6 text-base bg-primary text-white hover:bg-primary/90 sm:justify-self-end sm:w-auto"
+                  className="h-14 w-full min-w-0 px-6 text-base bg-primary text-white hover:bg-primary/90"
                   onClick={() => {
                     if (paymentMethod === "invoice") {
                       void form.handleSubmit(onSubmit)();
@@ -1201,7 +1201,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                 <Button
                   variant="outline"
                   size="lg"
-                  className="order-3 h-12 w-full min-w-0 px-5 border-border bg-white text-sm sm:justify-self-start sm:w-auto sm:px-6"
+                  className="h-12 w-full min-w-0 px-5 border-border bg-white text-sm"
                   onClick={async () => {
                     setPaymentError(null);
                     try {
@@ -1226,8 +1226,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                 <SaveAndReturnButton
                   onSave={savePaymentProgress}
                   disabled={isProcessing}
-                  className="order-2"
-                  buttonClassName="sm:min-w-[280px]"
+                  buttonClassName="text-base"
                 />
               </div>
             </section>

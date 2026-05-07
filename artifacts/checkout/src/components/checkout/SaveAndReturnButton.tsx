@@ -38,18 +38,20 @@ export default function SaveAndReturnButton({
   };
 
   return (
-    <div className={`flex flex-col items-center gap-2 w-full ${className}`}>
+    <div className={`flex flex-col items-stretch gap-2 w-full ${className}`}>
       <Button
         type="button"
         variant="outline"
         size="lg"
-        className={`h-14 w-full min-w-0 px-5 border-border bg-white text-sm leading-tight text-center whitespace-normal sm:w-auto sm:px-6 sm:text-base ${buttonClassName}`}
+        className={`h-14 w-full min-w-0 px-5 border-border bg-white text-sm leading-tight text-center whitespace-normal sm:px-6 sm:text-base ${buttonClassName}`}
         onClick={handleClick}
         disabled={disabled || isSaving}
         aria-label="Save progress and return to the HR Analytics Summit website"
       >
-        {isSaving ? "Saving..." : "Save and return to HR Analytics Summit"}
-        <ArrowUpRight className="w-4 h-4 ml-2 shrink-0" />
+        <span className="min-w-0 flex-1 text-center">
+          {isSaving ? "Saving..." : "Save and return to HR Analytics Summit"}
+        </span>
+        <ArrowUpRight className="w-4 h-4 shrink-0" />
       </Button>
       {saveError && (
         <p className="max-w-sm text-center text-xs font-medium text-destructive" role="alert">

@@ -928,11 +928,11 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
         </div>
       )}
 
-      <div className="grid gap-3 border-t border-border pt-6 md:grid-cols-[minmax(0,1fr)_minmax(280px,1fr)_minmax(0,1fr)] md:items-start md:gap-4">
+      <div className="flex flex-col gap-3 border-t border-border pt-6">
         <Button
           variant="outline"
           size="lg"
-          className="order-3 h-14 w-full min-w-0 px-6 text-base border-border md:order-1 md:justify-self-start md:w-auto"
+          className="h-14 w-full min-w-0 px-6 text-base border-border"
           onClick={async () => {
             await updateBooking.mutateAsync({ id: booking.id, data: { currentStep: 2 } });
             queryClient.invalidateQueries({ queryKey: ["booking"] });
@@ -944,12 +944,11 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
         <SaveAndReturnButton
           onSave={saveAttendeesProgress}
           disabled={isSubmitting || autosaveStatus === "saving"}
-          className="order-2 md:order-2"
-          buttonClassName="md:min-w-[280px]"
+          buttonClassName="text-base"
         />
         <Button
           size="lg"
-          className="order-1 h-14 w-full min-w-0 px-6 text-base bg-primary hover:bg-primary/90 text-white border-none md:order-3 md:justify-self-end md:w-auto"
+          className="h-14 w-full min-w-0 px-6 text-base bg-primary hover:bg-primary/90 text-white border-none"
           onClick={handleContinue}
           disabled={isSubmitting || autosaveStatus === "saving" || autosaveStatus === "error"}
         >
