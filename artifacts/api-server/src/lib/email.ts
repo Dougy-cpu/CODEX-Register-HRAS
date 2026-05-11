@@ -285,7 +285,7 @@ type BrandingSettings = {
   logoDataUrl?: string | null;
 };
 
-const EMAIL_LOGO_SIZE_PX = 96;
+const EMAIL_LOGO_SIZE_PX = 72;
 
 export function wrapInBrandedLayout(
   content: string,
@@ -303,7 +303,7 @@ export function wrapInBrandedLayout(
   const logoDataUrl = settings.logoDataUrl;
 
   const headerContent = logoDataUrl
-    ? `<img src="${escHtml(logoDataUrl)}" alt="${escHtml(eventName)}" width="${EMAIL_LOGO_SIZE_PX}" style="display:block;width:${EMAIL_LOGO_SIZE_PX}px;max-width:${EMAIL_LOGO_SIZE_PX}px;height:auto;max-height:${EMAIL_LOGO_SIZE_PX}px;margin:0 auto;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;" />`
+    ? `<img src="${escHtml(logoDataUrl)}" alt="${escHtml(orgName)}" width="${EMAIL_LOGO_SIZE_PX}" height="${EMAIL_LOGO_SIZE_PX}" style="display:block;width:${EMAIL_LOGO_SIZE_PX}px!important;height:${EMAIL_LOGO_SIZE_PX}px!important;max-width:${EMAIL_LOGO_SIZE_PX}px!important;max-height:${EMAIL_LOGO_SIZE_PX}px!important;margin:0 auto;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;object-fit:contain;" />`
     : `<strong style="font-size: 20px; color: #E74F3E;">${escHtml(eventName)}</strong>`;
 
   return `

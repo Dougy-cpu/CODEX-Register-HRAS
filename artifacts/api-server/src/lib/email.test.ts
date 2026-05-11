@@ -89,21 +89,23 @@ describe("wrapInBrandedLayout", () => {
       logoDataUrl: "data:image/png;base64,abc123",
     });
 
-    expect(html).toContain('width="96"');
-    expect(html).toContain("width:96px");
-    expect(html).toContain("max-width:96px");
-    expect(html).toContain("height:auto");
-    expect(html).toContain("max-height:96px");
+    expect(html).toContain('width="72"');
+    expect(html).toContain('height="72"');
+    expect(html).toContain("width:72px!important");
+    expect(html).toContain("height:72px!important");
+    expect(html).toContain("max-width:72px!important");
+    expect(html).toContain("max-height:72px!important");
     expect(html).toContain("display:block");
   });
 
   it("escapes logo attributes in the branded header", () => {
     const html = wrapInBrandedLayout("<p>Body</p>", {
       eventName: `HRAS "Summit"`,
+      orgName: `People "Strategy" Hub`,
       logoDataUrl: `x" onerror="alert(1)`,
     });
 
-    expect(html).toContain('alt="HRAS &quot;Summit&quot;"');
+    expect(html).toContain('alt="People &quot;Strategy&quot; Hub"');
     expect(html).not.toContain('onerror="alert(1)"');
   });
 });
