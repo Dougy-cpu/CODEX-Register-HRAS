@@ -4,7 +4,15 @@ import reactHooks from "eslint-plugin-react-hooks";
 
 export default tseslint.config(
   {
-    ignores: [".local/**", "**/node_modules/**", "**/dist/**", "**/build/**"],
+    ignores: [
+      ".local/**",
+      ".codex/**",
+      "codex updates/**",
+      "RESTORE_REPLIT_SECRETS_ONLY/**",
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/build/**",
+    ],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,

@@ -285,6 +285,8 @@ type BrandingSettings = {
   logoDataUrl?: string | null;
 };
 
+const EMAIL_LOGO_SIZE_PX = 96;
+
 export function wrapInBrandedLayout(
   content: string,
   settingsOrTitle?: BrandingSettings | string,
@@ -301,8 +303,8 @@ export function wrapInBrandedLayout(
   const logoDataUrl = settings.logoDataUrl;
 
   const headerContent = logoDataUrl
-    ? `<img src="${logoDataUrl}" alt="${eventName}" style="max-height:60px;max-width:200px;" />`
-    : `<strong style="font-size: 20px; color: #E74F3E;">${eventName}</strong>`;
+    ? `<img src="${escHtml(logoDataUrl)}" alt="${escHtml(eventName)}" width="${EMAIL_LOGO_SIZE_PX}" style="display:block;width:${EMAIL_LOGO_SIZE_PX}px;max-width:${EMAIL_LOGO_SIZE_PX}px;height:auto;max-height:${EMAIL_LOGO_SIZE_PX}px;margin:0 auto;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;" />`
+    : `<strong style="font-size: 20px; color: #E74F3E;">${escHtml(eventName)}</strong>`;
 
   return `
 <!DOCTYPE html>
