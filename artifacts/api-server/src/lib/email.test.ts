@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { escHtml } from "./email";
+import { escHtml, wrapInBrandedLayout } from "./email";
 
 describe("escHtml", () => {
   it("escapes the five HTML-significant characters", () => {
@@ -79,5 +79,31 @@ describe("template substitution pattern (integration shape)", () => {
     const row = `<td>${escHtml(malicious)}</td>`;
     expect(row).toBe(`<td>&lt;img src=x onerror=alert(1)&gt;</td>`);
     expect(row).not.toContain("<img");
+  });
+});
+
+describe("wrapInBrandedLayout", () => {
+  it("renders uploaded logos with fixed email-safe dimensions", () => {
+    const html = wrapInBrandedLayout("<p>Body</p>", {
+      eventName: "HR Analytics Summit",
+      logoDataUrl: "data:image/png;base64,abc123",
+    });
+
+    expect(html).toContain('width="96"');
+    expect(html).toContain("width:96px");
+    expect(html).toContain("max-width:96px");
+    expect(html).toContain("height:auto");
+    expect(html).toContain("max-height:96px");
+    expect(html).toContain("display:block");
+  });
+
+  it("escapes logo attributes in the branded header", () => {
+    const html = wrapInBrandedLayout("<p>Body</p>", {
+      eventName: `HRAS "Summit"`,
+      logoDataUrl: `x" onerror="alert(1)`,
+    });
+
+    expect(html).toContain('alt="HRAS &quot;Summit&quot;"');
+    expect(html).not.toContain('onerror="alert(1)"');
   });
 });

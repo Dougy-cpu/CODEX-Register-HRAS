@@ -56,3 +56,7 @@ Thumbs.db
 
 # Local recovery copy containing Replit environment values.
 RESTORE_REPLIT_SECRETS_ONLY/
+
+# Local Codex working/delivery folders.
+.codex/
+codex updates/
