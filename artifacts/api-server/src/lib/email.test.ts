@@ -89,12 +89,12 @@ describe("wrapInBrandedLayout", () => {
       logoDataUrl: "data:image/png;base64,abc123",
     });
 
-    expect(html).toContain('width="72"');
-    expect(html).toContain('height="72"');
-    expect(html).toContain("width:72px!important");
-    expect(html).toContain("height:72px!important");
-    expect(html).toContain("max-width:72px!important");
-    expect(html).toContain("max-height:72px!important");
+    expect(html).toContain('width="96"');
+    expect(html).toContain('height="96"');
+    expect(html).toContain("width:96px!important");
+    expect(html).toContain("height:96px!important");
+    expect(html).toContain("max-width:96px!important");
+    expect(html).toContain("max-height:96px!important");
     expect(html).toContain("display:block");
   });
 

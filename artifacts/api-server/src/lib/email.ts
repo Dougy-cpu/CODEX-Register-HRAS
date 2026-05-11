@@ -285,7 +285,7 @@ type BrandingSettings = {
   logoDataUrl?: string | null;
 };
 
-const EMAIL_LOGO_SIZE_PX = 72;
+const EMAIL_LOGO_SIZE_PX = 96;
 
 export function wrapInBrandedLayout(
   content: string,
