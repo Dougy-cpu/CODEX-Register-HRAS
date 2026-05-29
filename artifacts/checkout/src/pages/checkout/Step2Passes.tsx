@@ -121,7 +121,7 @@ function buildHRTierRows(tiers: DiscountTier[], qty: number, pricePerTicket: num
   if (noDiscountEnd >= 3) {
     rows.push({
       key: "1-2",
-      label: "1–2 tickets",
+      label: "1 to 2 tickets",
       note: `£${pricePerTicket}/ticket`,
       active: qty <= 2,
     });
@@ -135,7 +135,7 @@ function buildHRTierRows(tiers: DiscountTier[], qty: number, pricePerTicket: num
     if (noDiscountEnd > 3) {
       rows.push({
         key: `4-${noDiscountEnd}`,
-        label: `4–${noDiscountEnd} tickets`,
+        label: `4 to ${noDiscountEnd} tickets`,
         note: `£${pricePerTicket}/ticket`,
         active: qty >= 4 && qty <= noDiscountEnd,
       });
@@ -143,7 +143,7 @@ function buildHRTierRows(tiers: DiscountTier[], qty: number, pricePerTicket: num
   } else if (noDiscountEnd >= 1) {
     rows.push({
       key: `1-${noDiscountEnd}`,
-      label: noDiscountEnd === 1 ? "1 ticket" : `1–${noDiscountEnd} tickets`,
+      label: noDiscountEnd === 1 ? "1 ticket" : `1 to ${noDiscountEnd} tickets`,
       note: `£${pricePerTicket}/ticket`,
       active: qty <= noDiscountEnd,
     });
@@ -155,12 +155,12 @@ function buildHRTierRows(tiers: DiscountTier[], qty: number, pricePerTicket: num
     const maxQty = nextTier ? nextTier.minQuantity - 1 : null;
     const savingPerTicket = ((pricePerTicket * tier.discountPercent) / 100).toFixed(2);
     const rangeLabel = maxQty
-      ? `${tier.minQuantity}–${maxQty} tickets`
+      ? `${tier.minQuantity} to ${maxQty} tickets`
       : `${tier.minQuantity}+ tickets`;
     rows.push({
       key: rangeLabel,
       label: rangeLabel,
-      note: `${tier.discountPercent}% off — save £${savingPerTicket}/ticket`,
+      note: `${tier.discountPercent}% off, save £${savingPerTicket}/ticket`,
       active: qty >= tier.minQuantity && (maxQty === null || qty <= maxQty),
     });
   }
@@ -190,7 +190,7 @@ function buildBusinessTierRows(
   if (noDiscountEnd >= 1) {
     rows.push({
       key: `1-${noDiscountEnd}`,
-      label: noDiscountEnd === 1 ? "1 pass" : `1–${noDiscountEnd} passes`,
+      label: noDiscountEnd === 1 ? "1 pass" : `1 to ${noDiscountEnd} passes`,
       note: `£${pricePerPass}/pass`,
       active: qty <= noDiscountEnd,
     });
@@ -202,12 +202,12 @@ function buildBusinessTierRows(
     const maxQty = nextTier ? nextTier.minQuantity - 1 : null;
     const savingPerPass = ((pricePerPass * tier.discountPercent) / 100).toFixed(2);
     const rangeLabel = maxQty
-      ? `${tier.minQuantity}–${maxQty} pass${maxQty > 1 ? "es" : ""}`
+      ? `${tier.minQuantity} to ${maxQty} pass${maxQty > 1 ? "es" : ""}`
       : `${tier.minQuantity}+ passes`;
     rows.push({
       key: rangeLabel,
       label: rangeLabel,
-      note: `${tier.discountPercent}% off — save £${savingPerPass}/pass`,
+      note: `${tier.discountPercent}% off, save £${savingPerPass}/pass`,
       active: qty >= tier.minQuantity && (maxQty === null || qty <= maxQty),
     });
   }
@@ -240,7 +240,7 @@ function InventoryBadge({
         className={`flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-md ${className}`}
       >
         <AlertCircle className="w-3.5 h-3.5" />
-        {remaining} spots remaining — selling fast
+        {remaining} spots remaining, selling fast
       </div>
     );
   }
@@ -281,19 +281,20 @@ function UpsellNudge({ tiers, passType, quantity, unitLabel }: UpsellNudgeProps)
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -4 }}
-      className="flex items-start gap-2.5 bg-accent/20 border border-accent px-3 py-2.5 text-xs text-foreground"
+      className="flex items-start gap-2.5 rounded-md border border-primary/15 bg-white px-3 py-2.5 text-xs leading-relaxed text-foreground shadow-sm"
     >
-      <TrendingUp className="w-3.5 h-3.5 shrink-0 mt-0.5 text-secondary" />
+      <TrendingUp className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary" />
       <span>
         <span className="font-bold">
           Add {needed} more {unitLabel}
           {needed > 1 ? "s" : ""}
         </span>{" "}
-        to unlock <span className="font-bold text-secondary">{nextTier.discountPercent}% off</span>
+        to reach the next group discount:{" "}
+        <span className="font-bold text-primary">{nextTier.discountPercent}% off</span>
         {upliftValue > 0 && (
           <span>
             {" "}
-            — save an extra <span className="font-bold text-secondary">£{uplift}</span> on your
+            and save an extra <span className="font-bold text-secondary">£{uplift}</span> on your
             order
           </span>
         )}
@@ -616,12 +617,12 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
 
       {/* HR: Single pass with quantity picker */}
       {isHR && (
-        <Card className="relative border-2 border-primary overflow-hidden p-0 shadow-lg">
+        <Card className="relative overflow-hidden rounded-md border-2 border-primary bg-white p-0 shadow-lg">
           {/* ── Header band ── */}
           <div className="px-6 md:px-8 py-5 flex items-center justify-between gap-4 flex-wrap border-b border-border">
             <div>
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 font-semibold">
-                HR Analytics Summit · 3 Sep 2026, London
+                HR Analytics Summit | 3 Sep 2026, London
               </p>
               <h3 className="text-2xl font-bold text-primary font-display leading-tight">
                 HR Professional Pass
@@ -640,13 +641,13 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
                     </span>
                   )}
                   {singleDiscountPct !== null && (
-                    <span className="badge-shine text-xs font-bold px-3 py-1 rounded-full inline-block">
+                    <span className="inline-block rounded-md border border-primary/20 bg-primary px-3 py-1 text-xs font-bold text-white shadow-sm">
                       {singleDiscountPct}% off
                     </span>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Per ticket, ex VAT · {singlePeriodName}
+                  Per ticket, ex VAT | {singlePeriodName}
                 </p>
               </div>
             </div>
@@ -697,7 +698,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
                 }
               >
                 <span className="flex items-center gap-2">
-                  <Users className="w-4 h-4 shrink-0" />3 tickets — Most Popular
+                  <Users className="w-4 h-4 shrink-0" />3 tickets, Most Popular
                 </span>
                 <Check
                   className={`w-4 h-4 shrink-0 transition-opacity ${quantity === 3 ? "opacity-100" : "opacity-0"}`}
@@ -739,18 +740,29 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
               </div>
 
               {/* Tier table */}
-              <div className="space-y-1 text-xs">
-                {hrTierRows.map(({ key, label, note, active, isSpecial: _isSpecial }) => (
+              <div className="space-y-1.5 text-xs">
+                {hrTierRows.map(({ key, label, note, active, isSpecial }) => (
                   <div
                     key={key}
-                    className={`flex justify-between px-2 py-1.5 transition-all ${
+                    className={`flex items-center justify-between gap-3 rounded-md border px-3 py-2 transition-all ${
                       active
-                        ? "border-l-4 border-primary bg-primary/10 text-foreground font-semibold pl-2"
-                        : "text-muted-foreground pl-[6px]"
+                        ? "border-primary/40 bg-white text-foreground shadow-sm ring-1 ring-primary/10"
+                        : "border-primary/10 bg-white/70 text-muted-foreground"
                     }`}
                   >
-                    <span>{label}</span>
-                    <span className={active ? "text-primary font-bold" : ""}>{note}</span>
+                    <span className="flex min-w-0 items-center gap-2 font-semibold">
+                      <span>{label}</span>
+                      {active && (
+                        <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+                          Current
+                        </span>
+                      )}
+                    </span>
+                    <span
+                      className={`text-right ${active || isSpecial ? "font-bold text-primary" : ""}`}
+                    >
+                      {note}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -768,12 +780,12 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
       )}
       {/* Vendor: Business Pass with quantity + discounts */}
       {isVendor && (
-        <Card className="relative border-2 border-primary overflow-hidden p-0 shadow-lg">
+        <Card className="relative overflow-hidden rounded-md border-2 border-primary bg-white p-0 shadow-lg">
           {/* ── Header band ── */}
           <div className="px-6 md:px-8 py-5 flex items-center justify-between gap-4 flex-wrap border-b border-border">
             <div>
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 font-semibold">
-                HR Analytics Summit · 3 Sep 2026 · Consultants &amp; Vendors
+                HR Analytics Summit | 3 Sep 2026 | Consultants &amp; Vendors
               </p>
               <h3 className="text-2xl font-bold text-primary font-display leading-tight">
                 Business Pass
@@ -792,13 +804,13 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
                     </span>
                   )}
                   {businessDiscountPct !== null && (
-                    <span className="badge-shine text-xs font-bold px-3 py-1 rounded-full inline-block">
+                    <span className="inline-block rounded-md border border-primary/20 bg-primary px-3 py-1 text-xs font-bold text-white shadow-sm">
                       {businessDiscountPct}% off
                     </span>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Per pass, ex VAT · {businessPeriodName}
+                  Per pass, ex VAT | {businessPeriodName}
                 </p>
               </div>
             </div>
@@ -843,7 +855,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
             <div className="hidden md:block w-px bg-border self-stretch" />
 
             {/* ── Right column: Quantity picker (warm panel) ── */}
-            <div className="md:w-72 shrink-0 p-6 bg-muted space-y-4">
+            <div className="md:w-72 shrink-0 p-6 bg-primary/5 space-y-4">
               <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                 How many passes?
               </p>
@@ -884,18 +896,27 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
               </div>
 
               {/* Business discount tiers */}
-              <div className="space-y-1 text-xs">
+              <div className="space-y-1.5 text-xs">
                 {businessTierRows.map(({ key, label, note, active }) => (
                   <div
                     key={key}
-                    className={`flex justify-between px-2 py-1.5 transition-all ${
+                    className={`flex items-center justify-between gap-3 rounded-md border px-3 py-2 transition-all ${
                       active
-                        ? "border-l-4 border-primary bg-primary/10 text-foreground font-semibold pl-2"
-                        : "text-muted-foreground pl-[6px]"
+                        ? "border-primary/40 bg-white text-foreground shadow-sm ring-1 ring-primary/10"
+                        : "border-primary/10 bg-white/70 text-muted-foreground"
                     }`}
                   >
-                    <span>{label}</span>
-                    <span className={active ? "text-primary font-bold" : ""}>{note}</span>
+                    <span className="flex min-w-0 items-center gap-2 font-semibold">
+                      <span>{label}</span>
+                      {active && (
+                        <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+                          Current
+                        </span>
+                      )}
+                    </span>
+                    <span className={`text-right ${active ? "font-bold text-primary" : ""}`}>
+                      {note}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -950,7 +971,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
                 onChange={(e) => setHearAboutUs(e.target.value)}
                 className="w-full h-10 border border-input bg-white rounded-none px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               >
-                <option value="">Select an option…</option>
+                <option value="">Select an option...</option>
                 {hearOptions.map((opt) => (
                   <option key={opt} value={opt}>
                     {opt}
@@ -1016,7 +1037,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
                     onClick={handleApplyPromo}
                     disabled={promoValidating || !promoInput.trim()}
                   >
-                    {promoValidating ? "Checking…" : "Apply"}
+                    {promoValidating ? "Checking..." : "Apply"}
                   </Button>
                 </div>
                 {promoError && <p className="text-xs text-red-600 font-medium">{promoError}</p>}
@@ -1033,8 +1054,8 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
               <div className="flex justify-between text-sm">
                 <span>
                   {selectedPass === "business"
-                    ? `${quantity} × Business Pass`
-                    : `${quantity} × HR Professional Pass`}
+                    ? `${quantity} x Business Pass`
+                    : `${quantity} x HR Professional Pass`}
                 </span>
                 <span>£{currentPricing.baseSubtotal.toFixed(2)}</span>
               </div>
