@@ -54,7 +54,7 @@ Upload `.replit` to the root of the affected Replit project if you want to resto
 A backup copy also exists outside the update package:
 
 ```text
-C:\Users\dougl\OneDrive\Documents\New project 2\RESTORE_REPLIT_SECRETS_ONLY\.replit
+C:\Projects\Register HRAS\RESTORE_REPLIT_SECRETS_ONLY\.replit
 ```
 
 These files contain the previously available Replit `[userenv.shared]` values. Do not share them publicly and do not commit them to GitHub.
