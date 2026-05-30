@@ -2,7 +2,11 @@ import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { emailTemplatesTable, emailLogsTable, eventSettingsTable } from "@workspace/db";
-import { getEventSettings, DEFAULT_INVOICE_HELP_CONTENT } from "../lib/email";
+import {
+  getEventSettings,
+  DEFAULT_INVOICE_HELP_CONTENT,
+  buildPriceSummaryTableHtml,
+} from "../lib/email";
 import { DEFAULT_REF_PREFIX, DEFAULT_REF_OFFSET } from "../lib/order-reference";
 import { adminAuth } from "../middleware/admin-auth";
 import { logAdminAction } from "../lib/audit";
@@ -368,10 +372,11 @@ async function buildSampleVars(
       <tbody>${sampleAttendeeRows}</tbody>
     </table>`;
 
-  const samplePriceSummary = `
-      <div class="price-row"><span>Subtotal (excl. VAT)</span><span>£199.00</span></div>
-      <div class="price-row"><span>VAT (20%)</span><span>£39.80</span></div>
-      <div class="price-total"><span>Total</span><span>£238.80</span></div>`;
+  const samplePriceSummary = buildPriceSummaryTableHtml([
+    { label: "Subtotal (excl. VAT)", value: "£199.00" },
+    { label: "VAT (20%)", value: "£39.80" },
+    { label: "Total", value: "£238.80", isTotal: true },
+  ]);
 
   const sampleManagementLink = `<div style="background:#fff8f7;border:2px solid #E74F3E;border-radius:6px;padding:20px;margin:24px 0;">
       <p style="margin:0 0 12px;font-weight:700;color:#E74F3E;font-size:15px;">📋 Your Attendee Management Link</p>
@@ -389,7 +394,7 @@ async function buildSampleVars(
           "{{recipientName}}": toName || "Test User",
           "{{orderReference}}": "HRAS26-TEST-001",
           "{{dueDate}}": "30 April 2026",
-          "{{payOnlineButton}}": `<p style="margin:24px 0;text-align:center;"><a href="#" style="display:inline-block;background:#E74F3E;color:#fff;padding:14px 32px;text-decoration:none;font-weight:bold;font-size:15px;border-radius:4px;">Pay Invoice Online →</a></p>`,
+          "{{payOnlineButton}}": `<p style="margin:24px 0;text-align:center;"><a href="#" style="display:inline-block;background:#E74F3E;color:#fff;padding:14px 32px;text-decoration:none;font-weight:bold;font-size:15px;border-radius:300px;">Pay invoice online</a></p>`,
           "{{payOnlineUrl}}": "#",
         }
       : {

@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { escHtml, wrapInBrandedLayout } from "./email";
+import {
+  buildPriceSummaryTableHtml,
+  escHtml,
+  excludeCustomerNotificationRecipients,
+  wrapInBrandedLayout,
+} from "./email";
 
 describe("escHtml", () => {
   it("escapes the five HTML-significant characters", () => {
@@ -107,5 +112,38 @@ describe("wrapInBrandedLayout", () => {
 
     expect(html).toContain('alt="People &quot;Strategy&quot; Hub"');
     expect(html).not.toContain('onerror="alert(1)"');
+  });
+});
+
+describe("buildPriceSummaryTableHtml", () => {
+  it("renders email-safe rows with labels and values in separate table cells", () => {
+    const html = buildPriceSummaryTableHtml([
+      { label: "Subtotal (excl. VAT)", value: "£507.45" },
+      { label: "Group Discount", value: "-£89.55", valueColor: "#E74F3E" },
+      { label: "VAT (20%)", value: "£101.49" },
+      { label: "Total", value: "£608.94", isTotal: true },
+    ]);
+
+    expect(html).toContain("<table");
+    expect(html).toContain('role="presentation"');
+    expect(html).toContain("Subtotal (excl. VAT):");
+    expect(html).toContain("Group Discount:");
+    expect(html).toContain("VAT (20%):");
+    expect(html).toContain("Total:");
+    expect(html).toContain("text-align:right");
+    expect(html).not.toContain("display:flex");
+    expect(html).not.toContain("price-row");
+  });
+});
+
+describe("excludeCustomerNotificationRecipients", () => {
+  it("keeps organiser recipients and blocks addresses that match customers", () => {
+    const result = excludeCustomerNotificationRecipients(
+      ["ops@example.com", "customer@example.com", "OPS@example.com", "billing@example.com"],
+      ["customer@example.com", "billing@example.com"],
+    );
+
+    expect(result.recipients).toEqual(["ops@example.com"]);
+    expect(result.blockedRecipients).toEqual(["customer@example.com", "billing@example.com"]);
   });
 });

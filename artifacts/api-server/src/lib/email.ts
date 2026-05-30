@@ -112,7 +112,7 @@ const defaultSettings: Omit<EventSettings, "id" | "updatedAt"> = {
 /**
  * Built-in fallback copy for the "How invoicing works" help block. Used
  * whenever an admin has not set `event_settings.invoice_help_content`. Edit
- * via Admin → Settings → Pay-by-Invoice Help.
+ * via Admin > Settings > Pay-by-Invoice Help.
  */
 export const DEFAULT_INVOICE_HELP_CONTENT = `When will I receive the invoice?
 We email a VAT invoice to the billing address you provide as soon as your registration is confirmed — usually within a few minutes.
@@ -287,6 +287,32 @@ type BrandingSettings = {
 
 const EMAIL_LOGO_SIZE_PX = 96;
 
+export type PriceSummaryRow = {
+  label: string;
+  value: string;
+  isTotal?: boolean;
+  valueColor?: string;
+};
+
+export function buildPriceSummaryTableHtml(rows: PriceSummaryRow[]): string {
+  const body = rows
+    .map((row) => {
+      const labelWeight = row.isTotal ? "700" : "400";
+      const valueWeight = row.isTotal ? "700" : "600";
+      const fontSize = row.isTotal ? "18px" : "14px";
+      const color = row.valueColor || "#221D1B";
+      return `<tr>
+        <td style="padding:${row.isTotal ? "12px" : "8px"} 0;border-bottom:1px solid #eee;text-align:left;font-size:${fontSize};font-weight:${labelWeight};color:#444;">${escHtml(row.label)}:</td>
+        <td style="padding:${row.isTotal ? "12px" : "8px"} 0;border-bottom:1px solid #eee;text-align:right;font-size:${fontSize};font-weight:${valueWeight};color:${color};white-space:nowrap;">${escHtml(row.value)}</td>
+      </tr>`;
+    })
+    .join("");
+
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;font-size:14px;line-height:1.4;">
+    <tbody>${body}</tbody>
+  </table>`;
+}
+
 export function wrapInBrandedLayout(
   content: string,
   settingsOrTitle?: BrandingSettings | string,
@@ -323,8 +349,12 @@ export function wrapInBrandedLayout(
     h1, h2, h3 { color: #000; }
     .badge { display: inline-block; background: #F7E25E; color: #221D1B; padding: 4px 12px; border-radius: 100px; font-size: 12px; font-weight: 600; }
     .cta-btn { display: inline-block; background: #E74F3E; color: #fff; padding: 12px 28px; border-radius: 300px; text-decoration: none; font-weight: 600; margin: 16px 0; }
-    .price-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
-    .price-total { display: flex; justify-content: space-between; padding: 12px 0; font-weight: 700; font-size: 18px; }
+    .price-row { display: table; width: 100%; padding: 8px 0; border-bottom: 1px solid #eee; }
+    .price-row span:first-child { display: table-cell; text-align: left; }
+    .price-row span:last-child { display: table-cell; text-align: right; white-space: nowrap; }
+    .price-total { display: table; width: 100%; padding: 12px 0; font-weight: 700; font-size: 18px; }
+    .price-total span:first-child { display: table-cell; text-align: left; }
+    .price-total span:last-child { display: table-cell; text-align: right; white-space: nowrap; }
     .info-box { background: #FCFBFA; border: 1px solid #DEDDDC; padding: 16px 20px; border-radius: 4px; margin: 16px 0; }
   </style>
 </head>
@@ -394,17 +424,28 @@ async function buildConfirmationEmailHtml(
     <tbody>${attendeeRowsHtml}</tbody>
   </table>`;
 
-  const priceSummaryHtml = [
-    `<div class="price-row"><span>Subtotal (excl. VAT)</span><span>${formatCurrency(subtotal)}</span></div>`,
-    groupDiscount > 0
-      ? `<div class="price-row"><span>Group Discount</span><span>-${formatCurrency(groupDiscount)}</span></div>`
-      : "",
-    promoDiscount > 0
-      ? `<div class="price-row"><span>Promo Code (${escHtml(booking.promoCode)})</span><span>-${formatCurrency(promoDiscount)}</span></div>`
-      : "",
-    `<div class="price-row"><span>VAT (20%)</span><span>${formatCurrency(vat)}</span></div>`,
-    `<div class="price-total"><span>Total</span><span>${formatCurrency(total)}</span></div>`,
-  ].join("");
+  const priceSummaryRows: PriceSummaryRow[] = [
+    { label: "Subtotal (excl. VAT)", value: formatCurrency(subtotal) },
+  ];
+  if (groupDiscount > 0) {
+    priceSummaryRows.push({
+      label: "Group Discount",
+      value: `-${formatCurrency(groupDiscount)}`,
+      valueColor: "#E74F3E",
+    });
+  }
+  if (promoDiscount > 0) {
+    priceSummaryRows.push({
+      label: `Promo Code (${booking.promoCode || ""})`,
+      value: `-${formatCurrency(promoDiscount)}`,
+      valueColor: "#E74F3E",
+    });
+  }
+  priceSummaryRows.push(
+    { label: "VAT (20%)", value: formatCurrency(vat) },
+    { label: "Total", value: formatCurrency(total), isTotal: true },
+  );
+  const priceSummaryHtml = buildPriceSummaryTableHtml(priceSummaryRows);
 
   const manageUrl = booking.managementToken
     ? `${process.env.APP_BASE_URL || "https://register.hranalyticssummit.com"}/manage/${booking.managementToken}`
@@ -416,7 +457,7 @@ async function buildConfirmationEmailHtml(
       ? `${process.env.APP_BASE_URL || "https://register.hranalyticssummit.com"}/manage/${booking.managementToken}/billing`
       : "";
   const billingEditLinkHtml = billingEditUrl
-    ? `<p style="margin:14px 0 0;font-size:14px;"><a href="${billingEditUrl}" style="color:#E74F3E;font-weight:600;text-decoration:underline;">${booking.poNumber ? "Update PO number or billing details →" : "Add a PO number / update billing details →"}</a></p>`
+    ? `<p style="margin:14px 0 0;font-size:14px;"><a href="${billingEditUrl}" style="color:#E74F3E;font-weight:600;text-decoration:underline;">${booking.poNumber ? "Update PO number or billing details" : "Add a PO number or update billing details"}</a></p>`
     : "";
   // Inline form: leading <br> renders as a new line both inside the info-box
   // (where neighbouring fields use <br> separators) and in the standalone
@@ -426,7 +467,7 @@ async function buildConfirmationEmailHtml(
     : "";
 
   const invoicePaymentButtonHtml = booking.stripeInvoicePaymentUrl
-    ? `<p style="margin-top:16px;"><a href="${booking.stripeInvoicePaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;">Download Invoice / Pay Online →</a></p>`
+    ? `<p style="margin:24px 0;text-align:center;"><a href="${booking.stripeInvoicePaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;border-radius:300px;">Download invoice / pay online</a></p>`
     : "";
 
   // "How invoicing works" help block — only rendered for invoice bookings.
@@ -1030,29 +1071,9 @@ export async function resendConfirmationAndReceipt(
 
 export async function sendOrganiserNotification(bookingId: number): Promise<boolean> {
   const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
-  // Booking not found → nothing to retry; treat as a terminal success so the
+  // Booking not found means nothing to retry; treat as a terminal success so the
   // delivery flag isn't left flapping forever.
   if (!booking) return true;
-
-  const storedEmails = await db
-    .select()
-    .from(notificationEmailsTable)
-    .orderBy(notificationEmailsTable.createdAt);
-
-  const recipients = sanitizeRecipients([
-    ...storedEmails.filter((e) => e.notifyComplete).map((e) => e.email),
-    process.env.ORGANISER_EMAIL,
-  ]);
-
-  if (recipients.length === 0) {
-    logger.info(
-      { bookingId },
-      "No notification recipients configured — skipping organiser notification",
-    );
-    // No recipients = nothing to deliver; terminal success so the flag flips
-    // and we don't keep re-attempting on every webhook replay.
-    return true;
-  }
 
   const settings = await getEventSettings();
   const attendees = await db
@@ -1060,6 +1081,37 @@ export async function sendOrganiserNotification(bookingId: number): Promise<bool
     .from(attendeesTable)
     .where(eq(attendeesTable.bookingId, bookingId));
   const lead = attendees.find((a) => a.isLead) || attendees[0];
+
+  const storedEmails = await db
+    .select()
+    .from(notificationEmailsTable)
+    .orderBy(notificationEmailsTable.createdAt);
+
+  const configuredRecipients = [
+    ...storedEmails.filter((e) => e.notifyComplete).map((e) => e.email),
+    process.env.ORGANISER_EMAIL,
+  ];
+  const { recipients, blockedRecipients } = excludeCustomerNotificationRecipients(
+    configuredRecipients,
+    [booking.billingEmail, ...attendees.map((a) => a.workEmail)],
+  );
+
+  if (blockedRecipients.length > 0) {
+    logger.warn(
+      { bookingId, blockedRecipients },
+      "Skipped organiser notification recipients that match customer emails",
+    );
+  }
+
+  if (recipients.length === 0) {
+    logger.info(
+      { bookingId, configuredCount: sanitizeRecipients(configuredRecipients).length },
+      "No organiser-only notification recipients configured — skipping organiser notification",
+    );
+    // No recipients = nothing to deliver; terminal success so the flag flips
+    // and we don't keep re-attempting on every webhook replay.
+    return true;
+  }
 
   const passLabels: Record<string, string> = {
     single: "Single Pass",
@@ -1592,6 +1644,20 @@ function sanitizeRecipients(raw: (string | null | undefined)[]): string[] {
   return out;
 }
 
+export function excludeCustomerNotificationRecipients(
+  configuredRecipients: (string | null | undefined)[],
+  customerRecipients: (string | null | undefined)[],
+): { recipients: string[]; blockedRecipients: string[] } {
+  const configured = sanitizeRecipients(configuredRecipients);
+  const customerEmailSet = new Set(
+    sanitizeRecipients(customerRecipients).map((email) => email.toLowerCase()),
+  );
+  return {
+    recipients: configured.filter((email) => !customerEmailSet.has(email.toLowerCase())),
+    blockedRecipients: configured.filter((email) => customerEmailSet.has(email.toLowerCase())),
+  };
+}
+
 async function getOrganiserEmails(): Promise<string[]> {
   const storedEmails = await db
     .select()
@@ -1779,7 +1845,7 @@ function buildManageLinkSection(manageUrl: string): string {
         </ul>
         <p style="text-align: center; margin: 20px 0 16px;">
           <a href="${manageUrl}" style="display: inline-block; background: #E74F3E; color: #fff; padding: 13px 32px; border-radius: 300px; text-decoration: none; font-weight: 700; font-size: 15px;">
-            Manage Attendees →
+            Manage Attendees
           </a>
         </p>
         <p style="margin: 0 0 6px; font-size: 13px; color: #888; text-align: center;">Or copy this link:</p>
@@ -2042,7 +2108,7 @@ export async function sendCheckoutExpiredEmail(bookingId: number): Promise<void>
     <p><strong>Your booking details are still saved.</strong> To complete your registration, simply return to the checkout and restart the payment step — you won't need to re-enter your attendee information.</p>
     <p style="text-align:center;margin:32px 0;">
       <a href="${checkoutUrl}" class="cta-btn" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;border-radius:300px;text-decoration:none;font-weight:600;">
-        Return to Checkout →
+        Return to Checkout
       </a>
     </p>
     <p style="color:#666;font-size:14px;">If you have any questions, please contact us at <a href="mailto:douglas@dynamicbusinessleaders.co.uk">douglas@dynamicbusinessleaders.co.uk</a>.</p>
@@ -2159,7 +2225,7 @@ export async function sendInvoicePaymentFailedEmail(
         ? `
     <p style="text-align:center;margin:32px 0;">
       <a href="${paymentUrl}" class="cta-btn" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;border-radius:300px;text-decoration:none;font-weight:600;">
-        Pay Invoice Now →
+        Pay Invoice Now
       </a>
     </p>
     `
@@ -2240,7 +2306,7 @@ export async function sendDisputeAlertEmail(
     </div>
     <p style="text-align:center;margin:32px 0;">
       <a href="${stripeUrl}" class="cta-btn" style="display:inline-block;background:#842029;color:#fff;padding:12px 28px;border-radius:300px;text-decoration:none;font-weight:600;">
-        View Dispute in Stripe →
+        View Dispute in Stripe
       </a>
     </p>
     <p style="font-size:14px;color:#666;">Evidence to submit typically includes: the booking confirmation email, signed terms and conditions, and any correspondence with the customer.</p>
@@ -2305,7 +2371,7 @@ export async function sendInvoiceReminder(bookingId: number): Promise<void> {
     .from(emailTemplatesTable)
     .where(eq(emailTemplatesTable.type, "invoice_reminder"));
   const payOnlineButton = booking.stripeInvoicePaymentUrl
-    ? `<p style="margin:24px 0;text-align:center;"><a href="${booking.stripeInvoicePaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:14px 32px;text-decoration:none;font-weight:bold;font-size:15px;border-radius:4px;">Pay Invoice Online →</a></p>`
+    ? `<p style="margin:24px 0;text-align:center;"><a href="${booking.stripeInvoicePaymentUrl}" style="display:inline-block;background:#E74F3E;color:#fff;padding:14px 32px;text-decoration:none;font-weight:bold;font-size:15px;border-radius:300px;">Pay invoice online</a></p>`
     : "";
 
   // Body-vars are HTML-escaped (these are inserted into HTML email content),
