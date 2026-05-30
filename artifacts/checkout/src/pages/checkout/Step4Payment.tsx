@@ -737,18 +737,13 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
 
             {paymentMethod === "invoice" && (
               <section className="rounded-md border border-border bg-white">
-                <div className="flex flex-col gap-3 border-b border-border/70 p-5 sm:flex-row sm:items-start sm:justify-between">
+                <div className="border-b border-border/70 p-5">
                   <div>
                     <h2 className="text-xl font-bold">Billing details</h2>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Grouped to reduce scrolling and keep related fields together.
+                      Some details may already be copied from the lead attendee.
                     </p>
                   </div>
-                  {billingLead && (
-                    <span className="w-fit rounded-full bg-primary/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-primary">
-                      Pre-filled
-                    </span>
-                  )}
                 </div>
 
                 <div className="space-y-4 p-5">
