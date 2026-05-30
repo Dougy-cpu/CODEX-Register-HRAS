@@ -5,6 +5,7 @@ import { bookingsTable, attendeesTable } from "@workspace/db";
 import { logger } from "./logger";
 import type { DbExecutor } from "./pricing";
 import { defaultOrderRef } from "./order-reference";
+import { buildStripeInvoiceCustomFields } from "./invoice-custom-fields";
 
 const PASS_LABELS: Record<string, string> = {
   single: "HR Professional Pass",
@@ -306,17 +307,9 @@ export async function reissueBookingInvoice(
   }
   const vatParams = { tax_rates: [vatRateId] };
 
-  // Build custom_fields (max 4). When PO is set, replace the "Contact" field.
-  const baseCustomFields: Array<{ name: string; value: string }> = [
-    { name: "Booking Reference", value: orderRef },
-    { name: "Company Number", value: "12252258" },
-    { name: "VAT Number", value: "336124621" },
-  ];
-  if (booking.poNumber) {
-    baseCustomFields.push({ name: "PO Number", value: booking.poNumber.slice(0, 30) });
-  } else {
-    baseCustomFields.push({ name: "Contact", value: "douglas@dynamicbusinessleaders.co.uk" });
-  }
+  // Stripe invoices support a maximum of 4 custom fields. Keep the booking
+  // reference visible, then preserve company/VAT details and either PO or contact.
+  const baseCustomFields = buildStripeInvoiceCustomFields(orderRef, booking.poNumber);
 
   const invoiceObj = await stripe.invoices.create({
     customer: customer.id,
