@@ -1087,26 +1087,15 @@ export async function sendOrganiserNotification(bookingId: number): Promise<bool
     .from(notificationEmailsTable)
     .orderBy(notificationEmailsTable.createdAt);
 
-  const configuredRecipients = [
+  const recipients = sanitizeRecipients([
     ...storedEmails.filter((e) => e.notifyComplete).map((e) => e.email),
     process.env.ORGANISER_EMAIL,
-  ];
-  const { recipients, blockedRecipients } = excludeCustomerNotificationRecipients(
-    configuredRecipients,
-    [booking.billingEmail, ...attendees.map((a) => a.workEmail)],
-  );
-
-  if (blockedRecipients.length > 0) {
-    logger.warn(
-      { bookingId, blockedRecipients },
-      "Skipped organiser notification recipients that match customer emails",
-    );
-  }
+  ]);
 
   if (recipients.length === 0) {
     logger.info(
-      { bookingId, configuredCount: sanitizeRecipients(configuredRecipients).length },
-      "No organiser-only notification recipients configured — skipping organiser notification",
+      { bookingId },
+      "No notification recipients configured - skipping organiser notification",
     );
     // No recipients = nothing to deliver; terminal success so the flag flips
     // and we don't keep re-attempting on every webhook replay.
@@ -1642,20 +1631,6 @@ function sanitizeRecipients(raw: (string | null | undefined)[]): string[] {
     out.push(trimmed);
   }
   return out;
-}
-
-export function excludeCustomerNotificationRecipients(
-  configuredRecipients: (string | null | undefined)[],
-  customerRecipients: (string | null | undefined)[],
-): { recipients: string[]; blockedRecipients: string[] } {
-  const configured = sanitizeRecipients(configuredRecipients);
-  const customerEmailSet = new Set(
-    sanitizeRecipients(customerRecipients).map((email) => email.toLowerCase()),
-  );
-  return {
-    recipients: configured.filter((email) => !customerEmailSet.has(email.toLowerCase())),
-    blockedRecipients: configured.filter((email) => customerEmailSet.has(email.toLowerCase())),
-  };
 }
 
 async function getOrganiserEmails(): Promise<string[]> {

@@ -1,10 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  buildPriceSummaryTableHtml,
-  escHtml,
-  excludeCustomerNotificationRecipients,
-  wrapInBrandedLayout,
-} from "./email";
+import { buildPriceSummaryTableHtml, escHtml, wrapInBrandedLayout } from "./email";
 
 describe("escHtml", () => {
   it("escapes the five HTML-significant characters", () => {
@@ -45,16 +40,13 @@ describe("escHtml", () => {
 });
 
 /**
- * Renderer-path integration test (per code-review feedback on Task #68).
+ * Renderer-path integration test.
  *
  * The production confirmation builder substitutes user-controlled values
  * into a stored HTML template by escaping each value with `escHtml` and
  * then doing `body.replaceAll(placeholder, escapedValue)`. We cannot
- * call `buildConfirmationEmailHtml` directly in a unit test (it talks
- * to the DB), so we replicate the exact substitution pattern here and
- * assert that a malicious attendee `firstName` survives the round-trip
- * neutralised — proving the escape helper is wired into the renderer
- * pattern, not just exported in isolation.
+ * call `buildConfirmationEmailHtml` directly in a unit test because it
+ * talks to the DB, so we replicate the exact substitution pattern here.
  */
 describe("template substitution pattern (integration shape)", () => {
   it("escapes a malicious firstName when rendered into a template body", () => {
@@ -75,7 +67,6 @@ describe("template substitution pattern (integration shape)", () => {
     expect(body).toContain("&lt;script&gt;");
     expect(body).toContain("&lt;/script&gt;");
     expect(body).toContain("&quot;pwned&quot;");
-    // Sanity: the placeholder was actually substituted.
     expect(body).not.toContain("{{firstName}}");
   });
 
@@ -118,10 +109,10 @@ describe("wrapInBrandedLayout", () => {
 describe("buildPriceSummaryTableHtml", () => {
   it("renders email-safe rows with labels and values in separate table cells", () => {
     const html = buildPriceSummaryTableHtml([
-      { label: "Subtotal (excl. VAT)", value: "£507.45" },
-      { label: "Group Discount", value: "-£89.55", valueColor: "#E74F3E" },
-      { label: "VAT (20%)", value: "£101.49" },
-      { label: "Total", value: "£608.94", isTotal: true },
+      { label: "Subtotal (excl. VAT)", value: "GBP 507.45" },
+      { label: "Group Discount", value: "-GBP 89.55", valueColor: "#E74F3E" },
+      { label: "VAT (20%)", value: "GBP 101.49" },
+      { label: "Total", value: "GBP 608.94", isTotal: true },
     ]);
 
     expect(html).toContain("<table");
@@ -133,17 +124,5 @@ describe("buildPriceSummaryTableHtml", () => {
     expect(html).toContain("text-align:right");
     expect(html).not.toContain("display:flex");
     expect(html).not.toContain("price-row");
-  });
-});
-
-describe("excludeCustomerNotificationRecipients", () => {
-  it("keeps organiser recipients and blocks addresses that match customers", () => {
-    const result = excludeCustomerNotificationRecipients(
-      ["ops@example.com", "customer@example.com", "OPS@example.com", "billing@example.com"],
-      ["customer@example.com", "billing@example.com"],
-    );
-
-    expect(result.recipients).toEqual(["ops@example.com"]);
-    expect(result.blockedRecipients).toEqual(["customer@example.com", "billing@example.com"]);
   });
 });
