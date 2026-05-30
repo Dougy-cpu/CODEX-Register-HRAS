@@ -40,6 +40,59 @@ interface SaveResponse {
   reissue: { reissued?: boolean; alreadyPaid?: boolean; error?: string };
 }
 
+type BillingForm = {
+  poNumber: string;
+  billingName: string;
+  billingCompany: string;
+  billingEmail: string;
+  billingAddressLine1: string;
+  billingAddressLine2: string;
+  billingTown: string;
+  billingRegion: string;
+  billingPostcode: string;
+  billingCountry: string;
+  billingPhone: string;
+  billingVatNumber: string;
+};
+
+const emptyBillingForm: BillingForm = {
+  poNumber: "",
+  billingName: "",
+  billingCompany: "",
+  billingEmail: "",
+  billingAddressLine1: "",
+  billingAddressLine2: "",
+  billingTown: "",
+  billingRegion: "",
+  billingPostcode: "",
+  billingCountry: "United Kingdom",
+  billingPhone: "",
+  billingVatNumber: "",
+};
+
+function billingResponseToForm(data: BillingResponse): BillingForm {
+  return {
+    poNumber: data.poNumber ?? "",
+    billingName: data.billingName ?? "",
+    billingCompany: data.billingCompany ?? "",
+    billingEmail: data.billingEmail ?? "",
+    billingAddressLine1: data.billingAddressLine1 ?? "",
+    billingAddressLine2: data.billingAddressLine2 ?? "",
+    billingTown: data.billingTown ?? "",
+    billingRegion: data.billingRegion ?? "",
+    billingPostcode: data.billingPostcode ?? "",
+    billingCountry: data.billingCountry ?? "United Kingdom",
+    billingPhone: data.billingPhone ?? "",
+    billingVatNumber: data.billingVatNumber ?? "",
+  };
+}
+
+function billingFormsMatch(a: BillingForm, b: BillingForm): boolean {
+  return (Object.keys(emptyBillingForm) as Array<keyof BillingForm>).every(
+    (key) => a[key] === b[key],
+  );
+}
+
 export default function EditBilling() {
   const [, params] = useRoute("/manage/:token/billing");
   const token = params?.token ?? "";
@@ -53,52 +106,52 @@ export default function EditBilling() {
     retry: false,
   });
 
-  const [form, setForm] = useState({
-    poNumber: "",
-    billingName: "",
-    billingCompany: "",
-    billingEmail: "",
-    billingAddressLine1: "",
-    billingAddressLine2: "",
-    billingTown: "",
-    billingRegion: "",
-    billingPostcode: "",
-    billingCountry: "United Kingdom",
-    billingPhone: "",
-    billingVatNumber: "",
-  });
+  const [form, setForm] = useState<BillingForm>(emptyBillingForm);
+  const [lastSavedForm, setLastSavedForm] = useState<BillingForm>(emptyBillingForm);
   const [saved, setSaved] = useState(false);
+  const [discarded, setDiscarded] = useState(false);
 
   useEffect(() => {
     if (!data) return;
-    setForm({
-      poNumber: data.poNumber ?? "",
-      billingName: data.billingName ?? "",
-      billingCompany: data.billingCompany ?? "",
-      billingEmail: data.billingEmail ?? "",
-      billingAddressLine1: data.billingAddressLine1 ?? "",
-      billingAddressLine2: data.billingAddressLine2 ?? "",
-      billingTown: data.billingTown ?? "",
-      billingRegion: data.billingRegion ?? "",
-      billingPostcode: data.billingPostcode ?? "",
-      billingCountry: data.billingCountry ?? "United Kingdom",
-      billingPhone: data.billingPhone ?? "",
-      billingVatNumber: data.billingVatNumber ?? "",
-    });
+    const loadedForm = billingResponseToForm(data);
+    setForm(loadedForm);
+    setLastSavedForm(loadedForm);
   }, [data]);
 
   const mutation = useMutation({
-    mutationFn: async () =>
+    mutationFn: async (payload: BillingForm) =>
       customFetch<SaveResponse>(`/api/bookings/by-management-token/${token}/billing`, {
         method: "POST",
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       }),
-    onSuccess: () => {
+    onSuccess: (_response, submittedForm) => {
+      setLastSavedForm(submittedForm);
+      setForm(submittedForm);
       setSaved(true);
+      setDiscarded(false);
       queryClient.invalidateQueries({ queryKey: ["booking-billing", token] });
       setTimeout(() => setSaved(false), 6000);
     },
   });
+
+  const hasUnsavedChanges = !billingFormsMatch(form, lastSavedForm);
+
+  const updateForm = (field: keyof BillingForm, value: string) => {
+    setForm((current) => ({ ...current, [field]: value }));
+    setSaved(false);
+    setDiscarded(false);
+    if (mutation.isError) {
+      mutation.reset();
+    }
+  };
+
+  const discardChanges = () => {
+    setForm(lastSavedForm);
+    setSaved(false);
+    setDiscarded(true);
+    mutation.reset();
+    setTimeout(() => setDiscarded(false), 5000);
+  };
 
   if (!token) {
     return (
@@ -257,7 +310,7 @@ export default function EditBilling() {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                mutation.mutate();
+                mutation.mutate(form);
               }}
               className="bg-white border border-primary/15 rounded-md p-6 space-y-5"
             >
@@ -268,7 +321,7 @@ export default function EditBilling() {
                 <Input
                   value={form.poNumber}
                   maxLength={30}
-                  onChange={(e) => setForm((f) => ({ ...f, poNumber: e.target.value }))}
+                  onChange={(e) => updateForm("poNumber", e.target.value)}
                   placeholder="Add to appear on the invoice"
                   className="bg-white"
                 />
@@ -299,14 +352,14 @@ export default function EditBilling() {
                     </label>
                     <Input
                       value={form.billingName}
-                      onChange={(e) => setForm((f) => ({ ...f, billingName: e.target.value }))}
+                      onChange={(e) => updateForm("billingName", e.target.value)}
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold mb-1.5">Company</label>
                     <Input
                       value={form.billingCompany}
-                      onChange={(e) => setForm((f) => ({ ...f, billingCompany: e.target.value }))}
+                      onChange={(e) => updateForm("billingCompany", e.target.value)}
                     />
                   </div>
                 </div>
@@ -316,7 +369,7 @@ export default function EditBilling() {
                   <Input
                     type="email"
                     value={form.billingEmail}
-                    onChange={(e) => setForm((f) => ({ ...f, billingEmail: e.target.value }))}
+                    onChange={(e) => updateForm("billingEmail", e.target.value)}
                   />
                 </div>
 
@@ -325,7 +378,7 @@ export default function EditBilling() {
                   <Input
                     type="tel"
                     value={form.billingPhone}
-                    onChange={(e) => setForm((f) => ({ ...f, billingPhone: e.target.value }))}
+                    onChange={(e) => updateForm("billingPhone", e.target.value)}
                   />
                 </div>
 
@@ -333,9 +386,7 @@ export default function EditBilling() {
                   <label className="block text-sm font-semibold mb-1.5">Address Line 1</label>
                   <Input
                     value={form.billingAddressLine1}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, billingAddressLine1: e.target.value }))
-                    }
+                    onChange={(e) => updateForm("billingAddressLine1", e.target.value)}
                   />
                 </div>
                 <div className="mt-4">
@@ -345,9 +396,7 @@ export default function EditBilling() {
                   </label>
                   <Input
                     value={form.billingAddressLine2}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, billingAddressLine2: e.target.value }))
-                    }
+                    onChange={(e) => updateForm("billingAddressLine2", e.target.value)}
                   />
                 </div>
 
@@ -356,7 +405,7 @@ export default function EditBilling() {
                     <label className="block text-sm font-semibold mb-1.5">Town / City</label>
                     <Input
                       value={form.billingTown}
-                      onChange={(e) => setForm((f) => ({ ...f, billingTown: e.target.value }))}
+                      onChange={(e) => updateForm("billingTown", e.target.value)}
                     />
                   </div>
                   <div>
@@ -366,7 +415,7 @@ export default function EditBilling() {
                     </label>
                     <Input
                       value={form.billingRegion}
-                      onChange={(e) => setForm((f) => ({ ...f, billingRegion: e.target.value }))}
+                      onChange={(e) => updateForm("billingRegion", e.target.value)}
                     />
                   </div>
                 </div>
@@ -376,14 +425,14 @@ export default function EditBilling() {
                     <label className="block text-sm font-semibold mb-1.5">Postcode</label>
                     <Input
                       value={form.billingPostcode}
-                      onChange={(e) => setForm((f) => ({ ...f, billingPostcode: e.target.value }))}
+                      onChange={(e) => updateForm("billingPostcode", e.target.value)}
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold mb-1.5">Country</label>
                     <Input
                       value={form.billingCountry}
-                      onChange={(e) => setForm((f) => ({ ...f, billingCountry: e.target.value }))}
+                      onChange={(e) => updateForm("billingCountry", e.target.value)}
                     />
                   </div>
                 </div>
@@ -394,7 +443,7 @@ export default function EditBilling() {
                   </label>
                   <Input
                     value={form.billingVatNumber}
-                    onChange={(e) => setForm((f) => ({ ...f, billingVatNumber: e.target.value }))}
+                    onChange={(e) => updateForm("billingVatNumber", e.target.value)}
                   />
                 </div>
               </div>
@@ -437,6 +486,13 @@ export default function EditBilling() {
                 </div>
               )}
 
+              {discarded && (
+                <div className="flex items-start gap-2 text-muted-foreground bg-muted/40 border border-border rounded-md p-3 text-sm">
+                  <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                  <span>Unsaved changes discarded.</span>
+                </div>
+              )}
+
               <div className="flex items-center gap-3 pt-2 flex-wrap">
                 <Button
                   type="submit"
@@ -455,27 +511,10 @@ export default function EditBilling() {
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={mutation.isPending}
-                  onClick={() => {
-                    setForm({
-                      poNumber: data.poNumber ?? "",
-                      billingName: data.billingName ?? "",
-                      billingCompany: data.billingCompany ?? "",
-                      billingEmail: data.billingEmail ?? "",
-                      billingAddressLine1: data.billingAddressLine1 ?? "",
-                      billingAddressLine2: data.billingAddressLine2 ?? "",
-                      billingTown: data.billingTown ?? "",
-                      billingRegion: data.billingRegion ?? "",
-                      billingPostcode: data.billingPostcode ?? "",
-                      billingCountry: data.billingCountry ?? "",
-                      billingPhone: data.billingPhone ?? "",
-                      billingVatNumber: data.billingVatNumber ?? "",
-                    });
-                    setSaved(false);
-                    mutation.reset();
-                  }}
+                  disabled={mutation.isPending || !hasUnsavedChanges}
+                  onClick={discardChanges}
                 >
-                  Cancel
+                  Discard changes
                 </Button>
                 {data.stripeInvoicePaymentUrl && (
                   <a
