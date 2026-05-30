@@ -37,9 +37,9 @@ interface AttendeeForPdf {
 }
 
 const passLabels: Record<string, string> = {
-  single: "Single Pass — HR Analytics Summit",
-  team: "Team Pass (3 Seats) — HR Analytics Summit",
-  business: "Business Pass — HR Analytics Summit",
+  single: "Single Pass, HR Analytics Summit",
+  team: "Team Pass (3 Seats), HR Analytics Summit",
+  business: "Business Pass, HR Analytics Summit",
 };
 
 export function generatePdfReceipt(
@@ -84,7 +84,7 @@ export function generatePdfReceipt(
     doc
       .fontSize(11)
       .fillColor("#666")
-      .text("3 September 2026 · 155 Bishopsgate, London EC2M 3TQ", { align: "left" });
+      .text("3 September 2026, 155 Bishopsgate, London EC2M 3TQ", { align: "left" });
 
     doc.moveDown(0.5);
 
@@ -189,7 +189,7 @@ export function generatePdfReceipt(
 
     rowY += 10;
 
-    // Subtotal (excl. VAT) = subtotalAfterDiscounts — discounts already subtracted above.
+    // Subtotal (excl. VAT) = subtotalAfterDiscounts. Discounts already subtracted above.
     doc
       .fontSize(11)
       .fillColor("#333")
@@ -256,7 +256,7 @@ export function generatePdfReceipt(
     rowY += 20;
     doc.fillColor("#888");
     doc.text(
-      "HR Analytics Summit · 155 Bishopsgate, London EC2M 3TQ · hranalyticssummit.com",
+      "HR Analytics Summit, 155 Bishopsgate, London EC2M 3TQ, hranalyticssummit.com",
       50,
       rowY,
       { align: "center" },

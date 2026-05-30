@@ -1,5 +1,20 @@
 import { describe, it, expect } from "vitest";
-import { buildPriceSummaryTableHtml, escHtml, wrapInBrandedLayout } from "./email";
+import {
+  DEFAULT_INVOICE_HELP_CONTENT,
+  buildPriceSummaryTableHtml,
+  escHtml,
+  renderInvoiceHelpHtml,
+  wrapInBrandedLayout,
+} from "./email";
+
+const unsafePunctuationPattern = new RegExp(
+  [0x2014, 0x2013, 0x2192, 0x2190, 0x00d7].map((code) => String.fromCharCode(code)).join("|"),
+);
+const mojibakePattern = new RegExp(
+  [[0x00c3, 0x00a2], [0x00c3, 0x0192], [0x00c3, 0x201a], [0x00ef, 0x00bf, 0x00bd], [0xfffd]]
+    .map((codes) => codes.map((code) => String.fromCharCode(code)).join(""))
+    .join("|"),
+);
 
 describe("escHtml", () => {
   it("escapes the five HTML-significant characters", () => {
@@ -124,5 +139,18 @@ describe("buildPriceSummaryTableHtml", () => {
     expect(html).toContain("text-align:right");
     expect(html).not.toContain("display:flex");
     expect(html).not.toContain("price-row");
+  });
+});
+
+describe("invoice help copy", () => {
+  it("uses plain customer-facing punctuation", () => {
+    expect(DEFAULT_INVOICE_HELP_CONTENT).not.toMatch(unsafePunctuationPattern);
+    expect(DEFAULT_INVOICE_HELP_CONTENT).not.toMatch(mojibakePattern);
+  });
+
+  it("renders invoice help without unsafe punctuation", () => {
+    const html = renderInvoiceHelpHtml(DEFAULT_INVOICE_HELP_CONTENT);
+    expect(html).not.toMatch(unsafePunctuationPattern);
+    expect(html).not.toMatch(mojibakePattern);
   });
 });

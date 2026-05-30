@@ -248,14 +248,14 @@ const TEMPLATE_DEFAULTS: Record<string, { subject: string; htmlBody: string }> =
       "<h2>Welcome, {{firstName}}!</h2><p>We're thrilled to have you join us at the HR Analytics Summit 2026. Your booking is confirmed and we can't wait to see you there.</p><p>If you have any questions in the meantime, don't hesitate to reach out.</p><p>See you on 3 September!</p>",
   },
   confirmation: {
-    subject: "Booking Confirmed — HR Analytics Summit 2026",
+    subject: "Booking Confirmed: HR Analytics Summit 2026",
     htmlBody:
-      "<h2>Booking Confirmed, {{firstName}}!</h2><p>Thank you for registering. Your order reference is <strong>{{orderReference}}</strong>.</p><p>You have booked <strong>{{quantity}}</strong> {{passType}} pass(es). A full VAT receipt is attached to this email.</p>{{promoSummary}}<p>We look forward to seeing you at the HR Analytics Summit!</p>",
+      "<h2>Booking Confirmed, {{firstName}}!</h2><p>Thank you for registering. Your order reference is <strong>{{orderReference}}</strong>.</p><p>You have booked <strong>{{quantity}}</strong> {{passType}} pass(es). A full VAT receipt is attached to this email.</p>{{promoSummary}}<p>If the email does not arrive within a few minutes, please check your junk or spam folder.</p><p>We look forward to seeing you at the HR Analytics Summit!</p>",
   },
   invoice_reminder: {
-    subject: "Invoice Reminder — {{orderReference}} — HR Analytics Summit 2026",
+    subject: "Invoice Reminder: {{orderReference}}, HR Analytics Summit 2026",
     htmlBody:
-      '<p>Dear {{recipientName}},</p><p>This is a friendly reminder that invoice <strong>{{orderReference}}</strong> for your registration to the <strong>HR Analytics Summit 2026</strong> is due on <strong>{{dueDate}}</strong>.</p><p>Please arrange payment at your earliest convenience using the bank transfer details below. A copy of the invoice PDF is attached for your reference.</p>{{payOnlineButton}}<p>If you have already arranged payment, please disregard this email. For any queries, please contact <a href="mailto:douglas@dynamicbusinessleaders.co.uk">douglas@dynamicbusinessleaders.co.uk</a>.</p>',
+      '<p>Dear {{recipientName}},</p><p>This is a friendly reminder that invoice <strong>{{orderReference}}</strong> for your registration to the <strong>HR Analytics Summit 2026</strong> is due on <strong>{{dueDate}}</strong>.</p><p>Please arrange payment at your earliest convenience using the bank transfer details below. A copy of the invoice PDF is attached for your reference.</p>{{payOnlineButton}}<p>If the email does not arrive within a few minutes, please check your junk or spam folder.</p><p>If you have already arranged payment, please disregard this email. For any queries, please contact <a href="mailto:douglas@dynamicbusinessleaders.co.uk">douglas@dynamicbusinessleaders.co.uk</a>.</p>',
   },
 };
 
@@ -352,12 +352,12 @@ async function buildSampleVars(
 
   const sampleAttendeeRows = `
       <tr>
-        <td style="padding:8px 4px;border-bottom:1px solid #eee;">✓ Lead</td>
+        <td style="padding:8px 4px;border-bottom:1px solid #eee;">Lead</td>
         <td style="padding:8px 4px;border-bottom:1px solid #eee;">${toName || "Test User"}</td>
         <td style="padding:8px 4px;border-bottom:1px solid #eee;">Head of People Analytics</td>
         <td style="padding:8px 4px;border-bottom:1px solid #eee;">Acme Corp Ltd</td>
         <td style="padding:8px 4px;border-bottom:1px solid #eee;">${toEmail}</td>
-        <td style="padding:8px 4px;border-bottom:1px solid #eee;">—</td>
+        <td style="padding:8px 4px;border-bottom:1px solid #eee;">Not provided</td>
       </tr>`;
 
   const sampleAttendeesTable = `<table width="100%" cellspacing="0" cellpadding="0" style="font-size:14px;">
@@ -379,12 +379,12 @@ async function buildSampleVars(
   ]);
 
   const sampleManagementLink = `<div style="background:#fff8f7;border:2px solid #E74F3E;border-radius:6px;padding:20px;margin:24px 0;">
-      <p style="margin:0 0 12px;font-weight:700;color:#E74F3E;font-size:15px;">📋 Your Attendee Management Link</p>
+      <p style="margin:0 0 12px;font-weight:700;color:#E74F3E;font-size:15px;">Your Attendee Management Link</p>
       <ul style="margin:0 0 12px;padding-left:20px;color:#444;line-height:1.8;">
         <li>Fill in or update any attendee details</li>
-        <li>No login required — just use the secure link</li>
+        <li>No login required. Just use the secure link</li>
       </ul>
-      <p style="margin:0 0 12px;text-align:center;"><a href="#" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;border-radius:4px;">[SAMPLE LINK — not active in preview]</a></p>
+      <p style="margin:0 0 12px;text-align:center;"><a href="#" style="display:inline-block;background:#E74F3E;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:15px;border-radius:4px;">[SAMPLE LINK, not active in preview]</a></p>
     </div>`;
 
   const vars: Record<string, string> =
@@ -517,7 +517,7 @@ router.post("/email-templates/:type/preview", adminAuth, async (req, res): Promi
   if (type === "welcome") {
     vars["{{managementLink}}"] =
       vars["{{managementLink}}"] ||
-      `<div style="background:#fff8f7;border:2px solid #E74F3E;border-radius:6px;padding:20px;margin:24px 0;"><p style="margin:0;text-align:center;color:#E74F3E;font-weight:700;">[SAMPLE — Manage Attendees button appears here in real emails]</p></div>`;
+      `<div style="background:#fff8f7;border:2px solid #E74F3E;border-radius:6px;padding:20px;margin:24px 0;"><p style="margin:0;text-align:center;color:#E74F3E;font-weight:700;">[SAMPLE: Manage Attendees button appears here in real emails]</p></div>`;
   }
 
   let personalised = String(htmlBody);

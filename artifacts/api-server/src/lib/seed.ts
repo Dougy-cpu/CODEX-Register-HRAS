@@ -13,7 +13,7 @@ export async function runMigrations() {
 }
 
 const DEFAULT_CONFIRMATION_SUBJECT =
-  "Booking Confirmed — {{orderReference}} — HR Analytics Summit 2026";
+  "Booking Confirmed: {{orderReference}}, HR Analytics Summit 2026";
 
 const DEFAULT_CONFIRMATION_BODY = `
 <h2>Booking Confirmed!</h2>
@@ -43,28 +43,29 @@ const DEFAULT_CONFIRMATION_BODY = `
 {{socialCalendarLinks}}
 
 <h3 style="margin-top: 28px; margin-bottom: 12px; color: #000;">Update Attendee Details Anytime</h3>
-<p style="margin: 0 0 16px; color: #444; line-height: 1.6;">You have a secure self-service link to manage all your attendee information. You can fill in placeholder seats, update existing details, add dietary requirements — all without logging in. Need to share registration with colleagues? Forward them the link to enter their own details.</p>
+<p style="margin: 0 0 16px; color: #444; line-height: 1.6;">You have a secure self-service link to manage all your attendee information. You can fill in placeholder seats, update existing details and add dietary requirements without logging in. Need to share registration with colleagues? Forward them the link to enter their own details.</p>
 
 {{managementLink}}
 
 <p>A PDF VAT receipt is attached to this email for your records.</p>
+<p>If the email does not arrive within a few minutes, please check your junk or spam folder.</p>
 {{invoicePaymentButton}}
 <p>We look forward to seeing you at the HR Analytics Summit!</p>
 `;
 
-const DEFAULT_WELCOME_SUBJECT = "Welcome to HR Analytics Summit 2026 — We Can't Wait to See You!";
+const DEFAULT_WELCOME_SUBJECT = "Welcome to HR Analytics Summit 2026. We Can't Wait to See You!";
 
 const DEFAULT_WELCOME_BODY = `
 <h2>Welcome, {{firstName}}!</h2>
 
-<p>We're absolutely thrilled to have you joining us at the <strong>HR Analytics Summit 2026</strong> — the UK's leading event for HR leaders, people analytics practitioners, and business innovators who are shaping the future of work.</p>
+<p>We're absolutely thrilled to have you joining us at the <strong>HR Analytics Summit 2026</strong>, the UK's leading event for HR leaders, people analytics practitioners, and business innovators who are shaping the future of work.</p>
 
 <p>Here's what to look forward to on <strong>3 September 2026</strong> at <strong>155 Bishopsgate, London</strong>:</p>
 
 <ul>
   <li><strong>Inspiring keynotes</strong> from world-class HR and analytics leaders</li>
   <li><strong>Practical breakout sessions</strong> covering the latest in people data, AI in HR, and workforce planning</li>
-  <li><strong>Networking opportunities</strong> throughout the day — meet your peers, discover new solutions</li>
+  <li><strong>Networking opportunities</strong> throughout the day to meet your peers and discover new solutions</li>
   <li><strong>Happy Hour with entertainment</strong> to close out the day</li>
   <li><strong>Award-winning food & drink</strong> served throughout</li>
 </ul>

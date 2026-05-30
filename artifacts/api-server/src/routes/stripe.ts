@@ -19,21 +19,21 @@ import { defaultOrderRef } from "../lib/order-reference";
 import { getStripe } from "../lib/stripe-client";
 
 const DECLINE_CODE_LABELS: Record<string, string> = {
-  authentication_required: "Strong customer authentication required — please retry your payment",
+  authentication_required: "Strong customer authentication required. Please retry your payment",
   card_declined: "Card declined by your bank",
-  do_not_honor: "Card declined — please contact your bank",
+  do_not_honor: "Card declined. Please contact your bank",
   expired_card: "Card has expired",
-  fraudulent: "Suspected fraudulent activity — please contact your bank",
+  fraudulent: "Suspected fraudulent activity. Please contact your bank",
   generic_decline: "Card declined",
   incorrect_cvc: "Incorrect security code (CVC)",
   insufficient_funds: "Insufficient funds",
   invalid_account: "Invalid account",
-  lost_card: "Card reported lost — please contact your bank",
-  new_account_information_available: "Card details have changed — please use your updated card",
-  no_action_taken: "Card declined — no action taken by bank",
+  lost_card: "Card reported lost. Please contact your bank",
+  new_account_information_available: "Card details have changed. Please use your updated card",
+  no_action_taken: "Card declined. No action taken by bank",
   not_permitted: "This card type is not permitted for this transaction",
   restricted_card: "Card is restricted",
-  stolen_card: "Card reported stolen — please contact your bank",
+  stolen_card: "Card reported stolen. Please contact your bank",
   transaction_not_allowed: "Transaction not allowed on this card",
 };
 
@@ -187,7 +187,7 @@ router.post("/stripe/create-checkout-session", async (req, res): Promise<void> =
   const ownsBooking =
     sessionHeader && booking.sessionToken && sessionHeader === booking.sessionToken;
   if (!ownsBooking) {
-    res.status(403).json({ error: "Forbidden — invalid booking session" });
+    res.status(403).json({ error: "Forbidden. Invalid booking session" });
     return;
   }
 
@@ -199,9 +199,9 @@ router.post("/stripe/create-checkout-session", async (req, res): Promise<void> =
   }
 
   const passLabels: Record<string, string> = {
-    single: "Single Pass — HR Analytics Summit 2026",
-    team: "Team Pass (3 Seats) — HR Analytics Summit 2026",
-    business: "Business Pass — HR Analytics Summit 2026",
+    single: "Single Pass, HR Analytics Summit 2026",
+    team: "Team Pass, HR Analytics Summit 2026",
+    business: "Business Pass, HR Analytics Summit 2026",
   };
 
   const subtotalAfterDiscounts = parseFloat(booking.subtotalAmount?.toString() || "0");
@@ -213,7 +213,7 @@ router.post("/stripe/create-checkout-session", async (req, res): Promise<void> =
         currency: "gbp",
         product_data: {
           name: passLabels[booking.passType] || booking.passType,
-          description: `3 September 2026 · 155 Bishopsgate, London · ${booking.quantity} ${booking.quantity === 1 ? "pass" : "passes"}`,
+          description: `Thursday, 3 September 2026, 155 Bishopsgate, London, ${booking.quantity} ${booking.quantity === 1 ? "pass" : "passes"}`,
         },
         unit_amount: Math.round(subtotalAfterDiscounts * 100),
       },
@@ -277,7 +277,7 @@ router.post("/stripe/webhook", async (req, res): Promise<void> => {
       event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
     } else if (process.env.NODE_ENV === "production") {
       logger.error("STRIPE_WEBHOOK_SECRET is not set in production — rejecting webhook");
-      res.status(400).json({ error: "Webhook not configured — set STRIPE_WEBHOOK_SECRET" });
+      res.status(400).json({ error: "Webhook not configured. Set STRIPE_WEBHOOK_SECRET" });
       return;
     } else {
       logger.warn("STRIPE_WEBHOOK_SECRET not set — accepting without verification (dev only)");
@@ -673,7 +673,7 @@ router.post("/stripe/confirm-card-payment", async (req, res): Promise<void> => {
   const ownsBooking =
     sessionHeader && existing.sessionToken && sessionHeader === existing.sessionToken;
   if (!ownsBooking) {
-    res.status(403).json({ error: "Forbidden — invalid booking session" });
+    res.status(403).json({ error: "Forbidden. Invalid booking session" });
     return;
   }
 
@@ -793,7 +793,7 @@ router.post("/stripe/create-invoice", async (req, res): Promise<void> => {
   const ownsBooking =
     sessionHeader && booking.sessionToken && sessionHeader === booking.sessionToken;
   if (!ownsBooking) {
-    res.status(403).json({ error: "Forbidden — invalid booking session" });
+    res.status(403).json({ error: "Forbidden. Invalid booking session" });
     return;
   }
 

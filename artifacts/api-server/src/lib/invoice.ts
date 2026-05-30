@@ -7,9 +7,9 @@ import type { DbExecutor } from "./pricing";
 import { defaultOrderRef } from "./order-reference";
 
 const PASS_LABELS: Record<string, string> = {
-  single: "Single Pass — HR Analytics Summit 2026",
-  team: "Team Pass (3 Seats) — HR Analytics Summit 2026",
-  business: "Business Pass — HR Analytics Summit 2026",
+  single: "HR Professional Pass",
+  team: "Team Pass",
+  business: "Business Pass",
 };
 
 const INVOICE_FOOTER = [
@@ -302,7 +302,7 @@ export async function reissueBookingInvoice(
   // Look up — or bootstrap — the UK VAT 20% Stripe tax rate
   const vatRateId = await getOrCreateVatRate(stripe);
   if (!vatRateId) {
-    throw new Error("Could not establish UK VAT 20% tax rate in Stripe — invoice not issued");
+    throw new Error("Could not establish UK VAT 20% tax rate in Stripe. Invoice not issued");
   }
   const vatParams = { tax_rates: [vatRateId] };
 
@@ -322,7 +322,7 @@ export async function reissueBookingInvoice(
     customer: customer.id,
     collection_method: "send_invoice",
     days_until_due: 14,
-    description: `HR Analytics Summit 2026 — ${orderRef}`,
+    description: `HR Analytics Summit 2026, ${orderRef}`,
     footer: INVOICE_FOOTER,
     custom_fields: baseCustomFields,
     metadata: {
@@ -336,7 +336,7 @@ export async function reissueBookingInvoice(
   await stripe.invoiceItems.create({
     customer: customer.id,
     invoice: invoiceObj.id,
-    description: `${PASS_LABELS[booking.passType] || booking.passType} × ${booking.quantity}`,
+    description: `${PASS_LABELS[booking.passType] || booking.passType}, HR Analytics Summit 2026, quantity ${booking.quantity}`,
     amount: Math.round(baseAmount * 100),
     currency: "gbp",
     ...vatParams,
