@@ -15,6 +15,11 @@ export default function Confirmation({ booking }: ConfirmationProps) {
     // For now, assume backend webhook handles fulfillment, we just show success
   }, []);
 
+  const isInvoiceBooking = booking.paymentMethod === "invoice";
+  const invoiceIsPaid = booking.status === "paid";
+  const billingContact = booking.billingEmail || "the billing contact";
+  const passLabel = booking.passType === "single" ? "HR Professional Pass" : "Business Pass";
+
   return (
     <div className="max-w-3xl mx-auto text-center space-y-8 py-12">
       <div className="flex justify-center mb-6">
@@ -24,9 +29,9 @@ export default function Confirmation({ booking }: ConfirmationProps) {
       </div>
 
       <div>
-        <h1 className="text-4xl md:text-5xl font-bold mb-4">You're registered!</h1>
+        <h1 className="text-4xl md:text-5xl font-bold mb-4">You are registered!</h1>
         <p className="text-xl text-muted-foreground">
-          We can't wait to see you at the HR Analytics Summit.
+          We cannot wait to see you at the HR Analytics Summit.
         </p>
       </div>
 
@@ -59,46 +64,67 @@ export default function Confirmation({ booking }: ConfirmationProps) {
             </div>
           </div>
 
-          {booking.paymentMethod === "invoice" && (
-            <div className="bg-accent/20 p-4 border border-accent/50 rounded-sm">
+          {isInvoiceBooking && (
+            <div className="rounded-md border border-primary/20 bg-primary/5 p-5">
               <div className="flex items-start gap-3">
-                <FileText className="w-5 h-5 text-accent-foreground mt-0.5" />
-                <div className="space-y-2">
+                <FileText className="w-5 h-5 text-primary mt-0.5" />
+                <div className="space-y-3">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h4 className="font-bold text-accent-foreground">Invoice Requested</h4>
+                    <h4 className="font-bold text-foreground">Invoice issued</h4>
                     <InvoiceBadge status={booking.invoiceBadgeStatus} />
                   </div>
-                  <p className="text-sm text-accent-foreground/80">
-                    An invoice has been sent to {booking.billingEmail || "your billing email"}.
-                    Please arrange payment within 14 days.
+                  <p className="text-sm text-muted-foreground">
+                    Your registration is confirmed and the invoice has been emailed to{" "}
+                    <span className="font-semibold text-foreground">{billingContact}</span>.
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {invoiceIsPaid
+                      ? "This invoice is marked as paid."
+                      : "Invoice bookings are confirmed but are not marked as paid until payment has succeeded."}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    The invoice email includes company information, bank details and payment
+                    instructions. Your finance team can settle the invoice by bank transfer or
+                    through the secure Stripe payment link on the invoice.
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Need to add a PO number later? Use the secure billing link in your confirmation
+                    email. Once updated, we will automatically re-issue the invoice with the PO
+                    included.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    If the email does not arrive within a few minutes, please check your junk or
+                    spam folder.
                   </p>
                   {booking.poNumber && (
-                    <p className="text-sm text-accent-foreground/80">
+                    <p className="text-sm text-muted-foreground">
                       <span className="font-semibold">PO Number:</span>{" "}
                       <span className="font-mono">{booking.poNumber}</span>
                     </p>
                   )}
-                  {booking.stripeInvoicePaymentUrl && (
-                    <a
-                      href={booking.stripeInvoicePaymentUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary underline underline-offset-2 hover:text-primary/80"
-                    >
-                      Pay online →
-                    </a>
-                  )}
-                  {booking.managementToken && (
-                    <p className="text-xs text-accent-foreground/80 pt-1">
-                      <a
-                        href={`${import.meta.env.BASE_URL.replace(/\/$/, "")}/manage/${booking.managementToken}/billing`}
-                        className="font-semibold text-primary underline underline-offset-2 hover:text-primary/80"
-                      >
-                        {booking.poNumber
-                          ? "Update PO / billing details →"
-                          : "Add a PO number or update billing →"}
-                      </a>
-                    </p>
+                  {(booking.stripeInvoicePaymentUrl || booking.managementToken) && (
+                    <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:flex-wrap">
+                      {booking.stripeInvoicePaymentUrl && (
+                        <Button variant="outline" size="sm" asChild>
+                          <a
+                            href={booking.stripeInvoicePaymentUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Pay invoice online
+                          </a>
+                        </Button>
+                      )}
+                      {booking.managementToken && (
+                        <Button variant="outline" size="sm" asChild>
+                          <a
+                            href={`${import.meta.env.BASE_URL.replace(/\/$/, "")}/manage/${booking.managementToken}/billing`}
+                          >
+                            Add PO number or update billing
+                          </a>
+                        </Button>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -113,10 +139,9 @@ export default function Confirmation({ booking }: ConfirmationProps) {
             </h3>
             <div className="flex justify-between items-end border-b border-border pb-2 mb-2">
               <span className="font-bold text-lg">
-                {booking.quantity} ×{" "}
-                {booking.passType === "single" ? "Single Pass" : "Business Pass"}
+                {booking.quantity} x {passLabel}
               </span>
-              <span className="font-bold text-lg">£{booking.totalAmount.toFixed(2)}</span>
+              <span className="font-bold text-lg">&pound;{booking.totalAmount.toFixed(2)}</span>
             </div>
           </div>
 
@@ -151,20 +176,20 @@ export default function Confirmation({ booking }: ConfirmationProps) {
       </div>
 
       {booking.managementToken && (
-        <div className="bg-muted/40 border border-border rounded-sm p-5 text-left">
+        <div className="bg-muted/40 border border-border rounded-md p-5 text-left">
           <div className="flex items-start gap-3">
             <ExternalLink className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
             <div>
               <h4 className="font-bold mb-1">Need to update attendee details?</h4>
               <p className="text-sm text-muted-foreground mb-3">
-                You can add or update attendee names and contact information at any time — including
+                You can add or update attendee names and contact information at any time, including
                 TBC slots. This link is also included in your confirmation email.
               </p>
               <a
                 href={`${import.meta.env.BASE_URL.replace(/\/$/, "")}/manage/${booking.managementToken}`}
                 className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary underline underline-offset-2 hover:text-primary/80"
               >
-                Manage attendees →
+                Manage attendees
               </a>
             </div>
           </div>
@@ -173,7 +198,8 @@ export default function Confirmation({ booking }: ConfirmationProps) {
 
       <div className="pt-8">
         <p className="text-muted-foreground mb-6">
-          A confirmation email has been sent to the lead attendee.
+          A confirmation email has been sent to the lead attendee. If the email does not arrive
+          within a few minutes, please check your junk or spam folder.
         </p>
         <Button
           size="lg"
@@ -207,7 +233,7 @@ export default function Confirmation({ booking }: ConfirmationProps) {
               window.location.href = "/";
             }}
           >
-            ↺ Start new test registration
+            Start new test registration
           </Button>
         </div>
       )}
