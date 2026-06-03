@@ -29,7 +29,7 @@ import { refreshStripeInvoiceStatusIfStale } from "../lib/invoice";
 import { deriveInvoiceBadge } from "../lib/invoice-status";
 import { deliveryStatusForBooking, runConfirmationSideEffects } from "../lib/booking-confirmation";
 import { getStripe } from "../lib/stripe-client";
-import { generatePdfReceipt } from "../lib/pdf";
+import { getOrCreateReceiptDocumentForBooking } from "../lib/receipt-documents";
 
 const router: IRouter = Router();
 
@@ -438,16 +438,17 @@ router.get("/admin/registrations/:id/receipt-pdf", adminAuth, async (req, res): 
     return;
   }
 
-  const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, id));
-  const pdfBuffer = await generatePdfReceipt(booking, attendees);
-  const ref = booking.orderReference || String(id);
-  const safeName = `receipt-${ref}.pdf`.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const receipt = await getOrCreateReceiptDocumentForBooking(id);
+  if (!receipt) {
+    res.status(500).json({ error: "Could not prepare receipt PDF" });
+    return;
+  }
 
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
-  res.setHeader("Content-Length", pdfBuffer.length.toString());
+  res.setHeader("Content-Type", receipt.contentType);
+  res.setHeader("Content-Disposition", `attachment; filename="${receipt.filename}"`);
+  res.setHeader("Content-Length", receipt.buffer.length.toString());
   res.setHeader("Cache-Control", "private, no-store");
-  res.send(pdfBuffer);
+  res.send(receipt.buffer);
 });
 
 /**

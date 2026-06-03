@@ -19,6 +19,10 @@ import type { EventSettings } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { generatePdfReceipt } from "./pdf";
 import { buildGoogleCalendarUrl, buildOutlookCalendarUrl, type CalendarEvent } from "./ics";
+import {
+  getOrCreateReceiptDocumentForBooking,
+  saveReceiptDocumentForBooking,
+} from "./receipt-documents";
 
 async function downloadHttpsPdf(url: string, redirectsLeft = 5): Promise<Buffer | null> {
   return new Promise((resolve) => {
@@ -692,6 +696,13 @@ export async function sendConfirmationAndReceiptEmail(bookingId: number): Promis
     settings,
   );
 
+  let archivedReceipt: { buffer: Buffer; filename: string; contentType: string } | null = null;
+  try {
+    archivedReceipt = await saveReceiptDocumentForBooking(booking, attendees);
+  } catch (err) {
+    logger.error({ err, bookingId }, "Failed to archive receipt PDF for confirmation email");
+  }
+
   let pdfBuffer: Buffer | null = null;
   let pdfFilename = `receipt-${booking.orderReference || bookingId}.pdf`;
   const stripeInvoicePdfUrl = booking.stripeInvoicePdfUrl;
@@ -706,10 +717,14 @@ export async function sendConfirmationAndReceiptEmail(bookingId: number): Promis
     }
   }
   if (!pdfBuffer) {
-    try {
-      pdfBuffer = await generatePdfReceipt(booking, attendees);
-    } catch (err) {
-      logger.error({ err }, "Failed to generate PDF receipt");
+    pdfBuffer = archivedReceipt?.buffer ?? null;
+    pdfFilename = archivedReceipt?.filename ?? pdfFilename;
+    if (!pdfBuffer) {
+      try {
+        pdfBuffer = await generatePdfReceipt(booking, attendees);
+      } catch (err) {
+        logger.error({ err }, "Failed to generate PDF receipt");
+      }
     }
   }
 
@@ -803,6 +818,13 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
     settings,
   );
 
+  let archivedReceipt: { buffer: Buffer; filename: string; contentType: string } | null = null;
+  try {
+    archivedReceipt = await saveReceiptDocumentForBooking(booking, attendees);
+  } catch (err) {
+    logger.error({ err, bookingId }, "Failed to archive receipt PDF for booking email");
+  }
+
   // Prefer Stripe invoice PDF, then fall back to our custom receipt
   let pdfBuffer: Buffer | null = null;
   let pdfFilename = `receipt-${booking.orderReference || bookingId}.pdf`;
@@ -824,15 +846,20 @@ export async function sendBookingEmails(bookingId: number): Promise<void> {
     }
   }
   if (!pdfBuffer) {
-    try {
-      pdfBuffer = await generatePdfReceipt(booking, attendees);
-      if (pdfBuffer)
-        logger.info(
-          { bookingId, sizeBytes: pdfBuffer.length },
-          "Using custom PDF receipt for email attachment",
-        );
-    } catch (err) {
-      logger.error({ err }, "Failed to generate PDF receipt");
+    pdfBuffer = archivedReceipt?.buffer ?? null;
+    pdfFilename = archivedReceipt?.filename ?? pdfFilename;
+    if (!pdfBuffer) {
+      try {
+        pdfBuffer = await generatePdfReceipt(booking, attendees);
+      } catch (err) {
+        logger.error({ err }, "Failed to generate PDF receipt");
+      }
+    }
+    if (pdfBuffer) {
+      logger.info(
+        { bookingId, sizeBytes: pdfBuffer.length, source: archivedReceipt ? "archive" : "direct" },
+        "Using custom PDF receipt for email attachment",
+      );
     }
   }
 
@@ -1023,11 +1050,13 @@ export async function resendConfirmationAndReceipt(
   }
   if (!pdfBuffer) {
     try {
-      pdfBuffer = await generatePdfReceipt(booking, attendees);
+      const receipt = await getOrCreateReceiptDocumentForBooking(bookingId);
+      pdfBuffer = receipt?.buffer ?? null;
+      pdfFilename = receipt?.filename ?? pdfFilename;
       if (pdfBuffer)
         logger.info(
           { bookingId, sizeBytes: pdfBuffer.length },
-          "Using custom PDF receipt for resend",
+          "Using archived PDF receipt for resend",
         );
     } catch (err) {
       logger.error({ err }, "Failed to generate PDF for resend");
@@ -2508,11 +2537,6 @@ export async function resolveLatestBookingPdf(
   const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
   if (!booking) return null;
 
-  const attendees = await db
-    .select()
-    .from(attendeesTable)
-    .where(eq(attendeesTable.bookingId, bookingId));
-
   const ref = booking.orderReference || String(bookingId);
   // Invoice bookings always get an invoice-prefixed filename even when the
   // custom PDF fallback is used; only true card-payment bookings get a
@@ -2535,7 +2559,9 @@ export async function resolveLatestBookingPdf(
   }
   if (!buffer) {
     try {
-      buffer = await generatePdfReceipt(booking, attendees);
+      const receipt = await getOrCreateReceiptDocumentForBooking(bookingId);
+      buffer = receipt?.buffer ?? null;
+      if (receipt) filename = receipt.filename;
     } catch (err) {
       logger.error({ err, bookingId }, "Failed to generate fallback PDF receipt");
       return null;
