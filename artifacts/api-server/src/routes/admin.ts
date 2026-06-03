@@ -29,7 +29,7 @@ import { refreshStripeInvoiceStatusIfStale } from "../lib/invoice";
 import { deriveInvoiceBadge } from "../lib/invoice-status";
 import { deliveryStatusForBooking, runConfirmationSideEffects } from "../lib/booking-confirmation";
 import { getStripe } from "../lib/stripe-client";
-import { getOrCreateReceiptDocumentForBooking } from "../lib/receipt-documents";
+import { refreshReceiptDocumentForBooking } from "../lib/receipt-documents";
 
 const router: IRouter = Router();
 
@@ -438,7 +438,7 @@ router.get("/admin/registrations/:id/receipt-pdf", adminAuth, async (req, res): 
     return;
   }
 
-  const receipt = await getOrCreateReceiptDocumentForBooking(id);
+  const receipt = await refreshReceiptDocumentForBooking(id);
   if (!receipt) {
     res.status(500).json({ error: "Could not prepare receipt PDF" });
     return;

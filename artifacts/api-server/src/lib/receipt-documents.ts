@@ -81,6 +81,22 @@ export async function getOrCreateReceiptDocumentForBooking(bookingId: number): P
   const stored = await getStoredReceiptDocumentForBooking(bookingId);
   if (stored) return stored;
 
+  return createReceiptDocumentForBooking(bookingId);
+}
+
+export async function refreshReceiptDocumentForBooking(bookingId: number): Promise<{
+  buffer: Buffer;
+  filename: string;
+  contentType: string;
+} | null> {
+  return createReceiptDocumentForBooking(bookingId);
+}
+
+async function createReceiptDocumentForBooking(bookingId: number): Promise<{
+  buffer: Buffer;
+  filename: string;
+  contentType: string;
+} | null> {
   const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
   if (!booking) return null;
 

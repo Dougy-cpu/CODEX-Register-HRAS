@@ -4,6 +4,7 @@ import { PASS_PRICES } from "./pricing";
 interface BookingForPdf {
   id: number;
   orderReference: string | null;
+  status?: string | null;
   passType: string;
   quantity: number;
   subtotalAmount: string | null;
@@ -25,6 +26,10 @@ interface BookingForPdf {
   billingPhone?: string | null;
   billingVatNumber?: string | null;
   poNumber?: string | null;
+  paymentMethod?: string | null;
+  paidAt?: Date | null;
+  stripePaymentIntentId?: string | null;
+  stripeInvoiceId?: string | null;
   createdAt: Date;
 }
 
@@ -62,6 +67,13 @@ export function generatePdfReceipt(
       month: "long",
       year: "numeric",
     });
+    const paidDateStr = booking.paidAt
+      ? new Date(booking.paidAt).toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        })
+      : null;
 
     // booking.subtotalAmount IS subtotalAfterDiscounts (stored post-discount).
     const subtotalAfterDiscounts = parseFloat(booking.subtotalAmount?.toString() || "0");
@@ -101,6 +113,32 @@ export function generatePdfReceipt(
     doc.text(`Booking Reference: ${booking.orderReference || `#${booking.id}`}`);
     if (booking.poNumber) {
       doc.text(`PO Number: ${booking.poNumber}`);
+    }
+
+    doc.moveDown(0.5);
+    doc.fontSize(12).fillColor("#000").text("Payment Details:", { underline: true });
+    doc.fontSize(11).fillColor("#333");
+    if (booking.status === "paid") {
+      doc.text("Payment Status: Paid");
+    } else if (booking.status === "invoiced") {
+      doc.text("Payment Status: Invoice issued, payment pending");
+    }
+    if (booking.paymentMethod === "card") {
+      doc.text("Payment Method: Card via Stripe");
+      if (paidDateStr) {
+        doc.text(`Payment Received: ${paidDateStr}`);
+      }
+      if (booking.stripePaymentIntentId) {
+        doc.text(`Payment Reference: ${booking.stripePaymentIntentId}`);
+      }
+    } else if (booking.paymentMethod === "invoice") {
+      doc.text("Payment Method: Invoice");
+      if (paidDateStr) {
+        doc.text(`Payment Received: ${paidDateStr}`);
+      }
+      if (booking.stripeInvoiceId) {
+        doc.text(`Invoice Reference: ${booking.stripeInvoiceId}`);
+      }
     }
 
     doc.moveDown(1);
