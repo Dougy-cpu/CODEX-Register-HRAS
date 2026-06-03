@@ -945,6 +945,50 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /admin/registrations/{id}/receipt-pdf:
+    get:
+      operationId: getRegistrationReceiptPdf
+      tags: [admin]
+      summary: Download a VAT receipt PDF for a confirmed registration (admin)
+      description: |
+        Returns the booking-level HRAS VAT receipt PDF for paid or invoiced
+        registrations. The PDF includes company details, VAT number, booking
+        reference, billing details, line items, VAT and total.
+      security:
+        - AdminToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: VAT receipt PDF
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Booking not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Receipt is not available for this booking status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /admin/registrations/{id}:
     get:
       operationId: getRegistration

@@ -2694,6 +2694,82 @@ export const useRedeliverRegistration = <
 };
 
 /**
+ * Returns the booking-level HRAS VAT receipt PDF for paid or invoiced
+registrations. The PDF includes company details, VAT number, booking
+reference, billing details, line items, VAT and total.
+
+ * @summary Download a VAT receipt PDF for a confirmed registration (admin)
+ */
+export const getGetRegistrationReceiptPdfUrl = (id: number) => {
+  return `/api/admin/registrations/${id}/receipt-pdf`;
+};
+
+export const getRegistrationReceiptPdf = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getGetRegistrationReceiptPdfUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetRegistrationReceiptPdfQueryKey = (id: number) => {
+  return [`/api/admin/registrations/${id}/receipt-pdf`] as const;
+};
+
+export const getGetRegistrationReceiptPdfQueryOptions = <
+  TData = Awaited<ReturnType<typeof getRegistrationReceiptPdf>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof getRegistrationReceiptPdf>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetRegistrationReceiptPdfQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getRegistrationReceiptPdf>>> = ({
+    signal,
+  }) => getRegistrationReceiptPdf(id, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, enabled: !!id, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getRegistrationReceiptPdf>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetRegistrationReceiptPdfQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getRegistrationReceiptPdf>>
+>;
+export type GetRegistrationReceiptPdfQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Download a VAT receipt PDF for a confirmed registration (admin)
+ */
+
+export function useGetRegistrationReceiptPdf<
+  TData = Awaited<ReturnType<typeof getRegistrationReceiptPdf>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof getRegistrationReceiptPdf>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetRegistrationReceiptPdfQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
  * @summary Get a registration with full attendee details (admin)
  */
 export const getGetRegistrationUrl = (id: number) => {

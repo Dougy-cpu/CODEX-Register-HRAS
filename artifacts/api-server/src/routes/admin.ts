@@ -29,6 +29,7 @@ import { refreshStripeInvoiceStatusIfStale } from "../lib/invoice";
 import { deriveInvoiceBadge } from "../lib/invoice-status";
 import { deliveryStatusForBooking, runConfirmationSideEffects } from "../lib/booking-confirmation";
 import { getStripe } from "../lib/stripe-client";
+import { generatePdfReceipt } from "../lib/pdf";
 
 const router: IRouter = Router();
 
@@ -420,6 +421,33 @@ router.get("/admin/registrations/:id", adminAuth, async (req, res): Promise<void
     ...formatBooking(booking),
     attendees: attendees.map(formatAttendee),
   });
+});
+
+router.get("/admin/registrations/:id/receipt-pdf", adminAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+
+  const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, id));
+  if (!booking) {
+    res.status(404).json({ error: "Booking not found" });
+    return;
+  }
+
+  if (booking.status !== "paid" && booking.status !== "invoiced") {
+    res.status(409).json({ error: "No receipt is available for this booking yet" });
+    return;
+  }
+
+  const attendees = await db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, id));
+  const pdfBuffer = await generatePdfReceipt(booking, attendees);
+  const ref = booking.orderReference || String(id);
+  const safeName = `receipt-${ref}.pdf`.replace(/[^a-zA-Z0-9._-]/g, "_");
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
+  res.setHeader("Content-Length", pdfBuffer.length.toString());
+  res.setHeader("Cache-Control", "private, no-store");
+  res.send(pdfBuffer);
 });
 
 /**

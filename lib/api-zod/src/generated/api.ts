@@ -927,6 +927,17 @@ export const RedeliverRegistrationResponse = zod
   );
 
 /**
+ * Returns the booking-level HRAS VAT receipt PDF for paid or invoiced
+registrations. The PDF includes company details, VAT number, booking
+reference, billing details, line items, VAT and total.
+
+ * @summary Download a VAT receipt PDF for a confirmed registration (admin)
+ */
+export const GetRegistrationReceiptPdfParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
  * @summary Get a registration with full attendee details (admin)
  */
 export const GetRegistrationParams = zod.object({

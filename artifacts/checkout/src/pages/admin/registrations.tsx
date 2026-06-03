@@ -82,6 +82,53 @@ const statusBadge = (status: string) => {
   );
 };
 
+const isConfirmedRegistration = (status: string | null | undefined) =>
+  status === "paid" || status === "invoiced";
+
+function parseFilenameFromContentDisposition(header: string | null): string | null {
+  if (!header) return null;
+  const star = /filename\*\s*=\s*(?:UTF-8|utf-8)''([^;]+)/i.exec(header);
+  if (star?.[1]) {
+    try {
+      return decodeURIComponent(star[1].trim());
+    } catch {
+      // Fall through to the plain filename parser.
+    }
+  }
+  const plain = /filename\s*=\s*"?([^";]+)"?/i.exec(header);
+  return plain?.[1]?.trim() || null;
+}
+
+async function downloadRegistrationReceipt(bookingId: number): Promise<string> {
+  const token = localStorage.getItem("admin_token") || "";
+  const res = await fetch(`/api/admin/registrations/${bookingId}/receipt-pdf`, {
+    headers: { "x-admin-token": token },
+  });
+  if (!res.ok) {
+    let message = "Could not download the receipt PDF.";
+    try {
+      const body = (await res.json()) as { error?: string };
+      if (body && typeof body.error === "string") message = body.error;
+    } catch {
+      // Keep the default message for non-JSON error bodies.
+    }
+    throw new Error(message);
+  }
+
+  const filename =
+    parseFilenameFromContentDisposition(res.headers.get("content-disposition")) || "receipt.pdf";
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objectUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  return filename;
+}
+
 interface AttendeeEditForm {
   firstName: string;
   lastName: string;
@@ -187,6 +234,13 @@ function ExpandedRegistrationDetail({
   );
   const [billingSaveError, setBillingSaveError] = useState<string | null>(null);
   const [billingReissueInfo, setBillingReissueInfo] = useState<string | null>(null);
+  const [receiptDownloadingTarget, setReceiptDownloadingTarget] = useState<
+    "booking" | number | null
+  >(null);
+  const [receiptDownloadMessage, setReceiptDownloadMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   const startEditBilling = () => {
     if (!data) return;
@@ -319,6 +373,23 @@ function ExpandedRegistrationDetail({
   const invoiceDueDateStr = invoiceDueDate
     ? invoiceDueDate.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
     : null;
+  const canDownloadReceipt = isConfirmedRegistration(data?.status);
+
+  const handleDownloadReceipt = async (target: "booking" | number = "booking") => {
+    setReceiptDownloadingTarget(target);
+    setReceiptDownloadMessage(null);
+    try {
+      const filename = await downloadRegistrationReceipt(id);
+      setReceiptDownloadMessage({ type: "success", text: `${filename} downloaded.` });
+    } catch (err) {
+      setReceiptDownloadMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Could not download the receipt PDF.",
+      });
+    } finally {
+      setReceiptDownloadingTarget(null);
+    }
+  };
 
   const handleSendReminder = async () => {
     setReminderState("loading");
@@ -1056,6 +1127,36 @@ function ExpandedRegistrationDetail({
           </div>
         )}
 
+      {canDownloadReceipt && (
+        <div className="flex flex-wrap items-center gap-3 text-sm border border-border bg-muted/20 p-3">
+          <button
+            type="button"
+            onClick={() => handleDownloadReceipt("booking")}
+            disabled={receiptDownloadingTarget !== null}
+            className="inline-flex items-center gap-1.5 font-semibold text-primary underline underline-offset-2 hover:text-primary/80 disabled:opacity-60 disabled:no-underline"
+          >
+            {receiptDownloadingTarget === "booking" ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Download className="w-3.5 h-3.5" />
+            )}
+            Receipt PDF
+          </button>
+          <span className="text-xs text-muted-foreground">
+            Booking-level VAT receipt for expenses and records.
+          </span>
+          {receiptDownloadMessage && (
+            <span
+              className={`text-xs ${
+                receiptDownloadMessage.type === "success" ? "text-green-700" : "text-red-600"
+              }`}
+            >
+              {receiptDownloadMessage.text}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Attendee table */}
       <div>
         <h4 className="font-bold mb-3 uppercase text-xs tracking-wider text-muted-foreground">
@@ -1089,7 +1190,9 @@ function ExpandedRegistrationDetail({
                 <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground">
                   GDPR
                 </th>
-                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground w-16"></th>
+                <th className="text-left p-3 font-bold uppercase text-xs tracking-wider text-muted-foreground w-32">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -1158,23 +1261,41 @@ function ExpandedRegistrationDetail({
                         )}
                       </td>
                       <td className="p-3">
-                        {editingAttendeeId === a.id ? (
-                          <button
-                            onClick={cancelEditing}
-                            className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                            title="Cancel editing"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => startEditing(a)}
-                            className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-primary transition-colors"
-                            title="Edit attendee"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                        )}
+                        <div className="flex items-center gap-1">
+                          {canDownloadReceipt && (
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadReceipt(a.id)}
+                              disabled={receiptDownloadingTarget !== null}
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900 disabled:opacity-60 disabled:no-underline"
+                              title="Download booking receipt PDF"
+                            >
+                              {receiptDownloadingTarget === a.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Download className="w-3.5 h-3.5" />
+                              )}
+                              Receipt
+                            </button>
+                          )}
+                          {editingAttendeeId === a.id ? (
+                            <button
+                              onClick={cancelEditing}
+                              className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                              title="Cancel editing"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => startEditing(a)}
+                              className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-primary transition-colors"
+                              title="Edit attendee"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
 
@@ -1352,6 +1473,8 @@ export default function AdminRegistrations() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [receiptDownloadingId, setReceiptDownloadingId] = useState<number | null>(null);
+  const [receiptDownloadError, setReceiptDownloadError] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -1440,6 +1563,20 @@ export default function AdminRegistrations() {
     }
   };
 
+  const handleListReceiptDownload = async (bookingId: number) => {
+    setReceiptDownloadingId(bookingId);
+    setReceiptDownloadError(null);
+    try {
+      await downloadRegistrationReceipt(bookingId);
+    } catch (err) {
+      setReceiptDownloadError(
+        err instanceof Error ? err.message : "Could not download the receipt PDF.",
+      );
+    } finally {
+      setReceiptDownloadingId(null);
+    }
+  };
+
   const handleBulkDelete = async () => {
     setDeleting(true);
     try {
@@ -1496,6 +1633,13 @@ export default function AdminRegistrations() {
       )}
 
       <RegistrationQuickViews activeView={activeQuickView} onSelect={applyQuickView} />
+
+      {receiptDownloadError && (
+        <div className="mb-4 border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{receiptDownloadError}</span>
+        </div>
+      )}
 
       {/* Filters bar */}
       <div className="bg-white p-6 border border-border shadow-sm mb-4 flex flex-col md:flex-row gap-4 items-end">
@@ -1637,7 +1781,7 @@ export default function AdminRegistrations() {
                 <TableHead>Total</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
-                <TableHead>Invoice</TableHead>
+                <TableHead>Documents</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1706,16 +1850,34 @@ export default function AdminRegistrations() {
                       )}
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
-                      {reg.stripeInvoicePaymentUrl && (
-                        <a
-                          href={reg.stripeInvoicePaymentUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs font-semibold text-primary underline underline-offset-2 hover:text-primary/80 whitespace-nowrap"
-                        >
-                          Invoice ↗
-                        </a>
-                      )}
+                      <div className="flex flex-col items-start gap-1">
+                        {reg.stripeInvoicePaymentUrl && (
+                          <a
+                            href={reg.stripeInvoicePaymentUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs font-semibold text-primary underline underline-offset-2 hover:text-primary/80 whitespace-nowrap"
+                          >
+                            Invoice ↗
+                          </a>
+                        )}
+                        {isConfirmedRegistration(reg.status) && (
+                          <button
+                            type="button"
+                            onClick={() => handleListReceiptDownload(reg.id)}
+                            disabled={receiptDownloadingId !== null}
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900 disabled:opacity-60 disabled:no-underline whitespace-nowrap"
+                          >
+                            {receiptDownloadingId === reg.id && (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            )}
+                            Receipt PDF
+                          </button>
+                        )}
+                        {!reg.stripeInvoicePaymentUrl && !isConfirmedRegistration(reg.status) && (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                   {expandedId === reg.id && (
