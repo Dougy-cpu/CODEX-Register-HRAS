@@ -1473,15 +1473,7 @@ export async function sendIncompleteFormNotification(bookingId: number): Promise
   const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
   if (!booking) return;
 
-  const storedEmails = await db
-    .select()
-    .from(notificationEmailsTable)
-    .orderBy(notificationEmailsTable.createdAt);
-
-  const recipients = sanitizeRecipients([
-    ...storedEmails.filter((e) => e.notifyIncomplete).map((e) => e.email),
-    process.env.ORGANISER_EMAIL,
-  ]);
+  const recipients = await getIncompleteNotificationEmails();
 
   if (recipients.length === 0) {
     logger.info(
@@ -1671,6 +1663,23 @@ async function getOrganiserEmails(): Promise<string[]> {
   return sanitizeRecipients([
     ...storedEmails.filter((e) => e.notifyComplete).map((e) => e.email),
     process.env.ORGANISER_EMAIL,
+  ]);
+}
+
+async function getIncompleteNotificationEmails(): Promise<string[]> {
+  const storedEmails = await db
+    .select()
+    .from(notificationEmailsTable)
+    .orderBy(notificationEmailsTable.createdAt);
+
+  const configuredEmails = new Set(storedEmails.map((e) => e.email.trim().toLowerCase()));
+  const legacyOrganiserEmail = process.env.ORGANISER_EMAIL?.trim();
+  const includeLegacyOrganiser =
+    legacyOrganiserEmail && !configuredEmails.has(legacyOrganiserEmail.toLowerCase());
+
+  return sanitizeRecipients([
+    ...storedEmails.filter((e) => e.notifyIncomplete).map((e) => e.email),
+    includeLegacyOrganiser ? legacyOrganiserEmail : undefined,
   ]);
 }
 
@@ -2096,7 +2105,7 @@ export async function sendCheckoutExpiredEmail(bookingId: number): Promise<void>
   if (!lead) return;
 
   const settings = await getEventSettings();
-  const organisers = await getOrganiserEmails();
+  const incompleteNotificationRecipients = await getIncompleteNotificationEmails();
 
   const name = `${lead.firstName} ${lead.lastName}`;
   const safeName = escHtml(name);
@@ -2125,7 +2134,7 @@ export async function sendCheckoutExpiredEmail(bookingId: number): Promise<void>
 
   await sendMail({
     to: recipientEmail,
-    bcc: organisers.length > 0 ? organisers : undefined,
+    bcc: incompleteNotificationRecipients.length > 0 ? incompleteNotificationRecipients : undefined,
     subject: `Action Required: Your HR Analytics Summit checkout session expired, ${name}`,
     html,
   });
