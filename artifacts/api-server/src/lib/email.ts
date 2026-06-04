@@ -1683,6 +1683,23 @@ async function getIncompleteNotificationEmails(): Promise<string[]> {
   ]);
 }
 
+async function getCheckoutExpiredNotificationEmails(): Promise<string[]> {
+  const storedEmails = await db
+    .select()
+    .from(notificationEmailsTable)
+    .orderBy(notificationEmailsTable.createdAt);
+
+  const configuredEmails = new Set(storedEmails.map((e) => e.email.trim().toLowerCase()));
+  const legacyOrganiserEmail = process.env.ORGANISER_EMAIL?.trim();
+  const includeLegacyOrganiser =
+    legacyOrganiserEmail && !configuredEmails.has(legacyOrganiserEmail.toLowerCase());
+
+  return sanitizeRecipients([
+    ...storedEmails.filter((e) => e.notifyCheckoutExpired).map((e) => e.email),
+    includeLegacyOrganiser ? legacyOrganiserEmail : undefined,
+  ]);
+}
+
 function formatCalendarRangeLabel(start: Date, end: Date, tz: string): string {
   try {
     const dateFmt = new Intl.DateTimeFormat("en-GB", {
@@ -2105,7 +2122,7 @@ export async function sendCheckoutExpiredEmail(bookingId: number): Promise<void>
   if (!lead) return;
 
   const settings = await getEventSettings();
-  const incompleteNotificationRecipients = await getIncompleteNotificationEmails();
+  const checkoutExpiredNotificationRecipients = await getCheckoutExpiredNotificationEmails();
 
   const name = `${lead.firstName} ${lead.lastName}`;
   const safeName = escHtml(name);
@@ -2134,7 +2151,10 @@ export async function sendCheckoutExpiredEmail(bookingId: number): Promise<void>
 
   await sendMail({
     to: recipientEmail,
-    bcc: incompleteNotificationRecipients.length > 0 ? incompleteNotificationRecipients : undefined,
+    bcc:
+      checkoutExpiredNotificationRecipients.length > 0
+        ? checkoutExpiredNotificationRecipients
+        : undefined,
     subject: `Action Required: Your HR Analytics Summit checkout session expired, ${name}`,
     html,
   });
