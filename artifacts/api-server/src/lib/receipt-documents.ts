@@ -9,9 +9,16 @@ import {
 } from "@workspace/db";
 import { generatePdfReceipt } from "./pdf";
 import { logger } from "./logger";
+import { getStripe } from "./stripe-client";
+import type Stripe from "stripe";
 
 const RECEIPT_DOCUMENT_TYPE = "receipt";
 const PDF_CONTENT_TYPE = "application/pdf";
+
+interface CardReceiptDetails {
+  brand: string;
+  last4: string;
+}
 
 function receiptFilename(booking: Pick<Booking, "id" | "orderReference">): string {
   const ref = booking.orderReference || String(booking.id);
@@ -22,7 +29,11 @@ export async function saveReceiptDocumentForBooking(
   booking: Booking,
   attendees: Attendee[],
 ): Promise<{ buffer: Buffer; filename: string; contentType: string }> {
-  const buffer = await generatePdfReceipt(booking, attendees);
+  const cardDetails = await getCardReceiptDetails(booking);
+  const receiptBooking = cardDetails
+    ? { ...booking, cardBrand: cardDetails.brand, cardLast4: cardDetails.last4 }
+    : booking;
+  const buffer = await generatePdfReceipt(receiptBooking, attendees);
   const filename = receiptFilename(booking);
 
   await db
@@ -47,6 +58,33 @@ export async function saveReceiptDocumentForBooking(
 
   logger.info({ bookingId: booking.id, sizeBytes: buffer.length }, "Receipt PDF archived");
   return { buffer, filename, contentType: PDF_CONTENT_TYPE };
+}
+
+async function getCardReceiptDetails(booking: Booking): Promise<CardReceiptDetails | null> {
+  if (booking.paymentMethod !== "card" || !booking.stripePaymentIntentId) return null;
+
+  const stripe = getStripe();
+  if (!stripe) return null;
+
+  try {
+    const paymentIntent = await stripe.paymentIntents.retrieve(booking.stripePaymentIntentId, {
+      expand: ["latest_charge"],
+    });
+    const latestCharge = paymentIntent.latest_charge;
+    const charge =
+      typeof latestCharge === "string" || latestCharge === null
+        ? null
+        : (latestCharge as Stripe.Charge);
+    const card = charge?.payment_method_details?.card;
+    if (!card?.brand || !card?.last4) return null;
+    return { brand: card.brand, last4: card.last4 };
+  } catch (err) {
+    logger.warn(
+      { err, bookingId: booking.id, paymentIntentId: booking.stripePaymentIntentId },
+      "Could not retrieve Stripe card details for receipt",
+    );
+    return null;
+  }
 }
 
 export async function getStoredReceiptDocumentForBooking(bookingId: number): Promise<{

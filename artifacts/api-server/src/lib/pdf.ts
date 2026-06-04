@@ -30,6 +30,8 @@ interface BookingForPdf {
   paidAt?: Date | null;
   stripePaymentIntentId?: string | null;
   stripeInvoiceId?: string | null;
+  cardBrand?: string | null;
+  cardLast4?: string | null;
   createdAt: Date;
 }
 
@@ -47,6 +49,13 @@ const passLabels: Record<string, string> = {
   business: "Business Pass, HR Analytics Summit",
 };
 
+function formatCardBrand(brand: string): string {
+  return brand
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+    .trim();
+}
+
 export function generatePdfReceipt(
   booking: BookingForPdf,
   attendees: AttendeeForPdf[],
@@ -62,7 +71,8 @@ export function generatePdfReceipt(
     const formatCurrency = (n: number) => `£${n.toFixed(2)}`;
 
     const lead = attendees.find((a) => a.isLead) || attendees[0];
-    const dateStr = new Date().toLocaleDateString("en-GB", {
+    const receiptDate = booking.paidAt ? new Date(booking.paidAt) : new Date();
+    const dateStr = receiptDate.toLocaleDateString("en-GB", {
       day: "numeric",
       month: "long",
       year: "numeric",
@@ -125,6 +135,9 @@ export function generatePdfReceipt(
     }
     if (booking.paymentMethod === "card") {
       doc.text("Payment Method: Card via Stripe");
+      if (booking.cardBrand && booking.cardLast4) {
+        doc.text(`Card: ${formatCardBrand(booking.cardBrand)} ending ${booking.cardLast4}`);
+      }
       if (paidDateStr) {
         doc.text(`Payment Received: ${paidDateStr}`);
       }
