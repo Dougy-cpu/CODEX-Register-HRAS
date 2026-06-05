@@ -85,6 +85,42 @@ const statusBadge = (status: string) => {
 const isConfirmedRegistration = (status: string | null | undefined) =>
   status === "paid" || status === "invoiced";
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const INVOICE_PAYMENT_TERMS_DAYS = 14;
+
+type RegistrationDateSource = {
+  status?: string | null;
+  paymentMethod?: string | null;
+  paidAt?: string | null;
+  invoiceDueDate?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+function getRegistrationDisplayDate(reg: RegistrationDateSource): {
+  date: Date;
+  label: "Completed" | "Started";
+} {
+  if (isConfirmedRegistration(reg.status)) {
+    if (reg.paymentMethod === "invoice" && reg.invoiceDueDate) {
+      return {
+        date: new Date(
+          new Date(reg.invoiceDueDate).getTime() - INVOICE_PAYMENT_TERMS_DAYS * DAY_MS,
+        ),
+        label: "Completed",
+      };
+    }
+
+    if (reg.paidAt) {
+      return { date: new Date(reg.paidAt), label: "Completed" };
+    }
+
+    return { date: new Date(reg.updatedAt || reg.createdAt), label: "Completed" };
+  }
+
+  return { date: new Date(reg.createdAt), label: "Started" };
+}
+
 function parseFilenameFromContentDisposition(header: string | null): string | null {
   if (!header) return null;
   const star = /filename\*\s*=\s*(?:UTF-8|utf-8)''([^;]+)/i.exec(header);
@@ -1785,115 +1821,124 @@ export default function AdminRegistrations() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {registrations.map((reg) => (
-                <Fragment key={reg.id}>
-                  <TableRow
-                    className={`cursor-pointer hover:bg-muted/30 ${selected.has(reg.id) ? "bg-primary/5" : ""}`}
-                    onClick={() => setExpandedId(expandedId === reg.id ? null : reg.id)}
-                  >
-                    <TableCell className="pl-4" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        checked={selected.has(reg.id)}
-                        onCheckedChange={() => toggleOne(reg.id)}
-                        aria-label={`Select booking ${reg.orderReference}`}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {expandedId === reg.id ? (
-                        <ChevronDown className="w-4 h-4" />
-                      ) : (
-                        <ChevronRight className="w-4 h-4" />
-                      )}
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">{reg.orderReference || "-"}</TableCell>
-                    <TableCell>
-                      <p className="font-bold">{reg.leadName || "Unknown"}</p>
-                      <p className="text-xs text-muted-foreground">{reg.leadEmail}</p>
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`text-xs font-bold px-2 py-0.5 uppercase rounded ${reg.passType === "business" ? "bg-violet-100 text-violet-800" : "bg-slate-100 text-slate-700"}`}
-                      >
-                        {reg.passType === "business" ? "Business" : "Standard"}
-                      </span>
-                    </TableCell>
-                    <TableCell>{reg.quantity}</TableCell>
-                    <TableCell className="font-medium">£{reg.totalAmount}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        {statusBadge(reg.status)}
-                        {reg.status === "invoiced" &&
-                          reg.invoiceDueDate &&
-                          new Date(reg.invoiceDueDate) < new Date() && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-red-700 bg-red-100 px-1.5 py-0.5 rounded">
-                              <Clock className="w-2.5 h-2.5" /> Overdue
-                            </span>
-                          )}
-                        {reg.needsAttention && (
-                          <span
-                            className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-amber-900 bg-amber-200 px-1.5 py-0.5 rounded"
-                            title="One or more confirmation side-effects (email, organiser notif, Sheets sync) have not been delivered"
-                          >
-                            <AlertTriangle className="w-2.5 h-2.5" /> Needs attention
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      <div>{new Date(reg.createdAt).toLocaleDateString()}</div>
-                      {reg.status === "invoiced" && reg.invoiceDueDate && (
-                        <div
-                          className={`text-xs mt-0.5 ${new Date(reg.invoiceDueDate) < new Date() ? "text-red-600 font-semibold" : "text-muted-foreground"}`}
-                        >
-                          Due: {new Date(reg.invoiceDueDate).toLocaleDateString()}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <div className="flex flex-col items-start gap-1">
-                        {reg.stripeInvoicePaymentUrl && (
-                          <a
-                            href={reg.stripeInvoicePaymentUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-xs font-semibold text-primary underline underline-offset-2 hover:text-primary/80 whitespace-nowrap"
-                          >
-                            Invoice ↗
-                          </a>
-                        )}
-                        {isConfirmedRegistration(reg.status) && (
-                          <button
-                            type="button"
-                            onClick={() => handleListReceiptDownload(reg.id)}
-                            disabled={receiptDownloadingId !== null}
-                            className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900 disabled:opacity-60 disabled:no-underline whitespace-nowrap"
-                          >
-                            {receiptDownloadingId === reg.id && (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            )}
-                            Receipt PDF
-                          </button>
-                        )}
-                        {!reg.stripeInvoicePaymentUrl && !isConfirmedRegistration(reg.status) && (
-                          <span className="text-xs text-muted-foreground">-</span>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                  {expandedId === reg.id && (
-                    <TableRow className="bg-muted/10">
-                      <TableCell colSpan={10} className="p-6">
-                        <ExpandedRegistrationDetail
-                          id={reg.id}
-                          onStatusChanged={() =>
-                            queryClient.invalidateQueries({ queryKey: ["registrations"] })
-                          }
+              {registrations.map((reg) => {
+                const registrationDate = getRegistrationDisplayDate(reg);
+
+                return (
+                  <Fragment key={reg.id}>
+                    <TableRow
+                      className={`cursor-pointer hover:bg-muted/30 ${selected.has(reg.id) ? "bg-primary/5" : ""}`}
+                      onClick={() => setExpandedId(expandedId === reg.id ? null : reg.id)}
+                    >
+                      <TableCell className="pl-4" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selected.has(reg.id)}
+                          onCheckedChange={() => toggleOne(reg.id)}
+                          aria-label={`Select booking ${reg.orderReference}`}
                         />
                       </TableCell>
+                      <TableCell>
+                        {expandedId === reg.id ? (
+                          <ChevronDown className="w-4 h-4" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4" />
+                        )}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {reg.orderReference || "-"}
+                      </TableCell>
+                      <TableCell>
+                        <p className="font-bold">{reg.leadName || "Unknown"}</p>
+                        <p className="text-xs text-muted-foreground">{reg.leadEmail}</p>
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`text-xs font-bold px-2 py-0.5 uppercase rounded ${reg.passType === "business" ? "bg-violet-100 text-violet-800" : "bg-slate-100 text-slate-700"}`}
+                        >
+                          {reg.passType === "business" ? "Business" : "Standard"}
+                        </span>
+                      </TableCell>
+                      <TableCell>{reg.quantity}</TableCell>
+                      <TableCell className="font-medium">£{reg.totalAmount}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          {statusBadge(reg.status)}
+                          {reg.status === "invoiced" &&
+                            reg.invoiceDueDate &&
+                            new Date(reg.invoiceDueDate) < new Date() && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-red-700 bg-red-100 px-1.5 py-0.5 rounded">
+                                <Clock className="w-2.5 h-2.5" /> Overdue
+                              </span>
+                            )}
+                          {reg.needsAttention && (
+                            <span
+                              className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-amber-900 bg-amber-200 px-1.5 py-0.5 rounded"
+                              title="One or more confirmation side-effects (email, organiser notif, Sheets sync) have not been delivered"
+                            >
+                              <AlertTriangle className="w-2.5 h-2.5" /> Needs attention
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        <div>{registrationDate.date.toLocaleDateString("en-GB")}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          {registrationDate.label}
+                        </div>
+                        {reg.status === "invoiced" && reg.invoiceDueDate && (
+                          <div
+                            className={`text-xs mt-0.5 ${new Date(reg.invoiceDueDate) < new Date() ? "text-red-600 font-semibold" : "text-muted-foreground"}`}
+                          >
+                            Due: {new Date(reg.invoiceDueDate).toLocaleDateString()}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <div className="flex flex-col items-start gap-1">
+                          {reg.stripeInvoicePaymentUrl && (
+                            <a
+                              href={reg.stripeInvoicePaymentUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs font-semibold text-primary underline underline-offset-2 hover:text-primary/80 whitespace-nowrap"
+                            >
+                              Invoice ↗
+                            </a>
+                          )}
+                          {isConfirmedRegistration(reg.status) && (
+                            <button
+                              type="button"
+                              onClick={() => handleListReceiptDownload(reg.id)}
+                              disabled={receiptDownloadingId !== null}
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900 disabled:opacity-60 disabled:no-underline whitespace-nowrap"
+                            >
+                              {receiptDownloadingId === reg.id && (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              )}
+                              Receipt PDF
+                            </button>
+                          )}
+                          {!reg.stripeInvoicePaymentUrl && !isConfirmedRegistration(reg.status) && (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
+                        </div>
+                      </TableCell>
                     </TableRow>
-                  )}
-                </Fragment>
-              ))}
+                    {expandedId === reg.id && (
+                      <TableRow className="bg-muted/10">
+                        <TableCell colSpan={10} className="p-6">
+                          <ExpandedRegistrationDetail
+                            id={reg.id}
+                            onStatusChanged={() =>
+                              queryClient.invalidateQueries({ queryKey: ["registrations"] })
+                            }
+                          />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
+                );
+              })}
               {registrations.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">

@@ -33,6 +33,27 @@ import { refreshReceiptDocumentForBooking } from "../lib/receipt-documents";
 
 const router: IRouter = Router();
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const INVOICE_PAYMENT_TERMS_DAYS = 14;
+
+function registrationDisplayDate(b: typeof bookingsTable.$inferSelect): Date {
+  const isConfirmed = b.status === "paid" || b.status === "invoiced";
+
+  if (!isConfirmed) {
+    return b.createdAt;
+  }
+
+  if (b.paymentMethod === "invoice" && b.invoiceDueDate) {
+    return new Date(b.invoiceDueDate.getTime() - INVOICE_PAYMENT_TERMS_DAYS * DAY_MS);
+  }
+
+  if (b.paidAt) {
+    return b.paidAt;
+  }
+
+  return b.updatedAt || b.createdAt;
+}
+
 function formatBooking(b: typeof bookingsTable.$inferSelect) {
   return {
     ...b,
@@ -309,6 +330,7 @@ router.get("/admin/registrations/export", adminAuth, async (req, res): Promise<v
   headerRow.height = 22;
 
   for (const booking of bookings) {
+    const registeredAt = registrationDisplayDate(booking).toISOString();
     const bookingAttendees = allAttendees
       .filter((a) => a.bookingId === booking.id)
       .sort((a, b) => (a.seatIndex ?? 0) - (b.seatIndex ?? 0));
@@ -336,7 +358,7 @@ router.get("/admin/registrations/export", adminAuth, async (req, res): Promise<v
         phone: "",
         dietary: "",
         gdpr: "",
-        registeredAt: booking.createdAt.toISOString(),
+        registeredAt,
       });
       continue;
     }
@@ -364,7 +386,7 @@ router.get("/admin/registrations/export", adminAuth, async (req, res): Promise<v
         phone: a.isTbc ? "" : a.phone || "",
         dietary: a.isTbc ? "" : a.dietaryAccessibility || "",
         gdpr: a.isTbc ? "" : a.gdprConsent ? "Yes" : "No",
-        registeredAt: booking.createdAt.toISOString(),
+        registeredAt,
       });
       if (a.isLead) {
         row.getCell("lead").font = { bold: true, color: { argb: "FFE74F3E" } };
