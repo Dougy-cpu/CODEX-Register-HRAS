@@ -70,7 +70,6 @@
   }
 }
 
-/* Custom styles for pill buttons but sharp inputs */
 @layer components {
   button,
   [role="button"] {
@@ -81,44 +80,48 @@
   textarea {
     @apply rounded-none bg-white border-border text-foreground;
   }
+
+  .checkout-shell button,
+  .checkout-shell [role="button"],
+  .checkout-shell input,
+  .checkout-shell select,
+  .checkout-shell textarea {
+    border-radius: var(--radius);
+  }
+
+  .checkout-card {
+    @apply rounded-md border border-border bg-white shadow-sm;
+  }
+
+  .checkout-metric-strip {
+    @apply grid grid-cols-1 gap-3 sm:grid-cols-3;
+  }
+
+  .checkout-metric {
+    @apply min-h-[88px] rounded-md border border-border bg-white p-4 shadow-sm;
+  }
+
+  .checkout-primary-action {
+    @apply border border-primary bg-primary font-semibold text-white shadow-sm hover:bg-primary/90;
+  }
+
+  .checkout-secondary-action {
+    @apply border border-border bg-white font-semibold text-foreground shadow-sm hover:border-primary/40 hover:bg-primary/5;
+  }
+
+  .checkout-shell :focus-visible {
+    outline: 3px solid hsl(var(--ring) / 0.45);
+    outline-offset: 3px;
+  }
 }
 
-@keyframes shine {
-  0% {
-    background-position: -200% center;
+@media (prefers-reduced-motion: reduce) {
+  .checkout-shell *,
+  .checkout-shell *::before,
+  .checkout-shell *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
-  60% {
-    background-position: 200% center;
-  }
-  100% {
-    background-position: 200% center;
-  }
-}
-
-@keyframes pulse-glow {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.3);
-  }
-  50% {
-    box-shadow: 0 0 0 6px rgba(22, 163, 74, 0);
-  }
-}
-
-.badge-shine {
-  background: linear-gradient(
-    90deg,
-    hsl(43, 74%, 49%) 0%,
-    hsl(43, 90%, 72%) 30%,
-    hsl(43, 74%, 49%) 50%,
-    hsl(43, 90%, 72%) 80%,
-    hsl(43, 74%, 49%) 100%
-  );
-  background-size: 200% auto;
-  animation: shine 3s ease-in-out infinite;
-  color: #000;
-}
-
-.savings-pulse {
-  animation: pulse-glow 2s ease-in-out 1;
 }

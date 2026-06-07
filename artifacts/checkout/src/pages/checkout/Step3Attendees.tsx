@@ -634,25 +634,25 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
       </div>
 
       {totalSeats > 1 && (
-        <div className="flex gap-3 bg-blue-50 border border-blue-200 rounded p-4 text-sm text-blue-800">
+        <div className="flex gap-3 rounded-md border border-primary/20 bg-primary/5 p-4 text-sm text-foreground">
           <Info className="w-4 h-4 shrink-0 mt-0.5" />
           <p>
             <span className="font-semibold">Not sure who's attending yet?</span> Mark any additional
             ticket as <span className="font-semibold">TBC</span> to complete your booking now and
-            confirm the attendee details later — just contact us after booking.
+            confirm the attendee details later. You can update them after booking.
           </p>
         </div>
       )}
 
-      <div className="bg-white border border-border p-4 md:p-5 space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="border border-border p-3">
+      <div className="checkout-card space-y-4 p-4 md:p-5">
+        <div className="checkout-metric-strip">
+          <div className="checkout-metric min-h-0 p-3">
             <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
               Seats
             </p>
             <p className="text-xl font-bold mt-1">{totalSeats}</p>
           </div>
-          <div className="border border-border p-3">
+          <div className="checkout-metric min-h-0 p-3">
             <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
               Ready
             </p>
@@ -660,7 +660,7 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
               {readySeatCount}/{totalSeats}
             </p>
           </div>
-          <div className="border border-border p-3">
+          <div className="checkout-metric min-h-0 p-3">
             <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
               Lead company
             </p>
@@ -699,24 +699,35 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
           const isForMe = forMeFlags[index];
           const isTbc = tbcFlags[index];
           const label = isTbc
-            ? "TBC — details to be confirmed"
+            ? "Details to be confirmed"
             : data.firstName && data.lastName
               ? `${data.firstName} ${data.lastName}`
               : "Pending details";
+          const isReady = isTbc || attendeeSchema.safeParse(data).success;
+          const statusLabel = isTbc ? "TBC" : isReady ? "Ready" : "Needs details";
 
           return (
             <AccordionItem
               key={index}
               value={`attendee-${index}`}
-              className="bg-white border border-border px-6"
+              className="checkout-card overflow-hidden px-5 md:px-6"
             >
               <AccordionTrigger className="hover:no-underline py-6">
-                <div className="flex flex-col text-left">
-                  <span className="font-bold text-xl">Attendee {index + 1}</span>
+                <div className="flex min-w-0 flex-1 items-center justify-between gap-4 pr-3 text-left">
+                  <div className="min-w-0">
+                    <span className="block text-xl font-bold">Attendee {index + 1}</span>
+                    <span className="block truncate text-sm font-normal text-muted-foreground">
+                      {label}
+                    </span>
+                  </div>
                   <span
-                    className={`text-sm font-normal ${isTbc ? "text-amber-600 font-medium" : "text-muted-foreground"}`}
+                    className={`shrink-0 rounded-md border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${
+                      isReady
+                        ? "border-primary/20 bg-primary/10 text-primary"
+                        : "border-border bg-muted text-muted-foreground"
+                    }`}
                   >
-                    {label}
+                    {statusLabel}
                   </span>
                 </div>
               </AccordionTrigger>
@@ -727,7 +738,7 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
                       <button
                         type="button"
                         onClick={() => handleForMeToggle(index, !isForMe)}
-                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                        className={`inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-all ${
                           isForMe
                             ? "bg-primary text-white border-primary"
                             : "bg-white text-foreground border-border hover:border-primary/50"
@@ -748,10 +759,10 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
                     <button
                       type="button"
                       onClick={() => handleTbcToggle(index, !isTbc)}
-                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                      className={`inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-all ${
                         isTbc
-                          ? "bg-amber-500 text-white border-amber-500"
-                          : "bg-white text-foreground border-border hover:border-amber-400"
+                          ? "border-primary bg-primary text-white"
+                          : "border-border bg-white text-foreground hover:border-primary/50"
                       }`}
                     >
                       <Clock className="w-4 h-4" />
@@ -761,11 +772,11 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
                 </div>
 
                 {isTbc ? (
-                  <div className="bg-amber-50 border border-amber-200 rounded p-4 text-sm text-amber-800">
+                  <div className="rounded-md border border-primary/20 bg-primary/5 p-4 text-sm text-foreground">
                     <p className="font-semibold mb-1">This ticket is marked as TBC</p>
                     <p>
-                      You can confirm this attendee's details later — just contact us after booking
-                      and we'll update the registration for you.
+                      You can confirm this attendee's details later using the attendee management
+                      link in the confirmation email.
                     </p>
                   </div>
                 ) : (
@@ -891,7 +902,12 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
 
                 {index < totalSeats - 1 && (
                   <div className="flex justify-end mt-6">
-                    <Button type="button" onClick={() => setOpenItem(`attendee-${index + 1}`)}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="checkout-secondary-action"
+                      onClick={() => setOpenItem(`attendee-${index + 1}`)}
+                    >
                       Next Attendee
                     </Button>
                   </div>
@@ -903,7 +919,7 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
       </Accordion>
 
       {autosaveStatus === "error" && (
-        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded p-4 text-sm text-amber-800">
+        <div className="flex items-start gap-3 rounded-md border border-primary/20 bg-primary/5 p-4 text-sm text-foreground">
           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="font-semibold">We couldn't save your last change</p>
@@ -912,7 +928,7 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
               <button
                 type="button"
                 onClick={() => setAutosaveAttempt((n) => n + 1)}
-                className="underline font-semibold hover:text-amber-900"
+                className="font-semibold text-primary underline hover:text-primary/80"
               >
                 retry now
               </button>
@@ -928,11 +944,11 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
         </div>
       )}
 
-      <div className="flex flex-col gap-3 border-t border-border pt-6">
+      <div className="grid gap-3 border-t border-border pt-6 md:grid-cols-[auto_minmax(260px,1fr)_minmax(260px,320px)] md:items-start">
         <Button
           variant="outline"
           size="lg"
-          className="h-14 w-full min-w-0 px-6 text-base border-border"
+          className="checkout-secondary-action order-3 h-14 w-full min-w-0 px-6 text-base md:order-1 md:w-auto"
           onClick={async () => {
             await updateBooking.mutateAsync({ id: booking.id, data: { currentStep: 2 } });
             queryClient.invalidateQueries({ queryKey: ["booking"] });
@@ -944,11 +960,12 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
         <SaveAndReturnButton
           onSave={saveAttendeesProgress}
           disabled={isSubmitting || autosaveStatus === "saving"}
-          buttonClassName="text-base"
+          className="order-2 items-stretch md:items-center"
+          buttonClassName="h-14 w-full text-base md:w-auto md:min-w-[260px]"
         />
         <Button
           size="lg"
-          className="h-14 w-full min-w-0 px-6 text-base bg-primary hover:bg-primary/90 text-white border-none"
+          className="checkout-primary-action order-1 h-14 w-full min-w-0 px-6 text-base md:order-3"
           onClick={handleContinue}
           disabled={isSubmitting || autosaveStatus === "saving" || autosaveStatus === "error"}
         >

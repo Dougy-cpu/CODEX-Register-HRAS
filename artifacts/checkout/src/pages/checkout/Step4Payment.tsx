@@ -53,7 +53,7 @@ function LinkedFieldLabel({
       <FormLabel className="!mb-0">{label}</FormLabel>
       {canLink && linked && (
         <span
-          className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full"
+          className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary"
           title="This field is linked to your lead attendee. Editing it unlinks just this field."
           data-testid={`linked-${field}`}
         >
@@ -190,7 +190,7 @@ function StepBadge({ value }: { value: number }) {
 function NextStep({ value, children }: { value: number; children: ReactNode }) {
   return (
     <li className="grid grid-cols-[auto_1fr] items-start gap-3 text-sm text-muted-foreground">
-      <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-green-50 text-xs font-bold text-green-700">
+      <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
         {value}
       </span>
       <span>{children}</span>
@@ -524,12 +524,12 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
             </p>
           </div>
 
-          <div className="bg-white border border-border p-6 md:p-8 space-y-4">
-            <div className="flex items-start gap-3 text-green-800 bg-green-50 border border-green-200 p-4">
+          <div className="checkout-card space-y-4 p-6 md:p-8">
+            <div className="flex items-start gap-3 rounded-md border border-primary/20 bg-primary/5 p-4 text-foreground">
               <Check className="w-5 h-5 shrink-0 mt-0.5" />
               <div>
                 <p className="font-bold">Your promo code has been applied</p>
-                <p className="text-sm text-green-700 mt-0.5">
+                <p className="mt-0.5 text-sm text-muted-foreground">
                   This booking is completely free. Click the button below to confirm your place at
                   the summit.
                 </p>
@@ -538,40 +538,45 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
           </div>
 
           {paymentError && (
-            <div className="bg-red-50 border border-red-200 rounded p-4 text-sm text-red-800">
+            <div
+              className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"
+              role="alert"
+            >
               <p className="font-semibold mb-1">Error</p>
               <p>{paymentError}</p>
             </div>
           )}
 
-          <div className="space-y-3 pt-4">
-            <div className="flex justify-between">
-              <Button
-                variant="outline"
-                size="lg"
-                className="px-8 h-14 text-lg border-border"
-                onClick={async () => {
-                  await updateBooking.mutateAsync({ id: booking.id, data: { currentStep: 3 } });
-                  queryClient.invalidateQueries({ queryKey: ["booking"] });
-                }}
-              >
-                Back
-              </Button>
-              <Button
-                size="lg"
-                className="px-10 h-14 text-lg bg-primary hover:bg-primary/90 text-white border-none"
-                onClick={handleConfirmFree}
-                disabled={isFreeConfirming}
-              >
-                {isFreeConfirming ? "Confirming..." : "Confirm Registration"}
-              </Button>
-            </div>
-            <SaveAndReturnButton onSave={saveFreeProgress} disabled={isFreeConfirming} />
+          <div className="grid gap-3 border-t border-border pt-6 md:grid-cols-[auto_minmax(240px,1fr)_minmax(240px,1fr)] md:items-start">
+            <Button
+              variant="outline"
+              size="lg"
+              className="checkout-secondary-action order-3 h-14 w-full px-8 text-lg md:order-1 md:w-auto"
+              onClick={async () => {
+                await updateBooking.mutateAsync({ id: booking.id, data: { currentStep: 3 } });
+                queryClient.invalidateQueries({ queryKey: ["booking"] });
+              }}
+            >
+              Back
+            </Button>
+            <SaveAndReturnButton
+              onSave={saveFreeProgress}
+              disabled={isFreeConfirming}
+              className="order-2 items-stretch md:items-center"
+            />
+            <Button
+              size="lg"
+              className="checkout-primary-action order-1 h-14 w-full px-10 text-lg md:order-3"
+              onClick={handleConfirmFree}
+              disabled={isFreeConfirming}
+            >
+              {isFreeConfirming ? "Confirming..." : "Confirm Registration"}
+            </Button>
           </div>
         </div>
 
         <div className="w-full md:w-[380px] shrink-0 space-y-6">
-          <div className="bg-muted p-6">
+          <div className="checkout-card bg-muted p-6">
             <h3 className="text-xl font-bold mb-6">Order Summary</h3>
             <div className="space-y-4">
               <div className="flex justify-between text-base">
@@ -621,15 +626,14 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
     return (
       <div className="mx-auto w-full max-w-6xl space-y-6">
         <div className="space-y-2">
-          <p className="text-xs font-bold uppercase tracking-widest text-primary">Step 4 of 4</p>
           <h1 className="text-4xl md:text-5xl font-bold">Payment</h1>
           <p className="max-w-3xl text-lg text-muted-foreground">
             Choose how to pay, confirm invoice details if required, and finish the registration.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="min-h-[82px] rounded-md border border-border bg-white p-4">
+        <div className="checkout-metric-strip">
+          <div className="checkout-metric">
             <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
               Booking
             </p>
@@ -637,7 +641,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
               {booking.quantity} {bookingPassSummary}
             </p>
           </div>
-          <div className="min-h-[82px] rounded-md border border-border bg-white p-4">
+          <div className="checkout-metric">
             <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
               Payment choice
             </p>
@@ -645,7 +649,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
               {paymentMethod === "card" ? "Card" : "Invoice"}
             </p>
           </div>
-          <div className="min-h-[82px] rounded-md border border-border bg-white p-4">
+          <div className="checkout-metric">
             <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
               Total due
             </p>
@@ -655,7 +659,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
 
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-5">
-            <section className="rounded-md border border-border bg-white">
+            <section className="checkout-card">
               <div className="border-b border-border/70 p-5">
                 <h2 className="text-xl font-bold">Choose payment method</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -668,7 +672,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                   onValueChange={(val: "card" | "invoice") => setPaymentMethod(val)}
                   className="grid gap-4 md:grid-cols-2"
                 >
-                  <div
+                  <label
                     className={`min-h-[132px] cursor-pointer rounded-md border-2 p-5 transition-all hover:shadow-sm ${
                       paymentMethod === "card"
                         ? "border-primary bg-primary/5"
@@ -682,23 +686,23 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                         <div>
                           <div className="flex items-center gap-2">
                             <CreditCard className="h-5 w-5 text-primary" />
-                            <span className="text-lg font-bold">Pay by card now</span>
+                            <span className="text-lg font-bold">Pay by card</span>
                           </div>
                           <p className="mt-2 text-sm text-muted-foreground">
                             Pay now by card through Stripe. This is the fastest route if you are
-                            ready to pay today and do not need an invoice raised first.
+                            ready to pay today and do not need procurement approval first.
                           </p>
                         </div>
                       </div>
                       {paymentMethod === "card" && (
-                        <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-primary">
+                        <span className="rounded-md bg-primary px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
                           Selected
                         </span>
                       )}
                     </div>
-                  </div>
+                  </label>
 
-                  <div
+                  <label
                     className={`min-h-[132px] cursor-pointer rounded-md border-2 p-5 transition-all hover:shadow-sm ${
                       paymentMethod === "invoice"
                         ? "border-primary bg-primary/5"
@@ -725,18 +729,18 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                         </div>
                       </div>
                       {paymentMethod === "invoice" && (
-                        <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-primary">
+                        <span className="rounded-md bg-primary px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
                           Selected
                         </span>
                       )}
                     </div>
-                  </div>
+                  </label>
                 </RadioGroup>
               </div>
             </section>
 
             {paymentMethod === "invoice" && (
-              <section className="rounded-md border border-border bg-white">
+              <section className="checkout-card">
                 <div className="border-b border-border/70 p-5">
                   <div>
                     <h2 className="text-xl font-bold">Billing details</h2>
@@ -773,48 +777,32 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                       <li className="grid grid-cols-[auto_1fr] gap-3 rounded-md border border-primary/10 bg-white p-3">
                         <StepBadge value={1} />
                         <div>
-                          <p className="text-sm font-bold">Confirm registration</p>
+                          <p className="text-sm font-bold">
+                            Confirm registration and receive invoice
+                          </p>
                           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                            Complete this step and we will issue the invoice.
+                            Registration is confirmed and the invoice is emailed immediately to the
+                            billing contact.
                           </p>
                         </div>
                       </li>
                       <li className="grid grid-cols-[auto_1fr] gap-3 rounded-md border border-primary/10 bg-white p-3">
                         <StepBadge value={2} />
                         <div>
-                          <p className="text-sm font-bold">Invoice emailed immediately</p>
+                          <p className="text-sm font-bold">Share the finance information</p>
                           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                            The invoice is sent to the billing contact as soon as registration is
-                            confirmed.
+                            The invoice email includes company information, bank details and payment
+                            instructions for your finance team.
                           </p>
                         </div>
                       </li>
                       <li className="grid grid-cols-[auto_1fr] gap-3 rounded-md border border-primary/10 bg-white p-3">
                         <StepBadge value={3} />
                         <div>
-                          <p className="text-sm font-bold">Finance details included</p>
+                          <p className="text-sm font-bold">Pay or add a PO later</p>
                           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                            Company information, bank details and payment instructions are included
-                            in the invoice email.
-                          </p>
-                        </div>
-                      </li>
-                      <li className="grid grid-cols-[auto_1fr] gap-3 rounded-md border border-primary/10 bg-white p-3">
-                        <StepBadge value={4} />
-                        <div>
-                          <p className="text-sm font-bold">PO can be added later</p>
-                          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                            If you do not have a PO yet, you can add it later using the secure link
-                            in the invoice email.
-                          </p>
-                        </div>
-                      </li>
-                      <li className="grid grid-cols-[auto_1fr] gap-3 rounded-md border border-primary/10 bg-white p-3">
-                        <StepBadge value={5} />
-                        <div>
-                          <p className="text-sm font-bold">Pay later</p>
-                          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                            Pay by bank transfer or using the secure Stripe invoice payment link.
+                            Pay by bank transfer or secure Stripe invoice link. If needed, use the
+                            secure billing link to add a PO and receive a revised invoice.
                           </p>
                         </div>
                       </li>
@@ -1140,7 +1128,10 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
             )}
 
             {paymentError && (
-              <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+              <div
+                className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"
+                role="alert"
+              >
                 <p className="mb-1 font-semibold">Payment error</p>
                 <p>{paymentError}</p>
                 <p className="mt-2 text-red-700">
@@ -1155,7 +1146,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
           </div>
 
           <aside className="space-y-5 lg:sticky lg:top-28">
-            <section className="rounded-md border border-border bg-white">
+            <section className="checkout-card">
               <div className="border-b border-border/70 p-5">
                 <h3 className="text-lg font-bold">Order summary</h3>
               </div>
@@ -1205,10 +1196,10 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
               </div>
             </section>
 
-            <section className="rounded-md border border-border bg-white">
+            <section className="checkout-card">
               <div className="flex items-center justify-between gap-4 border-b border-border/70 p-5">
                 <h3 className="text-lg font-bold">What happens next</h3>
-                <span className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-primary">
+                <span className="rounded-md bg-primary/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-primary">
                   {paymentMethod === "card" ? "Card selected" : "Invoice selected"}
                 </span>
               </div>
@@ -1227,22 +1218,14 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                   ) : (
                     <>
                       <NextStep value={1}>
-                        Registration is confirmed when the invoice is issued.
+                        Registration is confirmed and the invoice is emailed immediately.
                       </NextStep>
                       <NextStep value={2}>
-                        The invoice is emailed immediately to the billing contact.
+                        Finance receives company information, bank details and payment instructions.
                       </NextStep>
                       <NextStep value={3}>
-                        The invoice email includes company information, bank details and payment
-                        instructions.
-                      </NextStep>
-                      <NextStep value={4}>
-                        PO and billing details can be updated later using the secure link in the
-                        email.
-                      </NextStep>
-                      <NextStep value={5}>
-                        Finance can pay by bank transfer or using the secure Stripe invoice payment
-                        link.
+                        Pay by bank transfer or secure Stripe invoice link, and add a PO later if
+                        needed.
                       </NextStep>
                     </>
                   )}
@@ -1250,21 +1233,20 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
               </div>
             </section>
 
-            <section className="rounded-md border border-border bg-white p-5">
+            <section className="checkout-card p-5">
               <div className="flex flex-col gap-3">
                 {paymentMethod === "invoice" && (
                   <div className="rounded-md border border-primary/15 bg-primary/5 p-3 text-xs leading-relaxed text-muted-foreground">
                     <p className="font-bold text-foreground">Ready to issue the invoice?</p>
                     <p className="mt-1">
-                      This confirms the registration and emails the invoice immediately to the
-                      billing contact. PO and billing details can still be updated before payment
-                      from the secure link in the invoice email.
+                      This confirms the registration and emails the invoice to the billing contact.
+                      PO and billing details can still be updated before payment.
                     </p>
                   </div>
                 )}
                 <Button
                   size="lg"
-                  className="h-14 w-full min-w-0 px-6 text-base bg-primary text-white hover:bg-primary/90"
+                  className="checkout-primary-action h-14 w-full min-w-0 px-6 text-base"
                   onClick={() => {
                     if (paymentMethod === "invoice") {
                       void form.handleSubmit(onSubmit)();
@@ -1279,7 +1261,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                 <Button
                   variant="outline"
                   size="lg"
-                  className="h-12 w-full min-w-0 px-5 border-border bg-white text-sm"
+                  className="checkout-secondary-action h-12 w-full min-w-0 px-5 text-sm"
                   onClick={async () => {
                     setPaymentError(null);
                     try {

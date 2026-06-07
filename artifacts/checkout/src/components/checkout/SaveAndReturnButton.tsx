@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const SUMMIT_WEBSITE_URL = "https://hranalyticssummit.com";
@@ -43,15 +42,14 @@ export default function SaveAndReturnButton({
         type="button"
         variant="outline"
         size="lg"
-        className={`h-14 w-full min-w-0 px-5 border-border bg-white text-sm leading-tight text-center whitespace-normal sm:px-6 sm:text-base ${buttonClassName}`}
+        className={`checkout-secondary-action h-14 w-full min-w-0 px-5 text-sm leading-tight text-center whitespace-normal sm:px-6 sm:text-base ${buttonClassName}`}
         onClick={handleClick}
         disabled={disabled || isSaving}
         aria-label="Save progress and return to the HR Analytics Summit website"
       >
-        <span className="min-w-0 flex-1 text-center">
+        <span className="min-w-0 text-center">
           {isSaving ? "Saving..." : "Save and return to HR Analytics Summit"}
         </span>
-        <ArrowUpRight className="w-4 h-4 shrink-0" />
       </Button>
       {saveError && (
         <p className="max-w-sm text-center text-xs font-medium text-destructive" role="alert">

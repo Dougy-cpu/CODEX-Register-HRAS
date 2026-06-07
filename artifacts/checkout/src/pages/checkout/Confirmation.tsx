@@ -3,6 +3,7 @@ import { CheckCircle2, FileText, Calendar, MapPin, ExternalLink } from "lucide-r
 import { Button } from "@/components/ui/button";
 import type { BookingWithAttendees } from "@/types/booking";
 import { InvoiceBadge } from "@/components/InvoiceBadge";
+import { getAttendeeDisplay } from "./attendeeDisplay";
 
 interface ConfirmationProps {
   booking: BookingWithAttendees;
@@ -21,7 +22,7 @@ export default function Confirmation({ booking }: ConfirmationProps) {
   const passLabel = booking.passType === "single" ? "HR Professional Pass" : "Business Pass";
 
   return (
-    <div className="max-w-3xl mx-auto text-center space-y-8 py-12">
+    <div className="mx-auto max-w-4xl space-y-8 py-6 text-center md:py-10">
       <div className="flex justify-center mb-6">
         <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center">
           <CheckCircle2 className="w-12 h-12 text-primary" />
@@ -35,7 +36,7 @@ export default function Confirmation({ booking }: ConfirmationProps) {
         </p>
       </div>
 
-      <div className="bg-white p-8 border border-border text-left mt-12 grid grid-cols-1 md:grid-cols-2 gap-8 relative overflow-hidden">
+      <div className="checkout-card relative mt-10 grid grid-cols-1 gap-8 overflow-hidden p-6 text-left md:grid-cols-2 md:p-8">
         <div className="absolute top-0 right-0 p-8 opacity-5">
           <CheckCircle2 className="w-48 h-48" />
         </div>
@@ -156,27 +157,27 @@ export default function Confirmation({ booking }: ConfirmationProps) {
                     arr.findIndex((b) => b.seatIndex === a.seatIndex && b.isLead === a.isLead) ===
                     idx,
                 ) ?? []
-              ).map((attendee, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-bold">
-                    {attendee.firstName.charAt(0)}
-                    {attendee.lastName.charAt(0)}
+              ).map((attendee, i) => {
+                const display = getAttendeeDisplay(attendee, i);
+                return (
+                  <div key={attendee.id || i} className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-bold">
+                      {display.initials}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold">{display.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">{display.email}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-bold">
-                      {attendee.firstName} {attendee.lastName}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{attendee.workEmail}</p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
       </div>
 
       {booking.managementToken && (
-        <div className="bg-muted/40 border border-border rounded-md p-5 text-left">
+        <div className="checkout-card bg-muted/40 p-5 text-left">
           <div className="flex items-start gap-3">
             <ExternalLink className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
             <div>
@@ -203,7 +204,7 @@ export default function Confirmation({ booking }: ConfirmationProps) {
         </p>
         <Button
           size="lg"
-          className="px-10 h-14 text-lg bg-primary hover:bg-primary/90 text-white"
+          className="checkout-primary-action h-14 px-10 text-lg"
           onClick={() => (window.location.href = "https://hranalyticssummit.com")}
         >
           Return to Website

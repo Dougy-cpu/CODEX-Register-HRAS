@@ -190,7 +190,7 @@ export default function Step1Lead({
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-          <div className="bg-white p-6 md:p-8 border border-border">
+          <div className="checkout-card p-6 md:p-8">
             <h2 className="text-2xl font-bold mb-6">I am registering as a:</h2>
             <FormField
               control={form.control}
@@ -206,7 +206,7 @@ export default function Step1Lead({
                       <FormItem>
                         <FormControl>
                           <label
-                            className={`flex flex-col cursor-pointer border-2 p-4 transition-all ${field.value === "hr_professional" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}
+                            className={`relative flex cursor-pointer flex-col rounded-md border-2 p-4 shadow-sm transition-all ${field.value === "hr_professional" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}
                           >
                             <div className="flex items-center gap-2 mb-2">
                               <RadioGroupItem value="hr_professional" className="sr-only" />
@@ -218,6 +218,11 @@ export default function Step1Lead({
                                 )}
                               </div>
                               <span className="font-bold text-lg">HR Professional</span>
+                              {field.value === "hr_professional" && (
+                                <span className="ml-auto rounded-md bg-primary px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
+                                  Selected
+                                </span>
+                              )}
                             </div>
                             <span className="text-sm text-muted-foreground ml-7">
                               HR Executives, Practitioners, and Business Leaders
@@ -228,7 +233,7 @@ export default function Step1Lead({
                       <FormItem>
                         <FormControl>
                           <label
-                            className={`flex flex-col cursor-pointer border-2 p-4 transition-all ${field.value === "consultant_vendor" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}
+                            className={`relative flex cursor-pointer flex-col rounded-md border-2 p-4 shadow-sm transition-all ${field.value === "consultant_vendor" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}
                           >
                             <div className="flex items-center gap-2 mb-2">
                               <RadioGroupItem value="consultant_vendor" className="sr-only" />
@@ -240,6 +245,11 @@ export default function Step1Lead({
                                 )}
                               </div>
                               <span className="font-bold text-lg">Vendor / Consultant</span>
+                              {field.value === "consultant_vendor" && (
+                                <span className="ml-auto rounded-md bg-primary px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
+                                  Selected
+                                </span>
+                              )}
                             </div>
                             <span className="text-sm text-muted-foreground ml-7">
                               Solution Providers, Recruiters, and Consultants
@@ -255,7 +265,7 @@ export default function Step1Lead({
             />
           </div>
 
-          <div className="bg-white p-6 md:p-8 border border-border space-y-6">
+          <div className="checkout-card space-y-6 p-6 md:p-8">
             <h2 className="text-2xl font-bold mb-6">Your Details</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -387,17 +397,23 @@ export default function Step1Lead({
           </div>
 
           {submitError && (
-            <div className="text-sm text-destructive border border-destructive/30 bg-destructive/5 rounded p-3">
+            <div
+              className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+              role="alert"
+            >
               {submitError}
             </div>
           )}
 
-          <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-4">
-            <SaveAndReturnButton onSave={handleSaveAndReturn} className="sm:items-start" />
+          <div className="grid gap-3 border-t border-border pt-6 sm:grid-cols-2 sm:items-start">
+            <SaveAndReturnButton
+              onSave={handleSaveAndReturn}
+              className="order-2 sm:order-1 sm:items-start"
+            />
             <Button
               type="submit"
               size="lg"
-              className="px-10 h-14 text-lg bg-primary hover:bg-primary/90 text-white border-none"
+              className="checkout-primary-action order-1 h-14 px-10 text-lg sm:order-2"
             >
               Continue to Passes
             </Button>

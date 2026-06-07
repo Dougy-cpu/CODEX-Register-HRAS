@@ -587,14 +587,14 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="bg-white border border-border p-4">
+      <div className="checkout-metric-strip">
+        <div className="checkout-metric">
           <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
             Booking type
           </p>
           <p className="text-lg font-bold mt-1">{audienceLabel}</p>
         </div>
-        <div className="bg-white border border-border p-4">
+        <div className="checkout-metric">
           <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
             Selected pass
           </p>
@@ -604,7 +604,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
           </p>
           <p className="text-sm text-muted-foreground">{passLabel}</p>
         </div>
-        <div className="bg-white border border-border p-4">
+        <div className="checkout-metric">
           <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
             Current total
           </p>
@@ -617,7 +617,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
 
       {/* HR: Single pass with quantity picker */}
       {isHR && (
-        <Card className="relative overflow-hidden rounded-md border-2 border-primary bg-white p-0 shadow-lg">
+        <Card className="relative overflow-hidden rounded-md border-2 border-primary bg-white p-0 shadow-sm">
           {/* ── Header band ── */}
           <div className="px-6 md:px-8 py-5 flex items-center justify-between gap-4 flex-wrap border-b border-border">
             <div>
@@ -629,6 +629,9 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
               </h3>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
+              <span className="rounded-md bg-primary px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
+                Selected pass
+              </span>
               <InventoryBadge remaining={inventory.single} />
               <div className="text-right">
                 <div className="flex items-baseline gap-2 justify-end flex-wrap">
@@ -683,19 +686,11 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
               <button
                 type="button"
                 onClick={() => setQuantity(3)}
-                className={`w-full flex items-center justify-between gap-2 px-4 py-3 text-sm font-bold transition-colors ${
+                className={`w-full flex items-center justify-between gap-2 rounded-md border px-4 py-3 text-sm font-bold transition-colors ${
                   quantity === 3
-                    ? "bg-primary text-white shadow-md"
-                    : "text-white shadow-md hover:shadow-lg"
+                    ? "border-primary bg-primary text-white shadow-sm"
+                    : "border-border bg-white text-foreground hover:border-primary/50 hover:bg-primary/5"
                 }`}
-                style={
-                  quantity !== 3
-                    ? {
-                        background:
-                          "linear-gradient(135deg, hsl(28,88%,62%) 0%, hsl(4,77%,57%) 100%)",
-                      }
-                    : undefined
-                }
               >
                 <span className="flex items-center gap-2">
                   <Users className="w-4 h-4 shrink-0" />3 tickets, Most Popular
@@ -706,22 +701,29 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
               </button>
 
               {/* Custom stepper */}
-              <div className="flex items-stretch border border-border bg-white overflow-hidden">
+              <div className="flex items-stretch overflow-hidden rounded-md border border-border bg-white">
                 <button
                   type="button"
                   className="flex-none w-11 flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-30"
                   onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                   disabled={quantity <= 1}
+                  aria-label="Decrease ticket quantity"
                 >
                   <Minus className="w-4 h-4" />
                 </button>
-                <div className="flex-1 text-center font-bold text-2xl py-2.5 text-foreground border-x border-border">
+                <div
+                  className="flex-1 border-x border-border py-2.5 text-center text-2xl font-bold text-foreground"
+                  aria-live="polite"
+                  aria-label={`${quantity} tickets selected`}
+                >
                   {quantity}
                 </div>
                 <button
                   type="button"
-                  className="flex-none w-11 flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  className="flex-none w-11 flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-30"
                   onClick={() => setQuantity((q) => Math.min(20, q + 1))}
+                  disabled={quantity >= 20}
+                  aria-label="Increase ticket quantity"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -780,7 +782,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
       )}
       {/* Vendor: Business Pass with quantity + discounts */}
       {isVendor && (
-        <Card className="relative overflow-hidden rounded-md border-2 border-primary bg-white p-0 shadow-lg">
+        <Card className="relative overflow-hidden rounded-md border-2 border-primary bg-white p-0 shadow-sm">
           {/* ── Header band ── */}
           <div className="px-6 md:px-8 py-5 flex items-center justify-between gap-4 flex-wrap border-b border-border">
             <div>
@@ -792,6 +794,9 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
               </h3>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
+              <span className="rounded-md bg-primary px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
+                Selected pass
+              </span>
               <InventoryBadge remaining={inventory.business} />
               <div className="text-right">
                 <div className="flex items-baseline gap-2 justify-end flex-wrap">
@@ -861,16 +866,21 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
               </p>
 
               {/* Custom stepper */}
-              <div className="flex items-stretch border border-border bg-white overflow-hidden">
+              <div className="flex items-stretch overflow-hidden rounded-md border border-border bg-white">
                 <button
                   type="button"
                   className="flex-none w-11 flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-30"
                   onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                   disabled={quantity <= 1}
+                  aria-label="Decrease pass quantity"
                 >
                   <Minus className="w-4 h-4" />
                 </button>
-                <div className="flex-1 text-center font-bold text-2xl py-2.5 text-foreground border-x border-border">
+                <div
+                  className="flex-1 border-x border-border py-2.5 text-center text-2xl font-bold text-foreground"
+                  aria-live="polite"
+                  aria-label={`${quantity} passes selected`}
+                >
                   {quantity}
                 </div>
                 <button
@@ -878,6 +888,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
                   className="flex-none w-11 flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-30"
                   onClick={() => setQuantity((q) => Math.min(10, q + 1))}
                   disabled={quantity >= 10}
+                  aria-label="Increase pass quantity"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -933,7 +944,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
         </Card>
       )}
       {/* ── Order Summary ── */}
-      <div className="bg-white border border-border flex flex-col md:flex-row md:items-start justify-between gap-0 md:gap-8 overflow-hidden">
+      <div className="checkout-card flex flex-col justify-between gap-0 overflow-hidden md:flex-row md:items-start md:gap-8">
         {/* Left: selection summary */}
         <div className="flex-1 p-6 md:p-8 space-y-1">
           <h2 className="text-xl font-bold">
@@ -955,21 +966,14 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
 
           {/* How did you hear about us */}
           <div className="pt-4">
-            <style>{`
-              @keyframes hau-glow {
-                0%, 100% { box-shadow: 0 0 0 0 rgba(231,79,62,0); border-color: rgba(231,79,62,0.25); }
-                50% { box-shadow: 0 0 0 3px rgba(231,79,62,0.12); border-color: rgba(231,79,62,0.7); }
-              }
-              .hau-card { animation: hau-glow 3.6s ease-in-out infinite; }
-            `}</style>
-            <div className="hau-card border rounded-none px-4 py-3 space-y-2 transition-colors">
+            <div className="space-y-2 rounded-md border border-border bg-muted/30 px-4 py-3">
               <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                 How did you hear about the event?
               </p>
               <select
                 value={hearAboutUs}
                 onChange={(e) => setHearAboutUs(e.target.value)}
-                className="w-full h-10 border border-input bg-white rounded-none px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className="h-10 w-full rounded-md border border-input bg-white px-3 text-sm text-foreground"
               >
                 <option value="">Select an option...</option>
                 {hearOptions.map((opt) => (
@@ -985,12 +989,12 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
           <div className="pt-4 space-y-2">
             {appliedPromoCode ? (
               <>
-                <div className="flex items-center gap-2 bg-green-50 border border-green-200 px-3 py-2 text-sm font-semibold text-green-800">
+                <div className="flex items-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-sm font-semibold text-primary">
                   <Tag className="w-4 h-4 shrink-0" />
                   <span className="flex-1">
                     Code <span className="font-mono">{appliedPromoCode}</span> applied
                     {appliedViaLink && (
-                      <span className="ml-2 inline-block text-[10px] uppercase tracking-wider font-bold bg-green-200 text-green-900 px-1.5 py-0.5 rounded-md">
+                      <span className="ml-2 inline-block rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
                         Applied via link
                       </span>
                     )}
@@ -998,7 +1002,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
                   <button
                     type="button"
                     onClick={handleRemovePromo}
-                    className="ml-auto text-green-600 hover:text-green-800 transition-colors"
+                    className="ml-auto text-primary transition-colors hover:text-primary/80"
                     aria-label="Remove promo code"
                   >
                     <X className="w-4 h-4" />
@@ -1095,7 +1099,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
                 <motion.div
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="savings-pulse flex justify-between items-center text-sm font-bold bg-success text-success-foreground px-4 py-2.5 -mx-2 mt-1"
+                  className="-mx-2 mt-1 flex items-center justify-between rounded-md bg-primary px-4 py-2.5 text-sm font-bold text-white"
                 >
                   <span className="flex items-center gap-1.5">
                     <Check className="w-4 h-4 shrink-0" />
@@ -1126,7 +1130,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
         <Button
           variant="outline"
           size="lg"
-          className="order-3 h-14 w-full px-8 text-lg border-border md:order-1 md:w-auto"
+          className="checkout-secondary-action order-3 h-14 w-full px-8 text-lg md:order-1 md:w-auto"
           onClick={async () => {
             await updateBooking.mutateAsync({ id: booking.id, data: { currentStep: 1 } });
             queryClient.invalidateQueries({ queryKey: ["booking"] });
@@ -1143,7 +1147,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
         />
         <Button
           size="lg"
-          className="order-1 h-14 w-full px-10 text-lg bg-primary hover:bg-primary/90 text-white border-none md:order-3"
+          className="checkout-primary-action order-1 h-14 w-full px-10 text-lg md:order-3"
           onClick={handleContinue}
           disabled={pricingLoading || !booking.id || compShortfall || updateBooking.isPending}
         >
