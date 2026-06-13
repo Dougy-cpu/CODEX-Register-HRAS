@@ -8,7 +8,7 @@ import { defaultOrderRef } from "./order-reference";
 import { buildStripeInvoiceCustomFields } from "./invoice-custom-fields";
 
 const PASS_LABELS: Record<string, string> = {
-  single: "HR Professional Pass",
+  single: "People & Workforce Pass",
   team: "Team Pass",
   business: "Business Pass",
 };

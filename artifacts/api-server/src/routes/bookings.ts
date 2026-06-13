@@ -970,7 +970,7 @@ router.post("/bookings/:id/confirm-free", async (req, res): Promise<void> => {
     }
   }
 
-  // Reserve the promo seats AND atomically flip the booking from
+  // Reserve the promo passes AND atomically flip the booking from
   // partial/pending_payment → paid in a single transaction. The status
   // flip uses a `WHERE status IN (...)` claim so two concurrent
   // /confirm-free calls cannot both win — the loser sees an empty
@@ -999,8 +999,8 @@ router.post("/bookings/:id/confirm-free", async (req, res): Promise<void> => {
           const msg =
             promo?.discountType === "complimentary"
               ? remaining === 0
-                ? "This complimentary code has been fully redeemed — no tickets remain"
-                : `Only ${remaining} complimentary ticket${remaining === 1 ? "" : "s"} remain on this code — please reduce your quantity`
+                ? "This complimentary code has been fully redeemed, no passes remain"
+                : `Only ${remaining} complimentary pass${remaining === 1 ? "" : "es"} remain on this code, please reduce your quantity`
               : "This promo code has already been used up";
           throw new PromoCapExceededError(msg);
         }

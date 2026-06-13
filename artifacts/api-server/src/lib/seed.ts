@@ -82,7 +82,7 @@ const DEFAULT_CONFIRMATION_BODY = `
 {{socialCalendarLinks}}
 
 <h3 style="margin-top: 28px; margin-bottom: 12px; color: #000;">Update Attendee Details Anytime</h3>
-<p style="margin: 0 0 16px; color: #444; line-height: 1.6;">You have a secure self-service link to manage all your attendee information. You can fill in placeholder seats, update existing details and add dietary requirements without logging in. Need to share registration with colleagues? Forward them the link to enter their own details.</p>
+<p style="margin: 0 0 16px; color: #444; line-height: 1.6;">You have a secure self-service link to manage all your attendee information. You can fill in placeholder passes, update existing details and add dietary requirements without logging in. Need to share registration with colleagues? Forward them the link to enter their own details.</p>
 
 {{managementLink}}
 

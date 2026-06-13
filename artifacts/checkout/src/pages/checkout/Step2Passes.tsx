@@ -109,7 +109,7 @@ function buildHRTierRows(tiers: DiscountTier[], qty: number, pricePerTicket: num
     rows.push({
       key: "all",
       label: "All quantities",
-      note: `£${pricePerTicket}/ticket`,
+      note: `£${pricePerTicket}/pass`,
       active: true,
     });
     return rows;
@@ -121,13 +121,13 @@ function buildHRTierRows(tiers: DiscountTier[], qty: number, pricePerTicket: num
   if (noDiscountEnd >= 3) {
     rows.push({
       key: "1-2",
-      label: "1 to 2 tickets",
-      note: `£${pricePerTicket}/ticket`,
+      label: "1 to 2 passes",
+      note: `£${pricePerTicket}/pass`,
       active: qty <= 2,
     });
     rows.push({
       key: "3",
-      label: "3 tickets",
+      label: "3 passes",
       note: "Most Popular",
       active: qty === 3,
       isSpecial: true,
@@ -135,16 +135,16 @@ function buildHRTierRows(tiers: DiscountTier[], qty: number, pricePerTicket: num
     if (noDiscountEnd > 3) {
       rows.push({
         key: `4-${noDiscountEnd}`,
-        label: `4 to ${noDiscountEnd} tickets`,
-        note: `£${pricePerTicket}/ticket`,
+        label: `4 to ${noDiscountEnd} passes`,
+        note: `£${pricePerTicket}/pass`,
         active: qty >= 4 && qty <= noDiscountEnd,
       });
     }
   } else if (noDiscountEnd >= 1) {
     rows.push({
       key: `1-${noDiscountEnd}`,
-      label: noDiscountEnd === 1 ? "1 ticket" : `1 to ${noDiscountEnd} tickets`,
-      note: `£${pricePerTicket}/ticket`,
+      label: noDiscountEnd === 1 ? "1 pass" : `1 to ${noDiscountEnd} passes`,
+      note: `£${pricePerTicket}/pass`,
       active: qty <= noDiscountEnd,
     });
   }
@@ -155,12 +155,12 @@ function buildHRTierRows(tiers: DiscountTier[], qty: number, pricePerTicket: num
     const maxQty = nextTier ? nextTier.minQuantity - 1 : null;
     const savingPerTicket = ((pricePerTicket * tier.discountPercent) / 100).toFixed(2);
     const rangeLabel = maxQty
-      ? `${tier.minQuantity} to ${maxQty} tickets`
-      : `${tier.minQuantity}+ tickets`;
+      ? `${tier.minQuantity} to ${maxQty} passes`
+      : `${tier.minQuantity}+ passes`;
     rows.push({
       key: rangeLabel,
       label: rangeLabel,
-      note: `${tier.discountPercent}% off, save £${savingPerTicket}/ticket`,
+      note: `${tier.discountPercent}% off, save £${savingPerTicket}/pass`,
       active: qty >= tier.minQuantity && (maxQty === null || qty <= maxQty),
     });
   }
@@ -230,7 +230,7 @@ function InventoryBadge({
         className={`flex items-center gap-1.5 text-xs font-bold text-red-700 bg-red-50 border border-red-200 px-2.5 py-1 rounded-md ${className}`}
       >
         <Flame className="w-3.5 h-3.5" />
-        Only {remaining} {remaining === 1 ? "spot" : "spots"} left!
+        Only {remaining} {remaining === 1 ? "pass" : "passes"} left!
       </div>
     );
   }
@@ -240,7 +240,7 @@ function InventoryBadge({
         className={`flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-md ${className}`}
       >
         <AlertCircle className="w-3.5 h-3.5" />
-        {remaining} spots remaining, selling fast
+        {remaining} passes remaining, selling fast
       </div>
     );
   }
@@ -249,7 +249,7 @@ function InventoryBadge({
       className={`flex items-center gap-1.5 text-xs font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-md ${className}`}
     >
       <AlertCircle className="w-3.5 h-3.5" />
-      {remaining} spots remaining
+      {remaining} passes remaining
     </div>
   );
 }
@@ -407,8 +407,8 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
     };
   }, [selectedPass, quantity, appliedPromoCode]);
 
-  // Complimentary codes are capped by ticket count, not booking count. When
-  // the requested quantity exceeds the seats remaining on the comp code, the
+  // Complimentary codes are capped by pass count, not booking count. When
+  // the requested quantity exceeds the passes remaining on the comp code, the
   // server returns the code as applied but does not zero out the price — the
   // user must either reduce their quantity or remove the code before they
   // can continue.
@@ -572,9 +572,9 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
     businessCfg && businessCfg.extraBenefits.length > 0
       ? businessCfg.extraBenefits
       : DEFAULT_BUSINESS_EXTRA_BENEFITS;
-  const audienceLabel = isVendor ? "Consultant / Vendor" : "HR Professional";
-  const passLabel = isVendor ? "Business Pass" : "HR Professional Pass";
-  const unitLabel = isVendor ? "pass" : "ticket";
+  const audienceLabel = isVendor ? "Commercial attendees" : "Employer-side attendees";
+  const passLabel = isVendor ? "Business Pass" : "People & Workforce Pass";
+  const unitLabel = "pass";
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -582,8 +582,8 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
         <h1 className="text-4xl md:text-5xl font-bold mb-4">Select your pass</h1>
         <p className="text-lg text-muted-foreground">
           {isVendor
-            ? "Your Business Pass gives you exclusive access and visibility at the summit."
-            : "Choose how many tickets you need. Group discounts apply automatically."}
+            ? "For commercial attendees joining as delegates to understand the market, hear the content and build relevant conversations."
+            : "For employer-side HR, People, Workforce, Data, Analytics and business-facing people teams. Group discounts are included in the total."}
         </p>
       </div>
 
@@ -625,12 +625,12 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
                 HR Analytics Summit | 3 Sep 2026, London
               </p>
               <h3 className="text-2xl font-bold text-primary font-display leading-tight">
-                HR Professional Pass
+                People & Workforce Pass
               </h3>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
               <span className="rounded-md bg-primary px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
-                Selected pass
+                People & Workforce Pass selected
               </span>
               <InventoryBadge remaining={inventory.single} />
               <div className="text-right">
@@ -650,7 +650,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Per ticket, ex VAT | {singlePeriodName}
+                  Per pass, ex VAT | {singlePeriodName}
                 </p>
               </div>
             </div>
@@ -662,6 +662,10 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
               {/* Benefits grid */}
               <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
                 What's included
+              </p>
+              <p className="mb-4 text-sm leading-relaxed text-muted-foreground">
+                This pass is not valid for vendors, consultants, recruiters, agencies or commercial
+                service providers.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4">
                 {singleBenefits.map((b) => (
@@ -679,10 +683,10 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
             {/* ── Right column: Quantity picker (warm panel) ── */}
             <div className="md:w-80 shrink-0 p-6 bg-muted space-y-4 ml-[0px]">
               <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                How many tickets?
+                How many passes?
               </p>
 
-              {/* 3 tickets shortcut */}
+              {/* 3 passes shortcut */}
               <button
                 type="button"
                 onClick={() => setQuantity(3)}
@@ -693,7 +697,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
                 }`}
               >
                 <span className="flex items-center gap-2">
-                  <Users className="w-4 h-4 shrink-0" />3 tickets, Most Popular
+                  <Users className="w-4 h-4 shrink-0" />3 passes, Most Popular
                 </span>
                 <Check
                   className={`w-4 h-4 shrink-0 transition-opacity ${quantity === 3 ? "opacity-100" : "opacity-0"}`}
@@ -707,14 +711,14 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
                   className="flex-none w-11 flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-30"
                   onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                   disabled={quantity <= 1}
-                  aria-label="Decrease ticket quantity"
+                  aria-label="Decrease pass quantity"
                 >
                   <Minus className="w-4 h-4" />
                 </button>
                 <div
                   className="flex-1 border-x border-border py-2.5 text-center text-2xl font-bold text-foreground"
                   aria-live="polite"
-                  aria-label={`${quantity} tickets selected`}
+                  aria-label={`${quantity} passes selected`}
                 >
                   {quantity}
                 </div>
@@ -723,7 +727,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
                   className="flex-none w-11 flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-30"
                   onClick={() => setQuantity((q) => Math.min(20, q + 1))}
                   disabled={quantity >= 20}
-                  aria-label="Increase ticket quantity"
+                  aria-label="Increase pass quantity"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -736,7 +740,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
                     tiers={allTiers}
                     passType="single"
                     quantity={quantity}
-                    unitLabel="ticket"
+                    unitLabel="pass"
                   />
                 </AnimatePresence>
               </div>
@@ -787,7 +791,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
           <div className="px-6 md:px-8 py-5 flex items-center justify-between gap-4 flex-wrap border-b border-border">
             <div>
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 font-semibold">
-                HR Analytics Summit | 3 Sep 2026 | Consultants &amp; Vendors
+                HR Analytics Summit | 3 Sep 2026 | Commercial attendees
               </p>
               <h3 className="text-2xl font-bold text-primary font-display leading-tight">
                 Business Pass
@@ -795,7 +799,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
             </div>
             <div className="flex items-center gap-3 flex-wrap">
               <span className="rounded-md bg-primary px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
-                Selected pass
+                Business Pass selected
               </span>
               <InventoryBadge remaining={inventory.business} />
               <div className="text-right">
@@ -827,6 +831,10 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
               {/* Standard benefits */}
               <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
                 What's included
+              </p>
+              <p className="mb-4 text-sm leading-relaxed text-muted-foreground">
+                This is an attendee pass, not a sponsorship package. Speaking and sponsor visibility
+                are handled separately.
               </p>
               <div className="space-y-2 mb-4">
                 {businessBenefits.map((b) => (
@@ -948,9 +956,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
         {/* Left: selection summary */}
         <div className="flex-1 p-6 md:p-8 space-y-1">
           <h2 className="text-xl font-bold">
-            {quantity}{" "}
-            {isHR ? `ticket${quantity !== 1 ? "s" : ""}` : `pass${quantity !== 1 ? "es" : ""}`}{" "}
-            selected
+            {quantity} pass{quantity !== 1 ? "es" : ""} selected
           </h2>
           {discountLabel && !isMostPopular && (
             <p className="text-sm font-semibold text-secondary">
@@ -1059,7 +1065,7 @@ export default function Step2Passes({ booking, onAdvance }: Step2PassesProps) {
                 <span>
                   {selectedPass === "business"
                     ? `${quantity} x Business Pass`
-                    : `${quantity} x HR Professional Pass`}
+                    : `${quantity} x People & Workforce Pass`}
                 </span>
                 <span>£{currentPricing.baseSubtotal.toFixed(2)}</span>
               </div>

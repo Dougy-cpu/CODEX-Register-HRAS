@@ -305,7 +305,8 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
   }, [booking.id, booking.status]);
 
   const currentPricing = calculatePricingMutation.data;
-  const bookingPassLabel = booking.passType === "single" ? "HR Professional Pass" : "Business Pass";
+  const bookingPassLabel =
+    booking.passType === "single" ? "People & Workforce Pass" : "Business Pass";
   const bookingPassSummary = booking.quantity === 1 ? bookingPassLabel : `${bookingPassLabel}es`;
 
   const billingLead =
@@ -689,8 +690,8 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                             <span className="text-lg font-bold">Pay by card</span>
                           </div>
                           <p className="mt-2 text-sm text-muted-foreground">
-                            Pay now by card through Stripe. This is the fastest route if you are
-                            ready to pay today and do not need procurement approval first.
+                            Pay securely by card through Stripe. This is the fastest route and your
+                            booking will be confirmed after successful payment.
                           </p>
                         </div>
                       </div>
@@ -719,8 +720,9 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                             <span className="text-lg font-bold">Pay by invoice</span>
                           </div>
                           <p className="mt-2 text-sm text-muted-foreground">
-                            Use this route for procurement, finance approval, supplier setup or PO
-                            handling before payment.
+                            Confirm your registration now and receive a VAT invoice by email.
+                            Finance can pay by bank transfer or using the secure Stripe invoice
+                            payment link.
                           </p>
                           <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                             The invoice email includes company information, bank details and payment
@@ -756,7 +758,8 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                       <div>
                         <p className="font-bold text-foreground">How invoice payment works</p>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          The invoice email includes company information, bank details and payment
+                          Confirm your registration now and receive a VAT invoice by email. The
+                          invoice email includes company information, bank details and payment
                           instructions for your finance team.
                         </p>
                       </div>
@@ -777,22 +780,20 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                       <li className="grid grid-cols-[auto_1fr] gap-3 rounded-md border border-primary/10 bg-white p-3">
                         <StepBadge value={1} />
                         <div>
-                          <p className="text-sm font-bold">
-                            Confirm registration and receive invoice
-                          </p>
+                          <p className="text-sm font-bold">Confirm registration</p>
                           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                            Registration is confirmed and the invoice is emailed immediately to the
-                            billing contact.
+                            Registration is confirmed and the VAT invoice is emailed immediately to
+                            the billing contact.
                           </p>
                         </div>
                       </li>
                       <li className="grid grid-cols-[auto_1fr] gap-3 rounded-md border border-primary/10 bg-white p-3">
                         <StepBadge value={2} />
                         <div>
-                          <p className="text-sm font-bold">Share the finance information</p>
+                          <p className="text-sm font-bold">Invoice emailed immediately</p>
                           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                            The invoice email includes company information, bank details and payment
-                            instructions for your finance team.
+                            Finance receives company information, bank details and payment
+                            instructions in the invoice email.
                           </p>
                         </div>
                       </li>
@@ -801,8 +802,8 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                         <div>
                           <p className="text-sm font-bold">Pay or add a PO later</p>
                           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                            Pay by bank transfer or secure Stripe invoice link. If needed, use the
-                            secure billing link to add a PO and receive a revised invoice.
+                            Finance can pay by bank transfer or using the secure Stripe invoice
+                            payment link. A PO can be added later if needed.
                           </p>
                         </div>
                       </li>
@@ -1100,8 +1101,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                                   <div className="rounded-md border border-primary/20 bg-primary/5 p-3 text-xs leading-relaxed text-primary">
                                     <p className="font-bold">PO number ready for invoice.</p>
                                     <p className="mt-1">
-                                      This PO number will appear on the invoice when you confirm
-                                      registration.
+                                      This PO number will appear on your invoice.
                                     </p>
                                   </div>
                                 ) : (
@@ -1112,7 +1112,7 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                                     <p className="mt-1">
                                       You can confirm registration now and add the PO later using
                                       the secure link in the invoice email. Once added, we will
-                                      automatically email a revised invoice with the PO included.
+                                      email a revised invoice with the PO included.
                                     </p>
                                   </div>
                                 )}
@@ -1218,14 +1218,14 @@ export default function Step4Payment({ booking }: Step4PaymentProps) {
                   ) : (
                     <>
                       <NextStep value={1}>
-                        Registration is confirmed and the invoice is emailed immediately.
+                        Registration is confirmed and the VAT invoice is emailed immediately.
                       </NextStep>
                       <NextStep value={2}>
                         Finance receives company information, bank details and payment instructions.
                       </NextStep>
                       <NextStep value={3}>
-                        Pay by bank transfer or secure Stripe invoice link, and add a PO later if
-                        needed.
+                        Finance can pay by bank transfer or using the secure Stripe invoice payment
+                        link. A PO can be added later if needed.
                       </NextStep>
                     </>
                   )}

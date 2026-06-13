@@ -122,7 +122,7 @@ export const DEFAULT_INVOICE_HELP_CONTENT = `When will I receive the invoice?
 We email a VAT invoice to the billing address you provide as soon as your registration is confirmed, usually within a few minutes.
 
 What are the payment terms?
-Invoices are due within 14 days, or before the event date if sooner. Your seats are reserved as soon as the invoice is issued.
+Invoices are due within 14 days, or before the event date if sooner. Your passes are reserved as soon as the invoice is issued.
 
 How can I pay?
 - Card or bank transfer using the secure "Pay Online" link on the invoice.
@@ -132,7 +132,7 @@ Where do I send remittance advice?
 Email remittance to accounts@hranalyticssummit.com so we can match your payment quickly.
 
 Need a PO number on the invoice?
-You can add or update a PO number and edit any billing field at any time before payment using the secure self-service link in your confirmation email. We'll re-issue the invoice automatically.
+You can add or update a PO number and edit any billing field at any time before payment using the secure self-service link in your confirmation email. We will email a revised invoice with the PO included.
 
 Questions?
 Email accounts@hranalyticssummit.com and we'll come back to you within one working day.`;
@@ -388,8 +388,8 @@ async function buildConfirmationEmailHtml(
   settings: EventSettings,
 ): Promise<{ html: string; subject: string }> {
   const passLabels: Record<string, string> = {
-    single: "HR Professional Pass",
-    team: "Team Pass (3 seats)",
+    single: "People & Workforce Pass",
+    team: "Team Pass (3 passes)",
     business: "Business Pass",
   };
   const passLabel = passLabels[booking.passType] || booking.passType;
@@ -568,7 +568,7 @@ async function buildConfirmationEmailHtml(
         const fallbackBlock =
           `\n<div style="margin:18px 0;padding:14px 18px;background:#fdf3f1;border:1px solid #f3c8c1;border-radius:6px;">` +
           `<p style="margin:0;font-size:14px;font-weight:600;color:#333;">Need a PO number on your invoice?</p>` +
-          `<p style="margin:6px 0 0;font-size:13px;color:#555;">Add or update your PO number and billing details from the secure self-service link below. We'll re-issue the invoice automatically.</p>` +
+          `<p style="margin:6px 0 0;font-size:13px;color:#555;">Add or update your PO number and billing details from the secure self-service link below. We will email a revised invoice with the PO included.</p>` +
           billingEditLinkHtml +
           `</div>`;
         const extraPo =
@@ -648,7 +648,7 @@ async function buildConfirmationEmailHtml(
       <strong>Venue:</strong> ${escHtml(settings.eventVenue)}, ${escHtml(settings.eventVenuePostcode)}
     </div>
     <h3 style="margin-top:28px;margin-bottom:12px;color:#000;">Update Attendee Details Anytime</h3>
-    <p style="margin:0 0 16px;color:#444;line-height:1.6;">You have a secure self-service link to manage all your attendee information. You can fill in placeholder seats, update existing details and add dietary requirements without logging in. Need to share registration with colleagues? Forward them the link to enter their own details.</p>
+    <p style="margin:0 0 16px;color:#444;line-height:1.6;">You have a secure self-service link to manage all your attendee information. You can fill in placeholder passes, update existing details and add dietary requirements without logging in. Need to share registration with colleagues? Forward them the link to enter their own details.</p>
     ${managementLinkHtml}
     <p>A PDF VAT receipt is attached to this email for your records.</p>
     ${invoicePaymentButtonHtml}
@@ -941,9 +941,9 @@ export async function sendReissuedInvoiceEmail(bookingId: number): Promise<void>
 
   const reissueBanner = `
     <div style="background:#fff8f7;border:2px solid #E74F3E;border-radius:6px;padding:18px 22px;margin:0 0 20px;">
-      <p style="margin:0 0 6px;font-size:15px;font-weight:700;color:#E74F3E;">Your invoice has been re-issued</p>
+      <p style="margin:0 0 6px;font-size:15px;font-weight:700;color:#E74F3E;">Your revised invoice is ready</p>
       <p style="margin:0;font-size:14px;color:#333;line-height:1.5;">
-        We've updated your billing details${booking.poNumber ? ` (including PO Number <strong style="font-family:monospace;">${escHtml(booking.poNumber)}</strong>)` : ""} and issued a fresh invoice. The previous invoice has been voided. The latest invoice PDF is attached and a payment link is below. If the updated invoice email does not arrive within a few minutes, please check your junk or spam folder.
+        We have updated your billing details${booking.poNumber ? ` (including PO Number <strong style="font-family:monospace;">${escHtml(booking.poNumber)}</strong>)` : ""} and emailed a revised invoice with the latest details. The previous invoice has been voided. The latest invoice PDF is attached and a payment link is below. If the updated invoice email does not arrive within a few minutes, please check your junk or spam folder.
       </p>
     </div>`;
   // Inject the banner just after the opening branded layout container if
@@ -1133,8 +1133,8 @@ export async function sendOrganiserNotification(bookingId: number): Promise<bool
   }
 
   const passLabels: Record<string, string> = {
-    single: "Single Pass",
-    team: "Team Pass (3 seats)",
+    single: "People & Workforce Pass",
+    team: "Team Pass (3 passes)",
     business: "Business Pass",
   };
 
@@ -1178,7 +1178,7 @@ export async function sendOrganiserNotification(bookingId: number): Promise<bool
     <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px">
       <tr><td style="padding:7px 0;color:#666;width:180px;border-bottom:1px solid #f0f0f0">Order Reference</td><td style="border-bottom:1px solid #f0f0f0"><strong style="font-family:monospace">${escHtml(booking.orderReference || `#${bookingId}`)}</strong></td></tr>
       <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Pass Type</td><td style="border-bottom:1px solid #f0f0f0">${passLabels[booking.passType] || booking.passType}</td></tr>
-      <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Quantity</td><td style="border-bottom:1px solid #f0f0f0">${booking.quantity} ${booking.quantity === 1 ? "ticket" : "tickets"}</td></tr>
+      <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Quantity</td><td style="border-bottom:1px solid #f0f0f0">${booking.quantity} ${booking.quantity === 1 ? "pass" : "passes"}</td></tr>
       <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Payment Method</td><td style="border-bottom:1px solid #f0f0f0">${booking.paymentMethod === "card" ? "Credit/Debit Card" : booking.paymentMethod === "invoice" ? "Invoice" : "Not provided"}</td></tr>
       <tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Status</td><td style="border-bottom:1px solid #f0f0f0"><strong style="color:${booking.status === "paid" ? "#16a34a" : "#d97706"}">${booking.status === "paid" ? "Paid" : booking.status === "invoiced" ? "Invoiced (Awaiting Payment)" : escHtml(booking.status)}</strong></td></tr>
       ${booking.promoCode ? `<tr><td style="padding:7px 0;color:#666;border-bottom:1px solid #f0f0f0">Promo Code</td><td style="border-bottom:1px solid #f0f0f0">${escHtml(booking.promoCode)}</td></tr>` : ""}
@@ -1491,9 +1491,9 @@ export async function sendIncompleteFormNotification(bookingId: number): Promise
   if (!lead) return;
 
   const passLabels: Record<string, string> = {
-    single: "Single Pass (HR Professional)",
-    team: "Team Pass (3 seats)",
-    business: "Business Pass (Vendor/Consultant)",
+    single: "People & Workforce Pass",
+    team: "Team Pass (3 passes)",
+    business: "Business Pass",
   };
 
   const submittedAt = booking.updatedAt || booking.createdAt;
@@ -1869,7 +1869,7 @@ function buildManageLinkSection(manageUrl: string): string {
           Your booking comes with a secure self-service link that lets you fill in or update attendee details at any time. <strong>No login or account needed</strong>. Use it to:
         </p>
         <ul style="margin: 0 0 16px; padding-left: 20px; font-size: 14px; color: #444; line-height: 2;">
-          <li>Fill in details for any placeholder (TBC) attendee seats</li>
+          <li>Fill in details for any placeholder (TBC) attendee passes</li>
           <li>Update names, job titles, companies, and email addresses</li>
           <li>Add dietary or accessibility requirements</li>
           <li>Forward the link to colleagues so they can enter their own details directly</li>
@@ -2386,8 +2386,8 @@ export async function sendInvoiceReminder(bookingId: number): Promise<void> {
     : "14 days from invoice issue";
 
   const passLabels: Record<string, string> = {
-    single: "Single Pass, HR Professional",
-    business: "Business Pass, Vendor/Consultant",
+    single: "People & Workforce Pass",
+    business: "Business Pass",
   };
   const passLabel = passLabels[booking.passType] || booking.passType;
   const totalAmount = parseFloat(booking.totalAmount?.toString() || "0").toFixed(2);

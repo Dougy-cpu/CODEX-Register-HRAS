@@ -44,8 +44,8 @@ interface AttendeeForPdf {
 }
 
 const passLabels: Record<string, string> = {
-  single: "Single Pass, HR Analytics Summit",
-  team: "Team Pass (3 Seats), HR Analytics Summit",
+  single: "People & Workforce Pass, HR Analytics Summit",
+  team: "Team Pass (3 passes), HR Analytics Summit",
   business: "Business Pass, HR Analytics Summit",
 };
 

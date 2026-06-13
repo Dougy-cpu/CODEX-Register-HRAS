@@ -628,8 +628,8 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
         <h1 className="text-4xl md:text-5xl font-bold mb-4">Attendee Details</h1>
         <p className="text-lg text-muted-foreground">
           {totalSeats === 1
-            ? "Please confirm who this ticket is for."
-            : `Please confirm who each of the ${totalSeats} tickets is for.`}
+            ? "Please confirm who this pass is for."
+            : `Please confirm who each of the ${totalSeats} passes is for.`}
         </p>
       </div>
 
@@ -638,7 +638,7 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
           <Info className="w-4 h-4 shrink-0 mt-0.5" />
           <p>
             <span className="font-semibold">Not sure who's attending yet?</span> Mark any additional
-            ticket as <span className="font-semibold">TBC</span> to complete your booking now and
+            pass as <span className="font-semibold">TBC</span> to complete your booking now and
             confirm the attendee details later. You can update them after booking.
           </p>
         </div>
@@ -648,7 +648,7 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
         <div className="checkout-metric-strip">
           <div className="checkout-metric min-h-0 p-3">
             <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              Seats
+              Passes
             </p>
             <p className="text-xl font-bold mt-1">{totalSeats}</p>
           </div>
@@ -687,7 +687,7 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
               onClick={markAdditionalAttendeesTbc}
               className="justify-center"
             >
-              Mark additional seats TBC
+              Mark additional passes TBC
             </Button>
           </div>
         )}
@@ -745,11 +745,11 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
                         }`}
                       >
                         <User className="w-4 h-4" />
-                        This ticket is for me
+                        This pass is for me
                       </button>
                       {isForMe && (
                         <p className="w-full mt-1 text-xs text-muted-foreground">
-                          Pre-filled from your profile. Edit any field to customise.
+                          Copied from your details. Edit any field to customise.
                         </p>
                       )}
                     </>
@@ -773,7 +773,7 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
 
                 {isTbc ? (
                   <div className="rounded-md border border-primary/20 bg-primary/5 p-4 text-sm text-foreground">
-                    <p className="font-semibold mb-1">This ticket is marked as TBC</p>
+                    <p className="font-semibold mb-1">This pass is marked as TBC</p>
                     <p>
                       You can confirm this attendee's details later using the attendee management
                       link in the confirmation email.
@@ -924,7 +924,7 @@ export default function Step3Attendees({ booking, onAdvance }: Step3AttendeesPro
           <div className="flex-1">
             <p className="font-semibold">We couldn't save your last change</p>
             <p>
-              Please check your connection. We'll retry automatically as you keep typing, or you can{" "}
+              Please check your connection. We will retry as you keep typing, or you can{" "}
               <button
                 type="button"
                 onClick={() => setAutosaveAttempt((n) => n + 1)}

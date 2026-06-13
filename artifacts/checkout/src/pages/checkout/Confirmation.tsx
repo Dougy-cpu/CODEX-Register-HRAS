@@ -19,7 +19,10 @@ export default function Confirmation({ booking }: ConfirmationProps) {
   const isInvoiceBooking = booking.paymentMethod === "invoice";
   const invoiceIsPaid = booking.status === "paid";
   const billingContact = booking.billingEmail || "the billing contact";
-  const passLabel = booking.passType === "single" ? "HR Professional Pass" : "Business Pass";
+  const passLabel = booking.passType === "single" ? "People & Workforce Pass" : "Business Pass";
+  const totalAmount = Number(booking.totalAmount ?? 0);
+  const isComplimentaryBooking = !isInvoiceBooking && totalAmount <= 0;
+  const isCardBooking = booking.paymentMethod === "card" && !isComplimentaryBooking;
 
   return (
     <div className="mx-auto max-w-4xl space-y-8 py-6 text-center md:py-10">
@@ -71,27 +74,26 @@ export default function Confirmation({ booking }: ConfirmationProps) {
                 <FileText className="w-5 h-5 text-primary mt-0.5" />
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h4 className="font-bold text-foreground">Invoice issued</h4>
+                    <h4 className="font-bold text-foreground">Registration confirmed</h4>
                     <InvoiceBadge status={booking.invoiceBadgeStatus} />
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Your registration is confirmed and the invoice has been emailed to{" "}
+                    Your registration is confirmed. A VAT invoice has been emailed to{" "}
                     <span className="font-semibold text-foreground">{billingContact}</span>.
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {invoiceIsPaid
                       ? "This invoice is marked as paid."
-                      : "Invoice bookings are confirmed but are not marked as paid until payment has succeeded."}
+                      : "This booking is confirmed, but payment is still outstanding until the invoice is paid."}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     The invoice email includes company information, bank details and payment
-                    instructions. Your finance team can settle the invoice by bank transfer or
-                    through the secure Stripe payment link on the invoice.
+                    instructions. Finance can pay by bank transfer or using the secure Stripe
+                    invoice payment link in the invoice email.
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Need to add a PO number later? Use the secure billing link in your confirmation
-                    email. Once updated, we will automatically re-issue the invoice with the PO
-                    included.
+                    You can add a PO number later using the secure billing link. If you do, we will
+                    email a revised invoice with the PO included.
                   </p>
                   <p className="text-xs text-muted-foreground">
                     If the email does not arrive within a few minutes, please check your junk or
@@ -127,6 +129,37 @@ export default function Confirmation({ booking }: ConfirmationProps) {
                       )}
                     </div>
                   )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!isInvoiceBooking && (
+            <div className="rounded-md border border-primary/20 bg-primary/5 p-5">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="w-5 h-5 text-primary mt-0.5" />
+                <div className="space-y-3">
+                  <h4 className="font-bold text-foreground">Your registration is confirmed.</h4>
+                  {isCardBooking && (
+                    <p className="text-sm text-muted-foreground">
+                      Your card payment was successful.
+                    </p>
+                  )}
+                  {isComplimentaryBooking && (
+                    <p className="text-sm text-muted-foreground">
+                      Your registration is complete and no payment is needed.
+                    </p>
+                  )}
+                  <p className="text-sm text-muted-foreground">
+                    Your booking reference is{" "}
+                    <span className="font-mono font-semibold text-foreground">
+                      {booking.orderReference || "PENDING"}
+                    </span>
+                    .
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    A confirmation email has been sent to the lead attendee.
+                  </p>
                 </div>
               </div>
             </div>

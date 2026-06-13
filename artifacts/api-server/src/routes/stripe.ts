@@ -199,7 +199,7 @@ router.post("/stripe/create-checkout-session", async (req, res): Promise<void> =
   }
 
   const passLabels: Record<string, string> = {
-    single: "Single Pass, HR Analytics Summit 2026",
+    single: "People & Workforce Pass, HR Analytics Summit 2026",
     team: "Team Pass, HR Analytics Summit 2026",
     business: "Business Pass, HR Analytics Summit 2026",
   };

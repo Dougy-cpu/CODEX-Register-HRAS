@@ -217,7 +217,7 @@ export default function Step1Lead({
                                   <div className="w-2.5 h-2.5 bg-primary rounded-full" />
                                 )}
                               </div>
-                              <span className="font-bold text-lg">HR Professional</span>
+                              <span className="font-bold text-lg">Employer-side attendees</span>
                               {field.value === "hr_professional" && (
                                 <span className="ml-auto rounded-md bg-primary px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
                                   Selected
@@ -225,7 +225,8 @@ export default function Step1Lead({
                               )}
                             </div>
                             <span className="text-sm text-muted-foreground ml-7">
-                              HR Executives, Practitioners, and Business Leaders
+                              HR, People, Workforce, Data, Analytics, Talent, Reward, Employee
+                              Experience, Transformation and business-facing people teams.
                             </span>
                           </label>
                         </FormControl>
@@ -244,7 +245,7 @@ export default function Step1Lead({
                                   <div className="w-2.5 h-2.5 bg-primary rounded-full" />
                                 )}
                               </div>
-                              <span className="font-bold text-lg">Vendor / Consultant</span>
+                              <span className="font-bold text-lg">Commercial attendees</span>
                               {field.value === "consultant_vendor" && (
                                 <span className="ml-auto rounded-md bg-primary px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
                                   Selected
@@ -252,7 +253,8 @@ export default function Step1Lead({
                               )}
                             </div>
                             <span className="text-sm text-muted-foreground ml-7">
-                              Solution Providers, Recruiters, and Consultants
+                              Vendors, consultants, advisory firms, recruiters, technology providers
+                              and commercial service providers.
                             </span>
                           </label>
                         </FormControl>
