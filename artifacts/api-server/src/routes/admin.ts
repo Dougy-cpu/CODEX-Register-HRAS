@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import type Stripe from "stripe";
 import { eq, desc, asc, or, and, sql, count, notInArray, isNull } from "drizzle-orm";
 import ExcelJS from "exceljs";
 import { db } from "@workspace/db";
@@ -32,6 +33,11 @@ import { getStripe } from "../lib/stripe-client";
 import { refreshReceiptDocumentForBooking } from "../lib/receipt-documents";
 
 const router: IRouter = Router();
+
+function stripeInvoicePaidAt(invoice: Stripe.Invoice): Date | null {
+  const paidAt = invoice.status_transitions?.paid_at;
+  return typeof paidAt === "number" && paidAt > 0 ? new Date(paidAt * 1000) : null;
+}
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const INVOICE_PAYMENT_TERMS_DAYS = 14;
@@ -538,7 +544,69 @@ router.patch("/admin/registrations/:id/status", adminAuth, async (req, res): Pro
   }
 
   let finalStatus = status;
-  let stripeAction: "refund_issued" | "invoice_voided" | "skipped" | "failed" = "skipped";
+  let stripeAction:
+    | "refund_issued"
+    | "invoice_voided"
+    | "invoice_paid_out_of_band"
+    | "invoice_already_paid"
+    | "skipped"
+    | "failed" = "skipped";
+  const statusUpdates: Partial<typeof bookingsTable.$inferInsert> = {
+    status: finalStatus as typeof existing.status,
+    updatedAt: new Date(),
+  };
+
+  if (
+    status === "paid" &&
+    existing.status !== "paid" &&
+    existing.paymentMethod === "invoice" &&
+    existing.stripeInvoiceId
+  ) {
+    const stripe = getStripe();
+    if (!stripe) {
+      logger.error(
+        { bookingId: id, invoiceId: existing.stripeInvoiceId },
+        "Stripe not configured - cannot mark invoice paid out of band",
+      );
+      res.status(502).json({
+        error: "Stripe is not configured. The booking was not marked paid.",
+        stripeAction: "failed",
+      });
+      return;
+    }
+
+    let invoice: Stripe.Invoice;
+    try {
+      const currentInvoice = await stripe.invoices.retrieve(existing.stripeInvoiceId);
+      if (currentInvoice.status === "paid") {
+        invoice = currentInvoice;
+        stripeAction = "invoice_already_paid";
+      } else {
+        invoice = await stripe.invoices.pay(existing.stripeInvoiceId, {
+          paid_out_of_band: true,
+        });
+        stripeAction = "invoice_paid_out_of_band";
+      }
+    } catch (err) {
+      logger.error(
+        { err, bookingId: id, invoiceId: existing.stripeInvoiceId },
+        "Failed to mark Stripe invoice paid out of band",
+      );
+      res.status(502).json({
+        error: "Stripe invoice could not be marked paid. The booking was not changed.",
+        stripeAction: "failed",
+      });
+      return;
+    }
+
+    statusUpdates.stripeInvoiceStatus = invoice.status ?? "paid";
+    statusUpdates.stripeInvoiceStatusSyncedAt = new Date();
+    statusUpdates.paidAt = stripeInvoicePaidAt(invoice) ?? existing.paidAt ?? new Date();
+    if (invoice.invoice_pdf) statusUpdates.stripeInvoicePdfUrl = invoice.invoice_pdf;
+    if (invoice.hosted_invoice_url) {
+      statusUpdates.stripeInvoicePaymentUrl = invoice.hosted_invoice_url;
+    }
+  }
 
   if (status === "cancelled") {
     const stripe = getStripe();
@@ -574,9 +642,11 @@ router.patch("/admin/registrations/:id/status", adminAuth, async (req, res): Pro
     }
   }
 
+  statusUpdates.status = finalStatus as typeof existing.status;
+
   const [updated] = await db
     .update(bookingsTable)
-    .set({ status: finalStatus as typeof existing.status, updatedAt: new Date() })
+    .set(statusUpdates)
     .where(eq(bookingsTable.id, id))
     .returning();
 

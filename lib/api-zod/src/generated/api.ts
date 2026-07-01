@@ -927,6 +927,88 @@ export const RedeliverRegistrationResponse = zod
   );
 
 /**
+ * Updates a booking status from the admin panel. When marking an invoice
+booking as paid, the related Stripe invoice is first marked paid using
+an external out-of-band payment. If Stripe cannot be updated, the
+booking status is not changed.
+
+ * @summary Update a registration status (admin)
+ */
+export const UpdateRegistrationStatusParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateRegistrationStatusBody = zod.object({
+  status: zod.enum([
+    "paid",
+    "invoiced",
+    "partial",
+    "pending_payment",
+    "cancelled",
+    "refunded",
+    "disputed",
+  ]),
+});
+
+export const UpdateRegistrationStatusResponse = zod
+  .object({
+    id: zod.number(),
+    orderReference: zod.string().nullish(),
+    status: zod.string(),
+    passType: zod.string(),
+    attendeeType: zod.string(),
+    quantity: zod.number(),
+    totalAmount: zod.number(),
+    paymentMethod: zod.string().nullish(),
+    leadName: zod.string().nullish(),
+    leadEmail: zod.string().nullish(),
+    leadCompany: zod.string().nullish(),
+    stripeInvoiceId: zod.string().nullish(),
+    stripeInvoicePaymentUrl: zod.string().nullish(),
+    invoiceDueDate: zod.coerce.date().nullish(),
+    paidAt: zod.coerce.date().nullish(),
+    stripeInvoiceStatus: zod.string().nullish(),
+    invoiceBadgeStatus: zod.enum(["paid", "voided", "overdue", "sent", "pending"]).optional(),
+    confirmationEmailSent: zod
+      .boolean()
+      .optional()
+      .describe("True once the customer-facing confirmation+receipt email has been sent."),
+    welcomeEmailsSent: zod
+      .boolean()
+      .optional()
+      .describe("True once welcome emails have been sent to all attendees."),
+    organiserNotified: zod
+      .boolean()
+      .optional()
+      .describe("True once the organiser has been notified of this booking."),
+    sheetsSynced: zod
+      .boolean()
+      .optional()
+      .describe("True once this booking has been synced to the Google Sheet."),
+    needsAttention: zod
+      .boolean()
+      .optional()
+      .describe(
+        "True if the booking is confirmed (paid or invoiced) but at least one delivery flag is still false.",
+      ),
+    currentStep: zod.number(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  })
+  .and(
+    zod.object({
+      stripeAction: zod.enum([
+        "refund_issued",
+        "invoice_voided",
+        "invoice_paid_out_of_band",
+        "invoice_already_paid",
+        "skipped",
+        "failed",
+      ]),
+    }),
+  );
+
+/**
  * Returns the booking-level HRAS VAT receipt PDF for paid or invoiced
 registrations. The PDF includes company details, VAT number, booking
 reference, billing details, line items, VAT and total.

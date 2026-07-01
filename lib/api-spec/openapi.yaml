@@ -945,6 +945,68 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /admin/registrations/{id}/status:
+    patch:
+      operationId: updateRegistrationStatus
+      tags: [admin]
+      summary: Update a registration status (admin)
+      description: |
+        Updates a booking status from the admin panel. When marking an invoice
+        booking as paid, the related Stripe invoice is first marked paid using
+        an external out-of-band payment. If Stripe cannot be updated, the
+        booking status is not changed.
+      security:
+        - AdminToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminRegistrationStatusUpdateBody"
+      responses:
+        "200":
+          description: Registration status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRegistrationStatusUpdateResult"
+        "400":
+          description: Invalid status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Booking not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Required Stripe action failed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ErrorResponse"
+                  - type: object
+                    properties:
+                      stripeAction:
+                        type: string
+                        enum: [failed]
+
   /admin/registrations/{id}/receipt-pdf:
     get:
       operationId: getRegistrationReceiptPdf
@@ -1936,6 +1998,32 @@ components:
       required:
         - token
         - expiresAt
+
+    AdminRegistrationStatusUpdateBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [paid, invoiced, partial, pending_payment, cancelled, refunded, disputed]
+      required:
+        - status
+
+    AdminRegistrationStatusUpdateResult:
+      allOf:
+        - $ref: "#/components/schemas/RegistrationSummary"
+        - type: object
+          properties:
+            stripeAction:
+              type: string
+              enum:
+                - refund_issued
+                - invoice_voided
+                - invoice_paid_out_of_band
+                - invoice_already_paid
+                - skipped
+                - failed
+          required:
+            - stripeAction
 
     RegistrationSummary:
       type: object

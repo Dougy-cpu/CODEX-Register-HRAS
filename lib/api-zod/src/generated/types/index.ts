@@ -8,6 +8,10 @@
 
 export * from "./adminLoginBody";
 export * from "./adminLoginResponse";
+export * from "./adminRegistrationStatusUpdateBody";
+export * from "./adminRegistrationStatusUpdateBodyStatus";
+export * from "./adminRegistrationStatusUpdateResult";
+export * from "./adminRegistrationStatusUpdateResultStripeAction";
 export * from "./adminStats";
 export * from "./adminStatsPassCounts";
 export * from "./adminStatsPaymentMethodCounts";
@@ -93,5 +97,7 @@ export * from "./updateEmailTemplateBody";
 export * from "./updatePromoCodeBody";
 export * from "./updatePromoCodeBodyApplicablePassTypesItem";
 export * from "./updatePromoCodeBodyDiscountType";
+export * from "./updateRegistrationStatus502";
+export * from "./updateRegistrationStatus502StripeAction";
 export * from "./validatePromoCodeBody";
 export * from "./validatePromoCodeBodyPassType";

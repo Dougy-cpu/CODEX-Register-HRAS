@@ -472,15 +472,23 @@ function ExpandedRegistrationDetail({
         headers: { "Content-Type": "application/json", "x-admin-token": token },
         body: JSON.stringify({ status: newStatus }),
       });
-      if (!res.ok) throw new Error("Status update failed");
       const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (body.stripeAction === "failed") {
+          setStripeActionResult("stripe_failed_blocked");
+        } else if (body.stripeAction && body.stripeAction !== "skipped") {
+          setStripeActionResult(body.stripeAction);
+        }
+        throw new Error(body.error || "Status update failed");
+      }
       if (body.stripeAction && body.stripeAction !== "skipped") {
         setStripeActionResult(body.stripeAction);
       }
       await refetch();
       onStatusChanged();
-    } catch {
-      alert("Failed to update status. Please try again.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to update status.";
+      alert(`${message} Please try again.`);
     } finally {
       setUpdatingStatus(false);
     }
@@ -658,9 +666,14 @@ function ExpandedRegistrationDetail({
       {/* Stripe action result banner */}
       {stripeActionResult && (
         <div
-          className={`flex items-start gap-2 px-4 py-2 text-sm border-b ${stripeActionResult === "failed" ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-green-50 border-green-200 text-green-800"}`}
+          className={`flex items-start gap-2 px-4 py-2 text-sm border-b ${stripeActionResult === "failed" || stripeActionResult === "stripe_failed_blocked" ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-green-50 border-green-200 text-green-800"}`}
         >
-          {stripeActionResult === "failed" ? (
+          {stripeActionResult === "stripe_failed_blocked" ? (
+            <>
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>Stripe action failed. The booking status was not changed.</span>
+            </>
+          ) : stripeActionResult === "failed" ? (
             <>
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
               <span>
@@ -676,6 +689,16 @@ function ExpandedRegistrationDetail({
             <>
               <Check className="h-4 w-4 mt-0.5 shrink-0" />
               <span>Booking cancelled · Stripe invoice voided</span>
+            </>
+          ) : stripeActionResult === "invoice_paid_out_of_band" ? (
+            <>
+              <Check className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>Stripe invoice marked paid with an external payment.</span>
+            </>
+          ) : stripeActionResult === "invoice_already_paid" ? (
+            <>
+              <Check className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>Stripe invoice was already paid. App status synced.</span>
             </>
           ) : null}
           <button

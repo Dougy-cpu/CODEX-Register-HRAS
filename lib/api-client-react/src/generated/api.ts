@@ -19,6 +19,8 @@ import type {
 import type {
   AdminLoginBody,
   AdminLoginResponse,
+  AdminRegistrationStatusUpdateBody,
+  AdminRegistrationStatusUpdateResult,
   AdminStats,
   Attendee,
   Booking,
@@ -62,6 +64,7 @@ import type {
   UpdateDiscountTiersBody,
   UpdateEmailTemplateBody,
   UpdatePromoCodeBody,
+  UpdateRegistrationStatus502,
   ValidatePromoCodeBody,
 } from "./api.schemas";
 
@@ -2691,6 +2694,98 @@ export const useRedeliverRegistration = <
   TContext
 > => {
   return useMutation(getRedeliverRegistrationMutationOptions(options));
+};
+
+/**
+ * Updates a booking status from the admin panel. When marking an invoice
+booking as paid, the related Stripe invoice is first marked paid using
+an external out-of-band payment. If Stripe cannot be updated, the
+booking status is not changed.
+
+ * @summary Update a registration status (admin)
+ */
+export const getUpdateRegistrationStatusUrl = (id: number) => {
+  return `/api/admin/registrations/${id}/status`;
+};
+
+export const updateRegistrationStatus = async (
+  id: number,
+  adminRegistrationStatusUpdateBody: AdminRegistrationStatusUpdateBody,
+  options?: RequestInit,
+): Promise<AdminRegistrationStatusUpdateResult> => {
+  return customFetch<AdminRegistrationStatusUpdateResult>(getUpdateRegistrationStatusUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(adminRegistrationStatusUpdateBody),
+  });
+};
+
+export const getUpdateRegistrationStatusMutationOptions = <
+  TError = ErrorType<ErrorResponse | UpdateRegistrationStatus502>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateRegistrationStatus>>,
+    TError,
+    { id: number; data: BodyType<AdminRegistrationStatusUpdateBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateRegistrationStatus>>,
+  TError,
+  { id: number; data: BodyType<AdminRegistrationStatusUpdateBody> },
+  TContext
+> => {
+  const mutationKey = ["updateRegistrationStatus"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateRegistrationStatus>>,
+    { id: number; data: BodyType<AdminRegistrationStatusUpdateBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateRegistrationStatus(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateRegistrationStatusMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateRegistrationStatus>>
+>;
+export type UpdateRegistrationStatusMutationBody = BodyType<AdminRegistrationStatusUpdateBody>;
+export type UpdateRegistrationStatusMutationError = ErrorType<
+  ErrorResponse | UpdateRegistrationStatus502
+>;
+
+/**
+ * @summary Update a registration status (admin)
+ */
+export const useUpdateRegistrationStatus = <
+  TError = ErrorType<ErrorResponse | UpdateRegistrationStatus502>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateRegistrationStatus>>,
+    TError,
+    { id: number; data: BodyType<AdminRegistrationStatusUpdateBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateRegistrationStatus>>,
+  TError,
+  { id: number; data: BodyType<AdminRegistrationStatusUpdateBody> },
+  TContext
+> => {
+  return useMutation(getUpdateRegistrationStatusMutationOptions(options));
 };
 
 /**

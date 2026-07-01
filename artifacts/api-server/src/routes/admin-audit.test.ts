@@ -267,6 +267,54 @@ const { mockDb, getRows, resetStore, makeTable } = vi.hoisted(() => {
   };
 });
 
+const {
+  stripeInvoicesRetrieve,
+  stripeInvoicesPay,
+  stripeInvoicesVoid,
+  stripeRefundsCreate,
+  getStripeMock,
+  resetStripeMock,
+} = vi.hoisted(() => {
+  const stripeInvoicesRetrieve = vi.fn();
+  const stripeInvoicesPay = vi.fn();
+  const stripeInvoicesVoid = vi.fn();
+  const stripeRefundsCreate = vi.fn();
+  let stripeMock: unknown = {
+    invoices: {
+      retrieve: stripeInvoicesRetrieve,
+      pay: stripeInvoicesPay,
+      voidInvoice: stripeInvoicesVoid,
+    },
+    refunds: {
+      create: stripeRefundsCreate,
+    },
+  };
+
+  return {
+    stripeInvoicesRetrieve,
+    stripeInvoicesPay,
+    stripeInvoicesVoid,
+    stripeRefundsCreate,
+    getStripeMock: () => stripeMock,
+    resetStripeMock: () => {
+      stripeInvoicesRetrieve.mockReset();
+      stripeInvoicesPay.mockReset();
+      stripeInvoicesVoid.mockReset();
+      stripeRefundsCreate.mockReset();
+      stripeMock = {
+        invoices: {
+          retrieve: stripeInvoicesRetrieve,
+          pay: stripeInvoicesPay,
+          voidInvoice: stripeInvoicesVoid,
+        },
+        refunds: {
+          create: stripeRefundsCreate,
+        },
+      };
+    },
+  };
+});
+
 vi.mock("@workspace/db", () => {
   const tableNames = [
     "bookingsTable",
@@ -303,6 +351,10 @@ vi.mock("drizzle-orm", () => ({
   sql: Object.assign((..._a: unknown[]) => ({ op: "sql" }), {
     raw: () => ({ op: "sql" }),
   }),
+}));
+
+vi.mock("../lib/stripe-client", () => ({
+  getStripe: () => getStripeMock(),
 }));
 
 // Side-effect-free email + integration helpers — we don't want the test to
@@ -382,6 +434,7 @@ afterAll(async () => {
 
 beforeEach(() => {
   resetStore();
+  resetStripeMock();
 });
 
 function activityRows(): Array<Record<string, unknown>> {
@@ -519,6 +572,183 @@ describe("admin audit trail — integration", () => {
     // against the audit row being written from stale data.
     const booking = getRows({ _name: "bookingsTable" })[0];
     expect(booking.status).toBe("paid");
+  });
+
+  it("PATCH /admin/registrations/:id/status marks a Stripe invoice paid out of band before setting an invoice booking paid", async () => {
+    seedBooking({
+      id: 101,
+      status: "invoiced",
+      paymentMethod: "invoice",
+      stripeInvoiceId: "in_123",
+      stripeInvoiceStatus: "open",
+      orderReference: "HRAS-12345",
+    });
+    stripeInvoicesRetrieve.mockResolvedValue({
+      id: "in_123",
+      status: "open",
+      invoice_pdf: "https://stripe.test/invoice.pdf",
+      hosted_invoice_url: "https://stripe.test/invoice",
+    });
+    stripeInvoicesPay.mockResolvedValue({
+      id: "in_123",
+      status: "paid",
+      invoice_pdf: "https://stripe.test/paid.pdf",
+      hosted_invoice_url: "https://stripe.test/paid",
+    });
+
+    const res = await fetch(`${baseUrl}/admin/registrations/101/status`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-token": adminToken,
+      },
+      body: JSON.stringify({ status: "paid" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.stripeAction).toBe("invoice_paid_out_of_band");
+    expect(stripeInvoicesPay).toHaveBeenCalledWith("in_123", { paid_out_of_band: true });
+
+    const booking = getRows({ _name: "bookingsTable" })[0];
+    expect(booking.status).toBe("paid");
+    expect(booking.stripeInvoiceStatus).toBe("paid");
+    expect(booking.stripeInvoicePdfUrl).toBe("https://stripe.test/paid.pdf");
+    expect(booking.stripeInvoicePaymentUrl).toBe("https://stripe.test/paid");
+    expect(booking.paidAt).toBeInstanceOf(Date);
+  });
+
+  it("PATCH /admin/registrations/:id/status syncs an already-paid Stripe invoice without paying it again", async () => {
+    seedBooking({
+      id: 101,
+      status: "invoiced",
+      paymentMethod: "invoice",
+      stripeInvoiceId: "in_paid",
+      stripeInvoiceStatus: "open",
+      orderReference: "HRAS-12345",
+    });
+    stripeInvoicesRetrieve.mockResolvedValue({
+      id: "in_paid",
+      status: "paid",
+      invoice_pdf: "https://stripe.test/already-paid.pdf",
+      hosted_invoice_url: "https://stripe.test/already-paid",
+    });
+
+    const res = await fetch(`${baseUrl}/admin/registrations/101/status`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-token": adminToken,
+      },
+      body: JSON.stringify({ status: "paid" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.stripeAction).toBe("invoice_already_paid");
+    expect(stripeInvoicesPay).not.toHaveBeenCalled();
+
+    const booking = getRows({ _name: "bookingsTable" })[0];
+    expect(booking.status).toBe("paid");
+    expect(booking.stripeInvoiceStatus).toBe("paid");
+    expect(booking.stripeInvoicePdfUrl).toBe("https://stripe.test/already-paid.pdf");
+    expect(booking.stripeInvoicePaymentUrl).toBe("https://stripe.test/already-paid");
+    expect(booking.paidAt).toBeInstanceOf(Date);
+  });
+
+  it("PATCH /admin/registrations/:id/status blocks the local paid status when Stripe external payment fails", async () => {
+    seedBooking({
+      id: 101,
+      status: "invoiced",
+      paymentMethod: "invoice",
+      stripeInvoiceId: "in_fail",
+      stripeInvoiceStatus: "open",
+      orderReference: "HRAS-12345",
+    });
+    stripeInvoicesRetrieve.mockResolvedValue({
+      id: "in_fail",
+      status: "open",
+      invoice_pdf: "https://stripe.test/invoice.pdf",
+      hosted_invoice_url: "https://stripe.test/invoice",
+    });
+    stripeInvoicesPay.mockRejectedValue(new Error("Stripe unavailable"));
+
+    const res = await fetch(`${baseUrl}/admin/registrations/101/status`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-token": adminToken,
+      },
+      body: JSON.stringify({ status: "paid" }),
+    });
+
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.stripeAction).toBe("failed");
+    expect(stripeInvoicesPay).toHaveBeenCalledWith("in_fail", { paid_out_of_band: true });
+
+    const booking = getRows({ _name: "bookingsTable" })[0];
+    expect(booking.status).toBe("invoiced");
+    expect(booking.stripeInvoiceStatus).toBe("open");
+    expect(booking.paidAt).toBeNull();
+    expect(activityRows()).toHaveLength(0);
+  });
+
+  it("PATCH /admin/registrations/:id/status keeps voiding Stripe invoices when cancelling invoice bookings", async () => {
+    seedBooking({
+      id: 101,
+      status: "invoiced",
+      paymentMethod: "invoice",
+      stripeInvoiceId: "in_void",
+      stripeInvoiceStatus: "open",
+      orderReference: "HRAS-12345",
+    });
+    stripeInvoicesVoid.mockResolvedValue({ id: "in_void", status: "void" });
+
+    const res = await fetch(`${baseUrl}/admin/registrations/101/status`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-token": adminToken,
+      },
+      body: JSON.stringify({ status: "cancelled" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.stripeAction).toBe("invoice_voided");
+    expect(stripeInvoicesVoid).toHaveBeenCalledWith("in_void");
+
+    const booking = getRows({ _name: "bookingsTable" })[0];
+    expect(booking.status).toBe("cancelled");
+  });
+
+  it("PATCH /admin/registrations/:id/status keeps refunding card payments when cancelling paid card bookings", async () => {
+    seedBooking({
+      id: 101,
+      status: "paid",
+      paymentMethod: "card",
+      stripePaymentIntentId: "pi_123",
+      orderReference: "HRAS-12345",
+    });
+    stripeRefundsCreate.mockResolvedValue({ id: "re_123" });
+
+    const res = await fetch(`${baseUrl}/admin/registrations/101/status`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-token": adminToken,
+      },
+      body: JSON.stringify({ status: "cancelled" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.stripeAction).toBe("refund_issued");
+    expect(stripeRefundsCreate).toHaveBeenCalledWith({ payment_intent: "pi_123" });
+
+    const booking = getRows({ _name: "bookingsTable" })[0];
+    expect(booking.status).toBe("refunded");
   });
 
   it("POST /admin/promo-codes records an admin_promo_created row with the new promo's after-state", async () => {

@@ -659,6 +659,35 @@ export interface AdminLoginResponse {
   expiresAt: string;
 }
 
+export type AdminRegistrationStatusUpdateBodyStatus =
+  (typeof AdminRegistrationStatusUpdateBodyStatus)[keyof typeof AdminRegistrationStatusUpdateBodyStatus];
+
+export const AdminRegistrationStatusUpdateBodyStatus = {
+  paid: "paid",
+  invoiced: "invoiced",
+  partial: "partial",
+  pending_payment: "pending_payment",
+  cancelled: "cancelled",
+  refunded: "refunded",
+  disputed: "disputed",
+} as const;
+
+export interface AdminRegistrationStatusUpdateBody {
+  status: AdminRegistrationStatusUpdateBodyStatus;
+}
+
+export type AdminRegistrationStatusUpdateResultStripeAction =
+  (typeof AdminRegistrationStatusUpdateResultStripeAction)[keyof typeof AdminRegistrationStatusUpdateResultStripeAction];
+
+export const AdminRegistrationStatusUpdateResultStripeAction = {
+  refund_issued: "refund_issued",
+  invoice_voided: "invoice_voided",
+  invoice_paid_out_of_band: "invoice_paid_out_of_band",
+  invoice_already_paid: "invoice_already_paid",
+  skipped: "skipped",
+  failed: "failed",
+} as const;
+
 export type RegistrationSummaryInvoiceBadgeStatus =
   (typeof RegistrationSummaryInvoiceBadgeStatus)[keyof typeof RegistrationSummaryInvoiceBadgeStatus];
 
@@ -712,6 +741,10 @@ export interface RegistrationSummary {
   createdAt: string;
   updatedAt: string;
 }
+
+export type AdminRegistrationStatusUpdateResult = RegistrationSummary & {
+  stripeAction: AdminRegistrationStatusUpdateResultStripeAction;
+};
 
 export type RegistrationRedeliveryResultRedelivery = {
   ran: string[];
@@ -992,6 +1025,17 @@ export const ListRegistrationsNeedsAttention = {
   NUMBER_1: "1",
   NUMBER_0: "0",
 } as const;
+
+export type UpdateRegistrationStatus502StripeAction =
+  (typeof UpdateRegistrationStatus502StripeAction)[keyof typeof UpdateRegistrationStatus502StripeAction];
+
+export const UpdateRegistrationStatus502StripeAction = {
+  failed: "failed",
+} as const;
+
+export type UpdateRegistrationStatus502 = ErrorResponse & {
+  stripeAction?: UpdateRegistrationStatus502StripeAction;
+};
 
 export type ExportRegistrationsParams = {
   status?: string;
