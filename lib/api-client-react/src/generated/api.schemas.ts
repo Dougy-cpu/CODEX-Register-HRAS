@@ -756,6 +756,25 @@ export type RegistrationRedeliveryResult = Booking & {
   redelivery: RegistrationRedeliveryResultRedelivery;
 };
 
+export type RegistrationEmailResendResultResendType =
+  (typeof RegistrationEmailResendResultResendType)[keyof typeof RegistrationEmailResendResultResendType];
+
+export const RegistrationEmailResendResultResendType = {
+  confirmation: "confirmation",
+  welcome: "welcome",
+} as const;
+
+export type RegistrationEmailResendResultResend = {
+  type: RegistrationEmailResendResultResendType;
+  sent: boolean;
+  recipients: string[];
+  failedRecipients: string[];
+};
+
+export type RegistrationEmailResendResult = Booking & {
+  resend: RegistrationEmailResendResultResend;
+};
+
 export interface RegistrationList {
   registrations: RegistrationSummary[];
   total: number;

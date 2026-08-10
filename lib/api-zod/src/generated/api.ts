@@ -927,6 +927,150 @@ export const RedeliverRegistrationResponse = zod
   );
 
 /**
+ * Sends a fresh confirmation and receipt email for a paid or invoiced
+booking. This does not run organiser notification or Sheets sync.
+
+ * @summary Resend the customer confirmation email (admin)
+ */
+export const ResendRegistrationConfirmationEmailParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ResendRegistrationConfirmationEmailResponse = zod
+  .object({
+    id: zod.number(),
+    sessionToken: zod.string(),
+    status: zod.enum(["partial", "pending_payment", "paid", "invoiced", "cancelled", "disputed"]),
+    passType: zod.enum(["single", "business"]),
+    attendeeType: zod.enum(["hr_professional", "consultant_vendor"]),
+    quantity: zod.number(),
+    promoCode: zod.string().nullish(),
+    promoDiscountAmount: zod.number().nullish(),
+    groupDiscountAmount: zod.number().nullish(),
+    subtotalAmount: zod.number(),
+    vatAmount: zod.number(),
+    totalAmount: zod.number(),
+    paymentMethod: zod
+      .union([zod.literal("card"), zod.literal("invoice"), zod.literal(null)])
+      .nullish(),
+    stripeSessionId: zod.string().nullish(),
+    stripePaymentIntentId: zod.string().nullish(),
+    stripeInvoiceId: zod.string().nullish(),
+    stripeInvoicePdfUrl: zod.string().nullish(),
+    stripeInvoicePaymentUrl: zod.string().nullish(),
+    orderReference: zod.string().nullish(),
+    currentStep: zod.number(),
+    billingName: zod.string().nullish(),
+    billingCompany: zod.string().nullish(),
+    billingEmail: zod.string().nullish(),
+    billingAddress: zod.string().nullish(),
+    billingAddressLine1: zod.string().nullish(),
+    billingAddressLine2: zod.string().nullish(),
+    billingTown: zod.string().nullish(),
+    billingRegion: zod.string().nullish(),
+    billingPostcode: zod.string().nullish(),
+    billingCountry: zod.string().nullish(),
+    billingVatNumber: zod.string().nullish(),
+    billingPhone: zod.string().nullish(),
+    poNumber: zod.string().nullish(),
+    managementToken: zod.string().nullish(),
+    invoiceDueDate: zod.coerce.date().nullish(),
+    paidAt: zod.coerce.date().nullish(),
+    stripeInvoiceStatus: zod.string().nullish(),
+    stripeInvoiceStatusSyncedAt: zod.coerce.date().nullish(),
+    invoiceBadgeStatus: zod.enum(["paid", "voided", "overdue", "sent", "pending"]).optional(),
+    confirmationEmailSent: zod.boolean().optional(),
+    welcomeEmailsSent: zod.boolean().optional(),
+    organiserNotified: zod.boolean().optional(),
+    sheetsSynced: zod.boolean().optional(),
+    needsAttention: zod.boolean().optional(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  })
+  .and(
+    zod.object({
+      resend: zod.object({
+        type: zod.enum(["confirmation", "welcome"]),
+        sent: zod.boolean(),
+        recipients: zod.array(zod.string()),
+        failedRecipients: zod.array(zod.string()),
+      }),
+    }),
+  );
+
+/**
+ * Sends fresh welcome emails to every non-TBC attendee on a paid or
+invoiced booking. This does not run organiser notification or Sheets sync.
+
+ * @summary Resend attendee welcome emails (admin)
+ */
+export const ResendRegistrationWelcomeEmailsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ResendRegistrationWelcomeEmailsResponse = zod
+  .object({
+    id: zod.number(),
+    sessionToken: zod.string(),
+    status: zod.enum(["partial", "pending_payment", "paid", "invoiced", "cancelled", "disputed"]),
+    passType: zod.enum(["single", "business"]),
+    attendeeType: zod.enum(["hr_professional", "consultant_vendor"]),
+    quantity: zod.number(),
+    promoCode: zod.string().nullish(),
+    promoDiscountAmount: zod.number().nullish(),
+    groupDiscountAmount: zod.number().nullish(),
+    subtotalAmount: zod.number(),
+    vatAmount: zod.number(),
+    totalAmount: zod.number(),
+    paymentMethod: zod
+      .union([zod.literal("card"), zod.literal("invoice"), zod.literal(null)])
+      .nullish(),
+    stripeSessionId: zod.string().nullish(),
+    stripePaymentIntentId: zod.string().nullish(),
+    stripeInvoiceId: zod.string().nullish(),
+    stripeInvoicePdfUrl: zod.string().nullish(),
+    stripeInvoicePaymentUrl: zod.string().nullish(),
+    orderReference: zod.string().nullish(),
+    currentStep: zod.number(),
+    billingName: zod.string().nullish(),
+    billingCompany: zod.string().nullish(),
+    billingEmail: zod.string().nullish(),
+    billingAddress: zod.string().nullish(),
+    billingAddressLine1: zod.string().nullish(),
+    billingAddressLine2: zod.string().nullish(),
+    billingTown: zod.string().nullish(),
+    billingRegion: zod.string().nullish(),
+    billingPostcode: zod.string().nullish(),
+    billingCountry: zod.string().nullish(),
+    billingVatNumber: zod.string().nullish(),
+    billingPhone: zod.string().nullish(),
+    poNumber: zod.string().nullish(),
+    managementToken: zod.string().nullish(),
+    invoiceDueDate: zod.coerce.date().nullish(),
+    paidAt: zod.coerce.date().nullish(),
+    stripeInvoiceStatus: zod.string().nullish(),
+    stripeInvoiceStatusSyncedAt: zod.coerce.date().nullish(),
+    invoiceBadgeStatus: zod.enum(["paid", "voided", "overdue", "sent", "pending"]).optional(),
+    confirmationEmailSent: zod.boolean().optional(),
+    welcomeEmailsSent: zod.boolean().optional(),
+    organiserNotified: zod.boolean().optional(),
+    sheetsSynced: zod.boolean().optional(),
+    needsAttention: zod.boolean().optional(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  })
+  .and(
+    zod.object({
+      resend: zod.object({
+        type: zod.enum(["confirmation", "welcome"]),
+        sent: zod.boolean(),
+        recipients: zod.array(zod.string()),
+        failedRecipients: zod.array(zod.string()),
+      }),
+    }),
+  );
+
+/**
  * Updates a booking status from the admin panel. When marking an invoice
 booking as paid, the related Stripe invoice is first marked paid using
 an external out-of-band payment. If Stripe cannot be updated, the

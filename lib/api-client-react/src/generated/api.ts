@@ -52,6 +52,7 @@ import type {
   PromoCode,
   PromoCodeValidationResult,
   PublicEventSettings,
+  RegistrationEmailResendResult,
   RegistrationList,
   RegistrationRedeliveryResult,
   StripeSessionResponse,
@@ -2694,6 +2695,176 @@ export const useRedeliverRegistration = <
   TContext
 > => {
   return useMutation(getRedeliverRegistrationMutationOptions(options));
+};
+
+/**
+ * Sends a fresh confirmation and receipt email for a paid or invoiced
+booking. This does not run organiser notification or Sheets sync.
+
+ * @summary Resend the customer confirmation email (admin)
+ */
+export const getResendRegistrationConfirmationEmailUrl = (id: number) => {
+  return `/api/admin/registrations/${id}/resend-confirmation-email`;
+};
+
+export const resendRegistrationConfirmationEmail = async (
+  id: number,
+  options?: RequestInit,
+): Promise<RegistrationEmailResendResult> => {
+  return customFetch<RegistrationEmailResendResult>(getResendRegistrationConfirmationEmailUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getResendRegistrationConfirmationEmailMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resendRegistrationConfirmationEmail>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof resendRegistrationConfirmationEmail>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["resendRegistrationConfirmationEmail"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof resendRegistrationConfirmationEmail>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return resendRegistrationConfirmationEmail(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ResendRegistrationConfirmationEmailMutationResult = NonNullable<
+  Awaited<ReturnType<typeof resendRegistrationConfirmationEmail>>
+>;
+
+export type ResendRegistrationConfirmationEmailMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Resend the customer confirmation email (admin)
+ */
+export const useResendRegistrationConfirmationEmail = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resendRegistrationConfirmationEmail>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof resendRegistrationConfirmationEmail>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getResendRegistrationConfirmationEmailMutationOptions(options));
+};
+
+/**
+ * Sends fresh welcome emails to every non-TBC attendee on a paid or
+invoiced booking. This does not run organiser notification or Sheets sync.
+
+ * @summary Resend attendee welcome emails (admin)
+ */
+export const getResendRegistrationWelcomeEmailsUrl = (id: number) => {
+  return `/api/admin/registrations/${id}/resend-welcome-emails`;
+};
+
+export const resendRegistrationWelcomeEmails = async (
+  id: number,
+  options?: RequestInit,
+): Promise<RegistrationEmailResendResult> => {
+  return customFetch<RegistrationEmailResendResult>(getResendRegistrationWelcomeEmailsUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getResendRegistrationWelcomeEmailsMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resendRegistrationWelcomeEmails>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof resendRegistrationWelcomeEmails>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["resendRegistrationWelcomeEmails"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof resendRegistrationWelcomeEmails>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return resendRegistrationWelcomeEmails(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ResendRegistrationWelcomeEmailsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof resendRegistrationWelcomeEmails>>
+>;
+
+export type ResendRegistrationWelcomeEmailsMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Resend attendee welcome emails (admin)
+ */
+export const useResendRegistrationWelcomeEmails = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resendRegistrationWelcomeEmails>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof resendRegistrationWelcomeEmails>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getResendRegistrationWelcomeEmailsMutationOptions(options));
 };
 
 /**

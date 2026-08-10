@@ -87,6 +87,8 @@ const isConfirmedRegistration = (status: string | null | undefined) =>
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const INVOICE_PAYMENT_TERMS_DAYS = 14;
+type ResendEmailKind = "confirmation" | "welcome";
+type AsyncActionState = "idle" | "loading" | "success" | "error";
 
 type RegistrationDateSource = {
   status?: string | null;
@@ -188,10 +190,20 @@ function ExpandedRegistrationDetail({
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<string | null>(null);
   const [stripeActionResult, setStripeActionResult] = useState<string | null>(null);
-  const [redeliverState, setRedeliverState] = useState<"idle" | "loading" | "success" | "error">(
-    "idle",
-  );
+  const [redeliverState, setRedeliverState] = useState<AsyncActionState>("idle");
   const [redeliverMessage, setRedeliverMessage] = useState<string | null>(null);
+  const [emailResendState, setEmailResendState] = useState<
+    Record<ResendEmailKind, AsyncActionState>
+  >({
+    confirmation: "idle",
+    welcome: "idle",
+  });
+  const [emailResendMessage, setEmailResendMessage] = useState<string | null>(null);
+  const [emailResendMessageState, setEmailResendMessageState] = useState<AsyncActionState>("idle");
+
+  const setResendActionState = (kind: ResendEmailKind, state: AsyncActionState) => {
+    setEmailResendState((current) => ({ ...current, [kind]: state }));
+  };
 
   const handleRedeliver = async () => {
     setRedeliverState("loading");
@@ -233,6 +245,45 @@ function ExpandedRegistrationDetail({
       setRedeliverState("error");
     }
   };
+  const handleEmailResend = async (kind: ResendEmailKind) => {
+    setResendActionState(kind, "loading");
+    setEmailResendMessage(null);
+    setEmailResendMessageState("idle");
+    try {
+      const token = localStorage.getItem("admin_token") || "";
+      const endpoint =
+        kind === "confirmation"
+          ? `/api/admin/registrations/${id}/resend-confirmation-email`
+          : `/api/admin/registrations/${id}/resend-welcome-emails`;
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "x-admin-token": token },
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        resend?: { recipients?: string[]; failedRecipients?: string[] };
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(body.error || "Email resend failed");
+      }
+
+      const recipientCount = body.resend?.recipients?.length ?? 0;
+      setEmailResendMessage(
+        kind === "confirmation"
+          ? "Confirmation email resent to the lead attendee."
+          : `Welcome emails resent to ${recipientCount} attendee${recipientCount === 1 ? "" : "s"}.`,
+      );
+      setEmailResendMessageState("success");
+      setResendActionState(kind, "success");
+      await refetch();
+      onStatusChanged();
+    } catch (err) {
+      setEmailResendMessage(err instanceof Error ? err.message : "Email resend failed");
+      setEmailResendMessageState("error");
+      setResendActionState(kind, "error");
+    }
+  };
+
   const [reminderState, setReminderState] = useState<"idle" | "loading" | "success" | "error">(
     "idle",
   );
@@ -755,22 +806,58 @@ function ExpandedRegistrationDetail({
                 </span>
               )}
             </h4>
-            <button
-              onClick={handleRedeliver}
-              disabled={redeliverState === "loading"}
-              className={`inline-flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded transition-all ${
-                redeliverState === "loading"
-                  ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-                  : data.needsAttention
-                    ? "bg-amber-600 text-white hover:bg-amber-700"
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <button
+                onClick={() => handleEmailResend("confirmation")}
+                disabled={emailResendState.confirmation === "loading"}
+                className={`inline-flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded transition-all ${
+                  emailResendState.confirmation === "loading"
+                    ? "bg-slate-100 text-slate-400 cursor-not-allowed"
                     : "bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100"
-              }`}
-            >
-              {redeliverState === "loading" && (
-                <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-current" />
-              )}
-              {redeliverState === "loading" ? "Redelivering…" : "Redeliver"}
-            </button>
+                }`}
+              >
+                {emailResendState.confirmation === "loading" ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Send className="h-3 w-3" />
+                )}
+                {emailResendState.confirmation === "loading"
+                  ? "Sending..."
+                  : "Resend confirmation email"}
+              </button>
+              <button
+                onClick={() => handleEmailResend("welcome")}
+                disabled={emailResendState.welcome === "loading"}
+                className={`inline-flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded transition-all ${
+                  emailResendState.welcome === "loading"
+                    ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                    : "bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100"
+                }`}
+              >
+                {emailResendState.welcome === "loading" ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Send className="h-3 w-3" />
+                )}
+                {emailResendState.welcome === "loading" ? "Sending..." : "Resend welcome emails"}
+              </button>
+              <button
+                onClick={handleRedeliver}
+                disabled={redeliverState === "loading"}
+                className={`${data.needsAttention ? "inline-flex" : "hidden"} items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded transition-all ${
+                  redeliverState === "loading"
+                    ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                    : data.needsAttention
+                      ? "bg-amber-600 text-white hover:bg-amber-700"
+                      : "bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100"
+                }`}
+              >
+                {redeliverState === "loading" && (
+                  <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-current" />
+                )}
+                {redeliverState === "loading" ? "Redelivering…" : "Redeliver"}
+              </button>
+            </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
             {(
@@ -796,6 +883,13 @@ function ExpandedRegistrationDetail({
               );
             })}
           </div>
+          {emailResendMessage && (
+            <p
+              className={`mt-3 text-xs ${emailResendMessageState === "error" ? "text-red-700" : "text-emerald-800"}`}
+            >
+              {emailResendMessage}
+            </p>
+          )}
           {redeliverMessage && (
             <p
               className={`mt-3 text-xs ${redeliverState === "error" ? "text-red-700" : "text-emerald-800"}`}
