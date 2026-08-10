@@ -6,6 +6,7 @@ import { logger } from "./logger";
 import type { DbExecutor } from "./pricing";
 import { defaultOrderRef } from "./order-reference";
 import { buildStripeInvoiceCustomFields } from "./invoice-custom-fields";
+import { buildStripeCustomerDisplayName } from "./stripe-customer";
 
 const PASS_LABELS: Record<string, string> = {
   single: "People & Workforce Pass",
@@ -261,6 +262,7 @@ export async function reissueBookingInvoice(
   const contactEmail = booking.billingEmail || lead.workEmail;
   const contactName = booking.billingName || `${lead.firstName} ${lead.lastName}`;
   const contactCompany = booking.billingCompany || lead.company;
+  const stripeCustomerName = buildStripeCustomerDisplayName(contactName, contactCompany);
 
   const addressInput = booking.billingAddressLine1
     ? {
@@ -274,30 +276,34 @@ export async function reissueBookingInvoice(
       }
     : undefined;
 
+  const customerCreateParams: Stripe.CustomerCreateParams = {
+    email: contactEmail,
+    name: stripeCustomerName,
+    metadata: { company: contactCompany || "", billingContactName: contactName },
+    ...(addressInput ? { address: addressInput } : {}),
+  };
+  const customerUpdateParams: Stripe.CustomerUpdateParams = {
+    name: stripeCustomerName,
+    metadata: { company: contactCompany || "", billingContactName: contactName },
+    ...(addressInput ? { address: addressInput } : {}),
+  };
+
   // Find or create Stripe customer; always sync name + address to current values
   const customerList = await stripe.customers.list({ email: contactEmail, limit: 1 });
   let customer: Stripe.Customer;
   if (customerList.data.length > 0) {
     customer = customerList.data[0];
     try {
-      await stripe.customers.update(customer.id, {
-        name: contactName,
-        metadata: { company: contactCompany || "" },
-        ...(addressInput ? { address: addressInput } : {}),
-      });
+      await stripe.customers.update(customer.id, customerUpdateParams);
     } catch (err) {
       logger.warn(
         { err, customerId: customer.id },
-        "Failed to sync Stripe customer billing details",
+        "Failed to sync Stripe customer billing details, creating a replacement customer",
       );
+      customer = await stripe.customers.create(customerCreateParams);
     }
   } else {
-    customer = await stripe.customers.create({
-      email: contactEmail,
-      name: contactName,
-      metadata: { company: contactCompany || "" },
-      ...(addressInput ? { address: addressInput } : {}),
-    });
+    customer = await stripe.customers.create(customerCreateParams);
   }
 
   // Look up — or bootstrap — the UK VAT 20% Stripe tax rate
