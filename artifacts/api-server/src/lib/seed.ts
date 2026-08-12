@@ -5,6 +5,20 @@ import { logger } from "./logger";
 
 export async function runMigrations() {
   try {
+    await db.execute(
+      sql`ALTER TYPE email_template_type ADD VALUE IF NOT EXISTS 'community_social'`,
+    );
+    await db.execute(sql`ALTER TYPE email_log_type ADD VALUE IF NOT EXISTS 'community_social'`);
+    await db.execute(sql`
+      ALTER TABLE bookings
+      ADD COLUMN IF NOT EXISTS community_social_email_sent BOOLEAN NOT NULL DEFAULT FALSE
+    `);
+    logger.info("Migration: Community Social email types and delivery flag ensured");
+  } catch (err) {
+    logger.warn({ err }, "Migration: could not ensure Community Social email support");
+  }
+
+  try {
     await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS hear_about_us TEXT`);
     logger.info("Migration: hear_about_us column ensured");
   } catch (err) {
@@ -132,6 +146,52 @@ const DEFAULT_WELCOME_BODY = `
 <strong>The HR Analytics Summit Team</strong></p>
 `;
 
+const DEFAULT_COMMUNITY_SOCIAL_SUBJECT =
+  "Your invitation to the HR Analytics Summit Community Social";
+
+const DEFAULT_COMMUNITY_SOCIAL_BODY = `
+<h2>Join us the night before the Summit</h2>
+
+<p>Hi {{firstName}},</p>
+
+<p>Hope you're well and looking forward to the HR Analytics Summit.</p>
+
+<p>This year, the HR Analytics Summit begins the night before.</p>
+
+<div class="info-box">
+  <strong>{{socialName}}</strong><br>
+  {{socialVenue}}<br>
+  {{socialDate}}<br>
+  From {{socialTime}}
+</div>
+
+<p>Just two minutes from Liverpool Street station and a short walk from 155 Bishopsgate, the evening is an opportunity to:</p>
+
+<ul>
+  <li>Meet fellow attendees and speakers before the Summit begins</li>
+  <li>Start conversations in a relaxed setting</li>
+  <li>Build some early connections and arrive the following morning with familiar faces</li>
+  <li>Enjoy artisan pizza and complimentary drinks</li>
+</ul>
+
+<p style="text-align:center;margin:28px 0;">
+  <a href="{{socialDetailsUrl}}" style="display:inline-block;background:#E74F3E;color:#fff;padding:13px 28px;border-radius:6px;text-decoration:none;font-weight:700;">Explore the Community Social</a>
+</p>
+
+{{socialCalendarLinks}}
+
+<p>Your place is complimentary as a Summit attendee, but capacity is limited and advance registration is essential.</p>
+
+<p>If you'd like to join us, simply reply to this email and let me know about any dietary requirements. If you have none, please reply with "none" so we can plan accurately.</p>
+
+<p>We'll confirm your place by return email.</p>
+
+<p>Looking forward to seeing you there.</p>
+
+<p>Best,<br>
+<strong>Douglas</strong></p>
+`;
+
 const DEFAULT_DISCOUNT_TIERS = [
   { passType: "single" as const, minQuantity: 4, discountPercent: "10", label: "4+ passes" },
   { passType: "single" as const, minQuantity: 8, discountPercent: "15", label: "8+ passes" },
@@ -183,6 +243,24 @@ export async function seed() {
       logger.info("Seeded confirmation email template");
     } else {
       logger.debug("Confirmation email template already present, skipping seed");
+    }
+
+    // This template is available for manual sends only. It is intentionally
+    // not part of the automatic post-booking email sequence.
+    const existingCommunitySocial = await db
+      .select()
+      .from(emailTemplatesTable)
+      .where(eq(emailTemplatesTable.type, "community_social"));
+
+    if (existingCommunitySocial.length === 0) {
+      await db.insert(emailTemplatesTable).values({
+        type: "community_social",
+        subject: DEFAULT_COMMUNITY_SOCIAL_SUBJECT,
+        htmlBody: DEFAULT_COMMUNITY_SOCIAL_BODY,
+      });
+      logger.info("Seeded Community Social email template");
+    } else {
+      logger.debug("Community Social email template already present, skipping seed");
     }
 
     const existingTiers = await db.select().from(discountTiersTable);

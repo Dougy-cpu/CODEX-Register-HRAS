@@ -87,7 +87,7 @@ const isConfirmedRegistration = (status: string | null | undefined) =>
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const INVOICE_PAYMENT_TERMS_DAYS = 14;
-type ResendEmailKind = "confirmation" | "welcome";
+type ResendEmailKind = "confirmation" | "welcome" | "community_social";
 type AsyncActionState = "idle" | "loading" | "success" | "error";
 
 type RegistrationDateSource = {
@@ -197,9 +197,11 @@ function ExpandedRegistrationDetail({
   >({
     confirmation: "idle",
     welcome: "idle",
+    community_social: "idle",
   });
   const [emailResendMessage, setEmailResendMessage] = useState<string | null>(null);
   const [emailResendMessageState, setEmailResendMessageState] = useState<AsyncActionState>("idle");
+  const [communitySocialConfirmOpen, setCommunitySocialConfirmOpen] = useState(false);
 
   const setResendActionState = (kind: ResendEmailKind, state: AsyncActionState) => {
     setEmailResendState((current) => ({ ...current, [kind]: state }));
@@ -251,10 +253,11 @@ function ExpandedRegistrationDetail({
     setEmailResendMessageState("idle");
     try {
       const token = localStorage.getItem("admin_token") || "";
-      const endpoint =
-        kind === "confirmation"
-          ? `/api/admin/registrations/${id}/resend-confirmation-email`
-          : `/api/admin/registrations/${id}/resend-welcome-emails`;
+      const endpoint = {
+        confirmation: `/api/admin/registrations/${id}/resend-confirmation-email`,
+        welcome: `/api/admin/registrations/${id}/resend-welcome-emails`,
+        community_social: `/api/admin/registrations/${id}/send-community-social-email`,
+      }[kind];
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "x-admin-token": token },
@@ -268,11 +271,13 @@ function ExpandedRegistrationDetail({
       }
 
       const recipientCount = body.resend?.recipients?.length ?? 0;
-      setEmailResendMessage(
+      const successMessage =
         kind === "confirmation"
           ? "Confirmation email resent to the lead attendee."
-          : `Welcome emails resent to ${recipientCount} attendee${recipientCount === 1 ? "" : "s"}.`,
-      );
+          : kind === "welcome"
+            ? `Welcome emails resent to ${recipientCount} attendee${recipientCount === 1 ? "" : "s"}.`
+            : `Community Social emails sent to ${recipientCount} attendee${recipientCount === 1 ? "" : "s"}.`;
+      setEmailResendMessage(successMessage);
       setEmailResendMessageState("success");
       setResendActionState(kind, "success");
       await refetch();
@@ -289,6 +294,8 @@ function ExpandedRegistrationDetail({
   );
   const [reminderError, setReminderError] = useState<string | null>(null);
   const [editingAttendeeId, setEditingAttendeeId] = useState<number | null>(null);
+  const communitySocialRecipientCount =
+    data?.attendees.filter((attendee) => !attendee.isTbc && !!attendee.workEmail).length ?? 0;
   const [editForm, setEditForm] = useState<AttendeeEditForm>({
     firstName: "",
     lastName: "",
@@ -714,6 +721,35 @@ function ExpandedRegistrationDetail({
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog open={communitySocialConfirmOpen} onOpenChange={setCommunitySocialConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {data?.communitySocialEmailSent
+                ? "Resend the Community Social email?"
+                : "Send the Community Social email?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will email {communitySocialRecipientCount} known non-TBC attendee
+              {communitySocialRecipientCount === 1 ? "" : "s"} on this booking. It will not resend
+              confirmation or welcome emails, notify the organiser, or run the Sheets sync.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={communitySocialRecipientCount === 0}
+              onClick={() => {
+                setCommunitySocialConfirmOpen(false);
+                void handleEmailResend("community_social");
+              }}
+            >
+              {data?.communitySocialEmailSent ? "Resend email" : "Send email"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Stripe action result banner */}
       {stripeActionResult && (
         <div
@@ -842,6 +878,30 @@ function ExpandedRegistrationDetail({
                 {emailResendState.welcome === "loading" ? "Sending..." : "Resend welcome emails"}
               </button>
               <button
+                onClick={() => setCommunitySocialConfirmOpen(true)}
+                disabled={
+                  emailResendState.community_social === "loading" ||
+                  communitySocialRecipientCount === 0
+                }
+                className={`inline-flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-md transition-all ${
+                  emailResendState.community_social === "loading" ||
+                  communitySocialRecipientCount === 0
+                    ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                    : "bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100"
+                }`}
+              >
+                {emailResendState.community_social === "loading" ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Send className="h-3 w-3" />
+                )}
+                {emailResendState.community_social === "loading"
+                  ? "Sending..."
+                  : data.communitySocialEmailSent
+                    ? "Resend Community Social email"
+                    : "Send Community Social email"}
+              </button>
+              <button
                 onClick={handleRedeliver}
                 disabled={redeliverState === "loading"}
                 className={`${data.needsAttention ? "inline-flex" : "hidden"} items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded transition-all ${
@@ -859,7 +919,7 @@ function ExpandedRegistrationDetail({
               </button>
             </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
             {(
               [
                 ["confirmationEmailSent", "Confirmation email"],
@@ -882,6 +942,20 @@ function ExpandedRegistrationDetail({
                 </div>
               );
             })}
+            <div className="flex items-center gap-2">
+              {data.communitySocialEmailSent ? (
+                <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+              ) : (
+                <Clock className="w-4 h-4 text-slate-500 shrink-0" />
+              )}
+              <span
+                className={data.communitySocialEmailSent ? "text-emerald-900" : "text-slate-600"}
+              >
+                {data.communitySocialEmailSent
+                  ? "Community Social email sent"
+                  : "Community Social email not sent"}
+              </span>
+            </div>
           </div>
           {emailResendMessage && (
             <p

@@ -29,7 +29,11 @@ import { logger } from "../lib/logger";
 import { refreshStripeInvoiceStatusIfStale } from "../lib/invoice";
 import { deriveInvoiceBadge } from "../lib/invoice-status";
 import { deliveryStatusForBooking, runConfirmationSideEffects } from "../lib/booking-confirmation";
-import { sendConfirmationAndReceiptEmail, sendWelcomeEmail } from "../lib/email";
+import {
+  sendCommunitySocialEmail,
+  sendConfirmationAndReceiptEmail,
+  sendWelcomeEmail,
+} from "../lib/email";
 import { getStripe } from "../lib/stripe-client";
 import { refreshReceiptDocumentForBooking } from "../lib/receipt-documents";
 
@@ -658,6 +662,91 @@ router.post(
       type: "admin_booking_redelivered",
       bookingId: id,
       summary: `Resent welcome emails for booking ${booking.orderReference || `#${id}`}`,
+      meta: { resend },
+    });
+
+    const [refreshed] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, id));
+    res.json({ ...formatBooking(refreshed), resend });
+  },
+);
+
+router.post(
+  "/admin/registrations/:id/send-community-social-email",
+  adminAuth,
+  async (req, res): Promise<void> => {
+    const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const id = parseInt(raw, 10);
+
+    const [[booking], attendees] = await Promise.all([
+      db.select().from(bookingsTable).where(eq(bookingsTable.id, id)),
+      db.select().from(attendeesTable).where(eq(attendeesTable.bookingId, id)),
+    ]);
+
+    if (!booking) {
+      res.status(404).json({ error: "Booking not found" });
+      return;
+    }
+    if (booking.status !== "paid" && booking.status !== "invoiced") {
+      res.status(400).json({
+        error: "Only confirmed (paid/invoiced) bookings can receive the Community Social email",
+      });
+      return;
+    }
+
+    const socialAttendees = attendees
+      .filter((attendee) => !attendee.isTbc && !!attendee.workEmail)
+      .sort((a, b) => (a.seatIndex ?? 0) - (b.seatIndex ?? 0));
+    if (socialAttendees.length === 0) {
+      res.status(409).json({ error: "No attendee email addresses are available" });
+      return;
+    }
+
+    const recipients: string[] = [];
+    const failedRecipients: string[] = [];
+    for (const attendee of socialAttendees) {
+      const sent = await sendCommunitySocialEmail(
+        id,
+        attendee.firstName || "there",
+        attendee.workEmail,
+      );
+      if (sent) {
+        recipients.push(attendee.workEmail);
+      } else {
+        failedRecipients.push(attendee.workEmail);
+      }
+    }
+
+    const sent = failedRecipients.length === 0;
+    const resend = {
+      type: "community_social" as const,
+      sent,
+      recipients,
+      failedRecipients,
+    };
+
+    if (!sent) {
+      await logAdminAction({
+        type: "admin_community_social_email_sent",
+        bookingId: id,
+        summary: `Community Social email delivery failed for booking ${booking.orderReference || `#${id}`}`,
+        meta: { resend },
+      });
+      res.status(502).json({
+        error: "One or more Community Social emails could not be sent. Check API logs.",
+        resend,
+      });
+      return;
+    }
+
+    await db
+      .update(bookingsTable)
+      .set({ communitySocialEmailSent: true })
+      .where(eq(bookingsTable.id, id));
+
+    await logAdminAction({
+      type: "admin_community_social_email_sent",
+      bookingId: id,
+      summary: `Sent Community Social emails for booking ${booking.orderReference || `#${id}`}`,
       meta: { resend },
     });
 

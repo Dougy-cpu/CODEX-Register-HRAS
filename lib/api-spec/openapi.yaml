@@ -636,6 +636,73 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /email-templates/community_social:
+    get:
+      operationId: getCommunitySocialEmailTemplate
+      tags: [email]
+      summary: Get the Community Social email template
+      security:
+        - AdminToken: []
+      responses:
+        "200":
+          description: Community Social email template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailTemplate"
+    put:
+      operationId: updateCommunitySocialEmailTemplate
+      tags: [email]
+      summary: Update the Community Social email template
+      security:
+        - AdminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEmailTemplateBody"
+      responses:
+        "200":
+          description: Template updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailTemplate"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /email-templates/community_social/test-send:
+    post:
+      operationId: sendTestCommunitySocialEmail
+      tags: [email]
+      summary: Send a test Community Social email
+      security:
+        - AdminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TestEmailBody"
+      responses:
+        "200":
+          description: Test email sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   # ==================== EMAIL LOGS ====================
   /admin/email-logs:
     get:
@@ -1041,6 +1108,55 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /admin/registrations/{id}/send-community-social-email:
+    post:
+      operationId: sendRegistrationCommunitySocialEmail
+      tags: [admin]
+      summary: Send the Community Social email to attendees (admin)
+      description: |
+        Manually sends the Community Social email to every non-TBC attendee on
+        a paid or invoiced booking. This endpoint is not part of automatic
+        booking confirmation, redelivery, organiser notification or Sheets sync.
+      security:
+        - AdminToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated registration with send summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationEmailResendResult"
+        "400":
+          description: Booking is not yet confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Booking not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: No attendee email addresses are available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: One or more emails could not be sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /admin/registrations/{id}/status:
     patch:
       operationId: updateRegistrationStatus
@@ -1411,6 +1527,8 @@ components:
         confirmationEmailSent:
           type: boolean
         welcomeEmailsSent:
+          type: boolean
+        communitySocialEmailSent:
           type: boolean
         organiserNotified:
           type: boolean
@@ -2039,7 +2157,7 @@ components:
           type: string
         type:
           type: string
-          enum: [confirmation, receipt, welcome, invoice, test]
+          enum: [confirmation, receipt, welcome, invoice, community_social, test]
         status:
           type: string
           enum: [sent, failed, pending]
@@ -2167,6 +2285,9 @@ components:
         welcomeEmailsSent:
           type: boolean
           description: True once welcome emails have been sent to all attendees.
+        communitySocialEmailSent:
+          type: boolean
+          description: True once the manually triggered Community Social email has been sent to every known non-TBC attendee on the booking.
         organiserNotified:
           type: boolean
           description: True once the organiser has been notified of this booking.
@@ -2228,7 +2349,7 @@ components:
               properties:
                 type:
                   type: string
-                  enum: [confirmation, welcome]
+                  enum: [confirmation, welcome, community_social]
                 sent:
                   type: boolean
                 recipients:

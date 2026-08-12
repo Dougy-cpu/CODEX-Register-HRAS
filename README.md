@@ -200,6 +200,7 @@ Core registration record. One row per checkout session.
 | `hear_about_us`                   | text          | How registrant heard about the event                                                  |
 | `confirmation_email_sent`         | boolean       | Per-side-effect delivery flag                                                         |
 | `welcome_emails_sent`             | boolean       | Per-side-effect delivery flag                                                         |
+| `community_social_email_sent`     | boolean       | Manual Community Social email delivery flag                                           |
 | `organiser_notified`              | boolean       | Per-side-effect delivery flag                                                         |
 | `sheets_synced`                   | boolean       | Per-side-effect delivery flag                                                         |
 | `partial_notification_sent`       | boolean       | Abandoned checkout flag                                                               |
@@ -260,7 +261,7 @@ Group discount tiers per pass type (e.g. 4+ Single passes → 10% off).
 
 ### `email_templates`
 
-Editable email templates for `confirmation` and `welcome` types. HTML body with `{{placeholder}}` variables. Seeded with defaults on first start.
+Editable email templates for `confirmation`, `welcome`, `invoice_reminder` and `community_social` types. HTML body with `{{placeholder}}` variables. Seeded with defaults on first start.
 
 ### `email_logs`
 
@@ -621,6 +622,7 @@ Emails are sent via Nodemailer using SMTP credentials from environment variables
 | -------------------------- | ---------------------------- | -------------------------------------- | --------------------------------------------- |
 | **Confirmation**           | On booking payment/invoice   | Lead attendee (or billing contact)     | Stripe Invoice PDF (fallback: PDFKit receipt) |
 | **Welcome**                | On booking payment/invoice   | Every individual attendee              | None                                          |
+| **Community Social**       | Admin-triggered only         | Every known non-TBC attendee           | None                                          |
 | **Organiser notification** | On new paid/invoiced booking | All addresses in `notification_emails` | None                                          |
 | **Invoice reminder**       | Admin-triggered or bulk send | Billing contact                        | Stripe Invoice PDF                            |
 
@@ -645,6 +647,8 @@ Templates use `{{placeholder}}` syntax. Available in confirmation/welcome:
 | `{{socialCalendarLinks}}`  | Pre-event social calendar links (if enabled)        |
 | `{{managementLink}}`       | Self-service attendee management URL                |
 | `{{invoicePaymentButton}}` | "Pay Invoice Online" button (invoice bookings only) |
+
+Community Social templates additionally support `{{socialName}}`, `{{socialVenue}}`, `{{socialDate}}`, `{{socialTime}}`, `{{socialDetailsUrl}}`, `{{socialMapUrl}}` and `{{socialCalendarLinks}}`. The Community Social email is never part of automatic booking confirmation or redelivery.
 
 ### PDF Receipt Fallback
 

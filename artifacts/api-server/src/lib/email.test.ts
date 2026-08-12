@@ -3,6 +3,7 @@ import {
   DEFAULT_INVOICE_HELP_CONTENT,
   buildPriceSummaryTableHtml,
   escHtml,
+  getCommunitySocialTemplateVars,
   renderInvoiceHelpHtml,
   wrapInBrandedLayout,
 } from "./email";
@@ -139,6 +140,38 @@ describe("buildPriceSummaryTableHtml", () => {
     expect(html).toContain("text-align:right");
     expect(html).not.toContain("display:flex");
     expect(html).not.toContain("price-row");
+  });
+});
+
+describe("Community Social email variables", () => {
+  it("uses the HRAS social defaults and safely personalises the attendee name", () => {
+    const settings = {
+      id: 1,
+      eventName: "HR Analytics Summit",
+      eventStartAt: null,
+      eventEndAt: null,
+      eventTimezone: "Europe/London",
+      eventDescription: null,
+      eventVenue: "155 Bishopsgate, London",
+      socialEnabled: false,
+      socialName: null,
+      socialStartAt: null,
+      socialEndAt: null,
+      socialVenue: null,
+      socialDescription: null,
+      orgWebsite: "https://www.hranalyticssummit.com",
+      updatedAt: new Date(),
+    } as Parameters<typeof getCommunitySocialTemplateVars>[0];
+
+    const vars = getCommunitySocialTemplateVars(settings, `<Douglas>`);
+
+    expect(vars["{{firstName}}"]).toBe("&lt;Douglas&gt;");
+    expect(vars["{{socialName}}"]).toBe("HR Analytics Summit Community Social");
+    expect(vars["{{socialVenue}}"]).toBe("Uncommon, 34-37 Liverpool Street, London EC2M 7PP");
+    expect(vars["{{socialDate}}"]).toBe("Wednesday 2 September 2026");
+    expect(vars["{{socialTime}}"]).toBe("6:00pm");
+    expect(vars["{{socialDetailsUrl}}"]).toBe("https://www.hranalyticssummit.com/community-social");
+    expect(vars["{{socialCalendarLinks}}"]).toBe("");
   });
 });
 

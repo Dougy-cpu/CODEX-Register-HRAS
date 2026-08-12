@@ -218,7 +218,7 @@ const FROM_NAME = process.env.FROM_NAME || "HR Analytics Summit";
 async function logEmail(
   bookingId: number | null,
   recipient: string,
-  type: "confirmation" | "receipt" | "welcome" | "invoice" | "test",
+  type: "confirmation" | "receipt" | "welcome" | "invoice" | "community_social" | "test",
   status: "sent" | "failed" | "pending",
   errorMessage?: string,
 ) {
@@ -1856,6 +1856,52 @@ export function buildCalendarLinksSection(settings: EventSettings): string {
   return getCalendarPlaceholders(settings).calendarLinks;
 }
 
+export function getCommunitySocialTemplateVars(
+  settings: EventSettings,
+  firstName: string,
+): Record<string, string> {
+  const venue = settings.socialVenue || "Uncommon, 34-37 Liverpool Street, London EC2M 7PP";
+  const startAt = settings.socialStartAt ? new Date(settings.socialStartAt) : null;
+  const hasValidStart = startAt !== null && !Number.isNaN(startAt.getTime());
+  const timeZone = settings.eventTimezone || "Europe/London";
+  const socialDate = hasValidStart
+    ? startAt.toLocaleDateString("en-GB", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        timeZone,
+      })
+    : "Wednesday 2 September 2026";
+  const socialTime = hasValidStart
+    ? startAt
+        .toLocaleTimeString("en-GB", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+          timeZone,
+        })
+        .replace(" ", "")
+        .toLowerCase()
+    : "6:00pm";
+  const socialMapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venue)}`;
+  const calendar = getCalendarPlaceholders(settings);
+
+  return {
+    "{{firstName}}": escHtml(firstName || "there"),
+    "{{socialName}}": escHtml(settings.socialName || "HR Analytics Summit Community Social"),
+    "{{socialVenue}}": escHtml(venue),
+    "{{socialDate}}": escHtml(socialDate),
+    "{{socialTime}}": escHtml(socialTime),
+    "{{socialDetailsUrl}}": "https://www.hranalyticssummit.com/community-social",
+    "{{socialMapUrl}}": escHtml(socialMapUrl),
+    "{{socialCalendarLinks}}":
+      settings.socialEnabled && settings.socialStartAt && settings.socialEndAt
+        ? calendar.socialCalendarLinks
+        : "",
+  };
+}
+
 function buildManageLinkSection(manageUrl: string): string {
   return `
     <div style="margin: 28px 0; background: #fff8f7; border: 2px solid #E74F3E; border-radius: 6px; overflow: hidden;">
@@ -1888,6 +1934,57 @@ function buildManageLinkSection(manageUrl: string): string {
         </p>
       </div>
     </div>`;
+}
+
+/**
+ * Send the manually triggered Community Social invitation to one attendee.
+ * This function is never called by the automatic booking confirmation flow.
+ */
+export async function sendCommunitySocialEmail(
+  bookingId: number,
+  firstName: string,
+  toEmail: string,
+): Promise<boolean> {
+  try {
+    const [template] = await db
+      .select()
+      .from(emailTemplatesTable)
+      .where(eq(emailTemplatesTable.type, "community_social"));
+
+    if (!template) {
+      logger.warn({ bookingId }, "No Community Social email template found");
+      return false;
+    }
+
+    const settings = await getEventSettings();
+    const vars = getCommunitySocialTemplateVars(settings, firstName);
+    let personalised = template.htmlBody;
+    for (const [key, value] of Object.entries(vars)) {
+      personalised = personalised.replaceAll(key, value);
+    }
+
+    const subject = template.subject.replaceAll("{{firstName}}", firstName || "there");
+    const html = wrapInBrandedLayout(personalised, settings);
+    const sent = await sendMail({
+      to: toEmail,
+      subject,
+      html,
+      fromName: settings.fromName,
+      fromEmail: settings.fromEmail,
+    });
+
+    await logEmail(
+      bookingId,
+      toEmail,
+      "community_social",
+      sent ? "sent" : "failed",
+      sent ? undefined : "SMTP not configured or send failed",
+    );
+    return sent;
+  } catch (err) {
+    logger.error({ err, bookingId, toEmail }, "Failed to send Community Social email");
+    return false;
+  }
 }
 
 export async function sendWelcomeEmail(
