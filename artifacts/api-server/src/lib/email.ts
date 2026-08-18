@@ -23,6 +23,12 @@ import {
   getOrCreateReceiptDocumentForBooking,
   saveReceiptDocumentForBooking,
 } from "./receipt-documents";
+import {
+  formatAttendeeSeatLabel,
+  formatAttendeeSnapshotName,
+  type AttendeeChangeSnapshot,
+  type AttendeeFieldChange,
+} from "./attendee-changes";
 
 async function downloadHttpsPdf(url: string, redirectsLeft = 5): Promise<Buffer | null> {
   return new Promise((resolve) => {
@@ -2058,18 +2064,40 @@ export async function sendWelcomeEmail(
   }
 }
 
+export function renderAttendeeChangeTableHtml(changes: AttendeeFieldChange[]): string {
+  return `<table width="100%" role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;table-layout:fixed">
+    <tr style="background:#0f172a">
+      <th align="left" style="width:26%;padding:11px 14px;color:#cbd5e1;font-size:12px;line-height:1.4;border-bottom:1px solid #334155">Field</th>
+      <th align="left" style="width:37%;padding:11px 14px;color:#cbd5e1;font-size:12px;line-height:1.4;border-bottom:1px solid #334155">Previous details</th>
+      <th align="left" style="width:37%;padding:11px 14px;color:#cbd5e1;font-size:12px;line-height:1.4;border-bottom:1px solid #334155">New details</th>
+    </tr>
+    ${changes
+      .map(
+        (change, index) => `<tr style="background:${index % 2 === 0 ? "#1e293b" : "#263548"}">
+      <td style="padding:11px 14px;font-weight:bold;color:#94a3b8;font-size:13px;line-height:1.45;border-bottom:1px solid #334155;vertical-align:top;overflow-wrap:anywhere">${escHtml(change.label)}</td>
+      <td style="padding:11px 14px;color:#e2e8f0;font-size:13px;line-height:1.45;border-bottom:1px solid #334155;vertical-align:top;overflow-wrap:anywhere">${escHtml(change.previous)}</td>
+      <td style="padding:11px 14px;color:#f8fafc;font-size:13px;line-height:1.45;border-bottom:1px solid #334155;vertical-align:top;overflow-wrap:anywhere">${escHtml(change.current)}</td>
+    </tr>`,
+      )
+      .join("")}
+  </table>`;
+}
+
 export async function sendAttendeeChangeNotification(
   bookingId: number,
   attendeeId: number,
-  updatedData: {
-    firstName: string;
-    lastName: string;
-    jobTitle?: string;
-    company?: string;
-    workEmail: string;
+  changeSet: {
+    previous: AttendeeChangeSnapshot;
+    current: AttendeeChangeSnapshot;
+    changes: AttendeeFieldChange[];
   },
 ): Promise<void> {
   try {
+    if (changeSet.changes.length === 0) {
+      logger.info({ bookingId, attendeeId }, "No attendee field changes detected");
+      return;
+    }
+
     const recipients = await getOrganiserEmails();
     if (recipients.length === 0) {
       logger.info(
@@ -2085,6 +2113,9 @@ export async function sendAttendeeChangeNotification(
     const settings = await getEventSettings();
     const orderRef =
       booking.orderReference || `${settings.refPrefix}-${settings.refOffset + bookingId}`;
+    const previousName = formatAttendeeSnapshotName(changeSet.previous);
+    const currentName = formatAttendeeSnapshotName(changeSet.current);
+    const seatLabel = formatAttendeeSeatLabel(changeSet.current, booking.quantity);
     const changedAt = new Date().toLocaleString("en-GB", {
       timeZone: "Europe/London",
       weekday: "short",
@@ -2099,10 +2130,20 @@ export async function sendAttendeeChangeNotification(
     const defaultAttendeeSubject = `Attendee Details Updated: {{orderReference}}, {{firstName}} {{lastName}}`;
     const subject = applySubjectVars(settings.notifyAttendeeSubject || defaultAttendeeSubject, {
       orderReference: orderRef,
-      firstName: updatedData.firstName,
-      lastName: updatedData.lastName,
+      firstName: changeSet.current.firstName,
+      lastName: changeSet.current.lastName,
       eventName: settings.eventName,
     });
+
+    const contextRows = [
+      ["Order reference", orderRef],
+      ["Seat", seatLabel],
+      ["Attendee ID", String(attendeeId)],
+      ["Previous attendee", previousName],
+      ["Current attendee", currentName],
+      ["Fields changed", String(changeSet.changes.length)],
+      ["Changed at", changedAt],
+    ];
 
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -2111,42 +2152,33 @@ export async function sendAttendeeChangeNotification(
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px">
     <tr>
       <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
+        <table width="680" cellpadding="0" cellspacing="0" style="max-width:680px;width:100%">
           <tr>
-            <td style="background:#1e293b;padding:32px 32px 24px;border-radius:4px 4px 0 0">
+            <td style="background:#1e293b;padding:32px 32px 24px;border-radius:6px 6px 0 0">
               <h1 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#f8fafc;letter-spacing:-0.02em">
                 Attendee Details Updated
               </h1>
               <p style="margin:0;font-size:14px;color:#64748b">
-                HR Analytics Summit &mdash; Self-Service Change Notification
+                HR Analytics Summit | Self-Service Change Notification
               </p>
             </td>
           </tr>
           <tr>
             <td style="background:#166534;padding:12px 32px">
               <p style="margin:0;font-size:14px;color:#dcfce7">
-                An attendee updated their details via the self-service management link at <strong style="color:#bbf7d0">${changedAt}</strong>.
+                <strong style="color:#bbf7d0">${changeSet.changes.length} ${changeSet.changes.length === 1 ? "field was" : "fields were"} changed</strong> for ${escHtml(seatLabel)}.
               </p>
             </td>
           </tr>
           <tr>
             <td style="background:#1e293b;padding:0">
-              <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
-                ${[
-                  ["Order Reference", orderRef],
-                  ["Attendee ID", String(attendeeId)],
-                  ["First Name", updatedData.firstName],
-                  ["Last Name", updatedData.lastName],
-                  ["Job Title", updatedData.jobTitle || "Not provided"],
-                  ["Company", updatedData.company || "Not provided"],
-                  ["Work Email", updatedData.workEmail],
-                  ["Changed At", changedAt],
-                ]
+              <table width="100%" role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
+                ${contextRows
                   .map(
                     ([label, value], i) => `
                   <tr style="background:${i % 2 === 0 ? "#1e293b" : "#263548"}">
-                    <td style="padding:11px 16px;font-weight:bold;color:#94a3b8;font-size:13px;width:160px;border-bottom:1px solid #334155">${escHtml(label)}</td>
-                    <td style="padding:11px 16px;color:#f1f5f9;font-size:13px;border-bottom:1px solid #334155">${escHtml(value)}</td>
+                    <td style="padding:11px 16px;font-weight:bold;color:#94a3b8;font-size:13px;width:170px;border-bottom:1px solid #334155">${escHtml(label)}</td>
+                    <td style="padding:11px 16px;color:#f1f5f9;font-size:13px;border-bottom:1px solid #334155;overflow-wrap:anywhere">${escHtml(value)}</td>
                   </tr>`,
                   )
                   .join("")}
@@ -2154,9 +2186,19 @@ export async function sendAttendeeChangeNotification(
             </td>
           </tr>
           <tr>
-            <td style="background:#0f172a;padding:20px 32px;border-top:1px solid #1e293b;border-radius:0 0 4px 4px">
+            <td style="background:#1e293b;padding:24px 24px 10px">
+              <h2 style="margin:0;font-size:16px;line-height:1.4;color:#f8fafc">What changed</h2>
+            </td>
+          </tr>
+          <tr>
+            <td style="background:#1e293b;padding:0 24px 24px">
+              ${renderAttendeeChangeTableHtml(changeSet.changes)}
+            </td>
+          </tr>
+          <tr>
+            <td style="background:#0f172a;padding:20px 32px;border-top:1px solid #1e293b;border-radius:0 0 6px 6px">
               <p style="margin:0;font-size:12px;color:#475569">
-                HR Analytics Summit &bull; ${settings.orgName} &bull; Internal organiser notification
+                HR Analytics Summit | ${escHtml(settings.orgName)} | Internal organiser notification
               </p>
             </td>
           </tr>

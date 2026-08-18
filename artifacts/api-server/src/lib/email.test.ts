@@ -4,6 +4,7 @@ import {
   buildPriceSummaryTableHtml,
   escHtml,
   getCommunitySocialTemplateVars,
+  renderAttendeeChangeTableHtml,
   renderInvoiceHelpHtml,
   wrapInBrandedLayout,
 } from "./email";
@@ -140,6 +141,26 @@ describe("buildPriceSummaryTableHtml", () => {
     expect(html).toContain("text-align:right");
     expect(html).not.toContain("display:flex");
     expect(html).not.toContain("price-row");
+  });
+});
+
+describe("renderAttendeeChangeTableHtml", () => {
+  it("renders an email-safe comparison table and escapes attendee-provided values", () => {
+    const html = renderAttendeeChangeTableHtml([
+      {
+        field: "dietaryAccessibility",
+        label: "Dietary / accessibility requirements",
+        previous: "Vegetarian & step-free access",
+        current: `<script>alert("unsafe")</script>`,
+      },
+    ]);
+
+    expect(html).toContain('role="presentation"');
+    expect(html).toContain("Previous details");
+    expect(html).toContain("New details");
+    expect(html).toContain("Vegetarian &amp; step-free access");
+    expect(html).toContain("&lt;script&gt;alert(&quot;unsafe&quot;)&lt;/script&gt;");
+    expect(html).not.toContain("<script>");
   });
 });
 

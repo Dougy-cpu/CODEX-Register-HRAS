@@ -201,6 +201,9 @@ const { mockDb, getRows, resetStore, makeTable } = vi.hoisted(() => {
             then(resolve: (v: unknown) => void) {
               resolve(undefined);
             },
+            catch() {
+              return Promise.resolve(undefined);
+            },
           };
           return out;
         },
@@ -317,24 +320,29 @@ const {
 
 const {
   sendConfirmationAndReceiptEmailMock,
+  sendAttendeeChangeNotificationMock,
   sendWelcomeEmailMock,
   sendCommunitySocialEmailMock,
   runConfirmationSideEffectsMock,
   resetDeliveryMocks,
 } = vi.hoisted(() => {
   const sendConfirmationAndReceiptEmailMock = vi.fn();
+  const sendAttendeeChangeNotificationMock = vi.fn();
   const sendWelcomeEmailMock = vi.fn();
   const sendCommunitySocialEmailMock = vi.fn();
   const runConfirmationSideEffectsMock = vi.fn();
 
   return {
     sendConfirmationAndReceiptEmailMock,
+    sendAttendeeChangeNotificationMock,
     sendWelcomeEmailMock,
     sendCommunitySocialEmailMock,
     runConfirmationSideEffectsMock,
     resetDeliveryMocks: () => {
       sendConfirmationAndReceiptEmailMock.mockReset();
       sendConfirmationAndReceiptEmailMock.mockResolvedValue(true);
+      sendAttendeeChangeNotificationMock.mockReset();
+      sendAttendeeChangeNotificationMock.mockResolvedValue(undefined);
       sendWelcomeEmailMock.mockReset();
       sendWelcomeEmailMock.mockResolvedValue(true);
       sendCommunitySocialEmailMock.mockReset();
@@ -390,7 +398,7 @@ vi.mock("../lib/stripe-client", () => ({
 // Side-effect-free email + integration helpers — we don't want the test to
 // try to send mail or call Stripe.
 vi.mock("../lib/email", () => ({
-  sendAttendeeChangeNotification: async () => undefined,
+  sendAttendeeChangeNotification: sendAttendeeChangeNotificationMock,
   sendWelcomeEmail: sendWelcomeEmailMock,
   sendCommunitySocialEmail: sendCommunitySocialEmailMock,
   sendConfirmationAndReceiptEmail: sendConfirmationAndReceiptEmailMock,
@@ -1119,5 +1127,126 @@ describe("admin audit trail — integration", () => {
     const attendee = getRows({ _name: "attendeesTable" })[0];
     expect(attendee.firstName).toBe("Alicia");
     expect(attendee.workEmail).toBe("alicia@acme.test");
+    expect(sendAttendeeChangeNotificationMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH /attendees/:id/managed sends organisers the stored before-and-after attendee changes", async () => {
+    seedBooking({
+      id: 101,
+      status: "paid",
+      quantity: 4,
+      managementToken: "mgmt-101",
+      orderReference: "HRAS-12345",
+    });
+    seedAttendee({
+      id: 202,
+      bookingId: 101,
+      isLead: false,
+      seatIndex: 2,
+      firstName: "Alice",
+      lastName: "Smith",
+      jobTitle: "Head of People",
+      company: "Acme",
+      workEmail: "alice@acme.test",
+      phone: "+44 7000 000 001",
+      dietaryAccessibility: "Vegetarian",
+      gdprConsent: true,
+      isTbc: false,
+    });
+
+    const res = await fetch(`${baseUrl}/attendees/202/managed`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        managementToken: "mgmt-101",
+        firstName: "Alicia",
+        lastName: "Smith",
+        jobTitle: "Chief People Officer",
+        company: "Acme",
+        workEmail: "alicia@acme.test",
+        phone: "+44 7000 000 002",
+        dietaryAccessibility: "Vegan and step-free access",
+        gdprConsent: true,
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    await vi.waitFor(() => {
+      expect(sendWelcomeEmailMock).toHaveBeenCalledWith(101, "Alicia", "alicia@acme.test");
+      expect(sendAttendeeChangeNotificationMock).toHaveBeenCalledTimes(1);
+    });
+
+    const [bookingId, attendeeId, changeSet] = sendAttendeeChangeNotificationMock.mock.calls[0];
+    expect(bookingId).toBe(101);
+    expect(attendeeId).toBe(202);
+    expect(changeSet.previous).toMatchObject({
+      firstName: "Alice",
+      jobTitle: "Head of People",
+      workEmail: "alice@acme.test",
+      seatIndex: 2,
+    });
+    expect(changeSet.current).toMatchObject({
+      firstName: "Alicia",
+      jobTitle: "Chief People Officer",
+      workEmail: "alicia@acme.test",
+      seatIndex: 2,
+    });
+    expect(changeSet.changes.map((change: { field: string }) => change.field)).toEqual([
+      "firstName",
+      "jobTitle",
+      "workEmail",
+      "phone",
+      "dietaryAccessibility",
+    ]);
+
+    const activity = activityRows()[0];
+    expect(activity.type).toBe("attendee_change");
+    expect(activity.attendeeId).toBe(202);
+  });
+
+  it("PATCH /attendees/:id/managed does not notify organisers when stored values are unchanged", async () => {
+    seedBooking({
+      id: 101,
+      status: "invoiced",
+      managementToken: "mgmt-101",
+    });
+    seedAttendee({
+      id: 202,
+      bookingId: 101,
+      isLead: false,
+      seatIndex: 1,
+      firstName: "Ben",
+      lastName: "Jones",
+      jobTitle: "People Director",
+      company: "Example Ltd",
+      workEmail: "ben@example.test",
+      phone: null,
+      dietaryAccessibility: null,
+      gdprConsent: true,
+      isTbc: false,
+    });
+
+    const res = await fetch(`${baseUrl}/attendees/202/managed`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        managementToken: "mgmt-101",
+        firstName: "Ben",
+        lastName: "Jones",
+        jobTitle: "People Director",
+        company: "Example Ltd",
+        workEmail: "ben@example.test",
+        phone: "",
+        dietaryAccessibility: "",
+        gdprConsent: true,
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    await vi.waitFor(() => {
+      expect(sendWelcomeEmailMock).toHaveBeenCalledWith(101, "Ben", "ben@example.test");
+      expect(activityRows()[0]?.type).toBe("attendee_change");
+    });
+    expect(sendAttendeeChangeNotificationMock).not.toHaveBeenCalled();
   });
 });
