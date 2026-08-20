@@ -1,18 +1,27 @@
 import ExcelJS from "exceljs";
 import type { Attendee, Booking } from "@workspace/db";
 
-export const SESSION_SCHEDULER_HEADERS = ["Name", "Email", "Company"] as const;
+export const SESSION_SCHEDULER_HEADERS = ["Name", "Email", "Company", "Job Title"] as const;
 
 type SchedulerBooking = Pick<Booking, "id" | "status">;
 type SchedulerAttendee = Pick<
   Attendee,
-  "id" | "bookingId" | "firstName" | "lastName" | "company" | "workEmail" | "isTbc" | "updatedAt"
+  | "id"
+  | "bookingId"
+  | "firstName"
+  | "lastName"
+  | "company"
+  | "jobTitle"
+  | "workEmail"
+  | "isTbc"
+  | "updatedAt"
 >;
 
 export interface SessionSchedulerExportRow {
   Name: string;
   Email: string;
   Company: string;
+  "Job Title": string;
 }
 
 interface SessionSchedulerExportCandidate extends SessionSchedulerExportRow {
@@ -85,6 +94,7 @@ export function buildSessionSchedulerExportRows(
       Name: collapseWhitespace(`${attendee.firstName} ${attendee.lastName}`),
       Email: email,
       Company: attendee.company.trim(),
+      "Job Title": attendee.jobTitle.trim(),
     };
     const key = email.toLowerCase();
     const current = attendeesByEmail.get(key);
@@ -95,7 +105,12 @@ export function buildSessionSchedulerExportRows(
   }
 
   return Array.from(attendeesByEmail.values())
-    .map(({ Name, Email, Company }) => ({ Name, Email, Company }))
+    .map(({ Name, Email, Company, "Job Title": JobTitle }) => ({
+      Name,
+      Email,
+      Company,
+      "Job Title": JobTitle,
+    }))
     .sort((left, right) => {
       const nameComparison = left.Name.localeCompare(right.Name, "en-GB", {
         sensitivity: "base",
@@ -119,9 +134,10 @@ export function createSessionSchedulerWorkbook(
     { header: SESSION_SCHEDULER_HEADERS[0], key: "Name", width: 30 },
     { header: SESSION_SCHEDULER_HEADERS[1], key: "Email", width: 34 },
     { header: SESSION_SCHEDULER_HEADERS[2], key: "Company", width: 30 },
+    { header: SESSION_SCHEDULER_HEADERS[3], key: "Job Title", width: 30 },
   ] as ExcelJS.Column[];
   sheet.addRows(rows.map((row) => ({ ...row })));
-  sheet.autoFilter = `A1:C${Math.max(1, sheet.rowCount)}`;
+  sheet.autoFilter = `A1:D${Math.max(1, sheet.rowCount)}`;
 
   const headerRow = sheet.getRow(1);
   headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };

@@ -11,7 +11,15 @@ import {
 type TestBooking = Pick<Booking, "id" | "status">;
 type TestAttendee = Pick<
   Attendee,
-  "id" | "bookingId" | "firstName" | "lastName" | "company" | "workEmail" | "isTbc" | "updatedAt"
+  | "id"
+  | "bookingId"
+  | "firstName"
+  | "lastName"
+  | "company"
+  | "jobTitle"
+  | "workEmail"
+  | "isTbc"
+  | "updatedAt"
 >;
 
 function booking(id: number, status: Booking["status"]): TestBooking {
@@ -25,6 +33,7 @@ function attendee(overrides: Partial<TestAttendee> = {}): TestAttendee {
     firstName: "Alice",
     lastName: "Smith",
     company: "Acme Ltd",
+    jobTitle: "People Director",
     workEmail: "alice@example.com",
     isTbc: false,
     updatedAt: new Date("2026-08-20T09:00:00Z"),
@@ -62,8 +71,18 @@ describe("buildSessionSchedulerExportRows", () => {
     ];
 
     expect(buildSessionSchedulerExportRows(bookings, attendees)).toEqual([
-      { Name: "Invoiced Smith", Email: "invoiced@example.com", Company: "Acme Ltd" },
-      { Name: "Paid Smith", Email: "paid@example.com", Company: "Acme Ltd" },
+      {
+        Name: "Invoiced Smith",
+        Email: "invoiced@example.com",
+        Company: "Acme Ltd",
+        "Job Title": "People Director",
+      },
+      {
+        Name: "Paid Smith",
+        Email: "paid@example.com",
+        Company: "Acme Ltd",
+        "Job Title": "People Director",
+      },
     ]);
   });
 
@@ -79,6 +98,7 @@ describe("buildSessionSchedulerExportRows", () => {
           firstName: " Old ",
           lastName: " Record ",
           company: " Old Company ",
+          jobTitle: " Old Title ",
           workEmail: " Person@Example.com ",
           updatedAt: older,
         }),
@@ -88,6 +108,7 @@ describe("buildSessionSchedulerExportRows", () => {
           firstName: "Latest",
           lastName: "Record",
           company: " Latest Company ",
+          jobTitle: " Latest Title ",
           workEmail: "person@example.com",
           updatedAt: latest,
         }),
@@ -97,6 +118,7 @@ describe("buildSessionSchedulerExportRows", () => {
           firstName: "Tie",
           lastName: "Winner",
           company: " Tie Winner Ltd ",
+          jobTitle: " Chief People Officer ",
           workEmail: "PERSON@example.com",
           updatedAt: latest,
         }),
@@ -104,7 +126,12 @@ describe("buildSessionSchedulerExportRows", () => {
     );
 
     expect(rows).toEqual([
-      { Name: "Tie Winner", Email: "PERSON@example.com", Company: "Tie Winner Ltd" },
+      {
+        Name: "Tie Winner",
+        Email: "PERSON@example.com",
+        Company: "Tie Winner Ltd",
+        "Job Title": "Chief People Officer",
+      },
     ]);
   });
 
@@ -147,8 +174,18 @@ describe("buildSessionSchedulerExportRows", () => {
 describe("Session Scheduler workbook", () => {
   it("round-trips through ExcelJS with the exact worksheet contract", async () => {
     const workbook = createSessionSchedulerWorkbook([
-      { Name: "Alice Smith", Email: "alice@example.com", Company: "Acme Ltd" },
-      { Name: "Ben Jones", Email: "ben@example.com", Company: "Example Group" },
+      {
+        Name: "Alice Smith",
+        Email: "alice@example.com",
+        Company: "Acme Ltd",
+        "Job Title": "People Director",
+      },
+      {
+        Name: "Ben Jones",
+        Email: "ben@example.com",
+        Company: "Example Group",
+        "Job Title": "HR Analytics Lead",
+      },
     ]);
     const bytes = await workbook.xlsx.writeBuffer();
     const reopened = new ExcelJS.Workbook();
@@ -157,23 +194,26 @@ describe("Session Scheduler workbook", () => {
     expect(reopened.worksheets).toHaveLength(1);
     const sheet = reopened.worksheets[0];
     expect(sheet?.name).toBe("Attendees");
-    expect([1, 2, 3].map((column) => sheet?.getCell(1, column).value)).toEqual([
+    expect([1, 2, 3, 4].map((column) => sheet?.getCell(1, column).value)).toEqual([
       "Name",
       "Email",
       "Company",
+      "Job Title",
     ]);
-    expect(sheet?.columnCount).toBe(3);
+    expect(sheet?.columnCount).toBe(4);
     expect(sheet?.getRow(2).values).toEqual([
       undefined,
       "Alice Smith",
       "alice@example.com",
       "Acme Ltd",
+      "People Director",
     ]);
     expect(sheet?.getRow(3).values).toEqual([
       undefined,
       "Ben Jones",
       "ben@example.com",
       "Example Group",
+      "HR Analytics Lead",
     ]);
     expect(sheet?.views[0]).toMatchObject({ state: "frozen", ySplit: 1 });
     expect(sheet?.autoFilter).toBeTruthy();

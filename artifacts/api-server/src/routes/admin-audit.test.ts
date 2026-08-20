@@ -614,6 +614,7 @@ describe("admin audit trail — integration", () => {
       firstName: "Alice",
       lastName: "Smith",
       company: "Acme Ltd",
+      jobTitle: "People Director",
       workEmail: "alice@example.com",
     });
     seedAttendee({
@@ -622,6 +623,7 @@ describe("admin audit trail — integration", () => {
       firstName: "Ben",
       lastName: "Jones",
       company: "Example Group",
+      jobTitle: "HR Analytics Lead",
       workEmail: "ben@example.com",
     });
     seedAttendee({
@@ -650,12 +652,14 @@ describe("admin audit trail — integration", () => {
       "Alice Smith",
       "alice@example.com",
       "Acme Ltd",
+      "People Director",
     ]);
     expect(firstSheet?.getRow(3).values).toEqual([
       undefined,
       "Ben Jones",
       "ben@example.com",
       "Example Group",
+      "HR Analytics Lead",
     ]);
     expect(JSON.stringify(firstSheet?.getSheetValues())).not.toContain("billing@example.com");
     expect(JSON.stringify(firstSheet?.getSheetValues())).not.toContain("Billing Company");
@@ -666,6 +670,7 @@ describe("admin audit trail — integration", () => {
       firstName: "Cara",
       lastName: "Wilson",
       company: "New Company",
+      jobTitle: "HR Business Partner",
       workEmail: "cara@example.com",
     });
 
@@ -680,6 +685,7 @@ describe("admin audit trail — integration", () => {
       "Cara Wilson",
       "cara@example.com",
       "New Company",
+      "HR Business Partner",
     ]);
   });
 

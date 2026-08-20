@@ -3519,8 +3519,9 @@ export function useExportRegistrations<
 
 /**
  * Generates a fresh Excel workbook containing every non-TBC attendee
-attached to a paid or invoiced booking. This export is independent of
-the filters on the registrations page.
+attached to a paid or invoiced booking. The worksheet columns are Name,
+Email, Company and Job Title. This export is independent of the filters
+on the registrations page.
 
  * @summary Export eligible attendees for Session Scheduler (admin)
  */
