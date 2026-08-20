@@ -1,0 +1,1 @@
+- [GitHub branch sync](github-branch-sync.md) — when the workspace GitHub HTTPS credential expires, use the attached GitHub connector after validating the expected remote tip and final tree.
