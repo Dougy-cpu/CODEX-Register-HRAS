@@ -37,7 +37,16 @@ export const GetBookingResponse = zod
   .object({
     id: zod.number(),
     sessionToken: zod.string(),
-    status: zod.enum(["partial", "pending_payment", "paid", "invoiced", "cancelled", "disputed"]),
+    status: zod.enum([
+      "partial",
+      "pending_payment",
+      "paid",
+      "invoiced",
+      "transferred",
+      "cancelled",
+      "refunded",
+      "disputed",
+    ]),
     passType: zod.enum(["single", "business"]),
     attendeeType: zod.enum(["hr_professional", "consultant_vendor"]),
     quantity: zod.number(),
@@ -50,6 +59,7 @@ export const GetBookingResponse = zod
     paymentMethod: zod
       .union([zod.literal("card"), zod.literal("invoice"), zod.literal(null)])
       .nullish(),
+    manualEntry: zod.boolean(),
     stripeSessionId: zod.string().nullish(),
     stripePaymentIntentId: zod.string().nullish(),
     stripeInvoiceId: zod.string().nullish(),
@@ -141,7 +151,16 @@ export const UpdateBookingBody = zod.object({
   poNumber: zod.string().nullish(),
   invoiceDueDate: zod.coerce.date().nullish(),
   status: zod
-    .enum(["partial", "pending_payment", "paid", "invoiced", "cancelled", "disputed"])
+    .enum([
+      "partial",
+      "pending_payment",
+      "paid",
+      "invoiced",
+      "transferred",
+      "cancelled",
+      "refunded",
+      "disputed",
+    ])
     .optional(),
   stripeInvoiceId: zod.string().nullish(),
   stripeInvoicePdfUrl: zod.string().nullish(),
@@ -151,7 +170,16 @@ export const UpdateBookingBody = zod.object({
 export const UpdateBookingResponse = zod.object({
   id: zod.number(),
   sessionToken: zod.string(),
-  status: zod.enum(["partial", "pending_payment", "paid", "invoiced", "cancelled", "disputed"]),
+  status: zod.enum([
+    "partial",
+    "pending_payment",
+    "paid",
+    "invoiced",
+    "transferred",
+    "cancelled",
+    "refunded",
+    "disputed",
+  ]),
   passType: zod.enum(["single", "business"]),
   attendeeType: zod.enum(["hr_professional", "consultant_vendor"]),
   quantity: zod.number(),
@@ -164,6 +192,7 @@ export const UpdateBookingResponse = zod.object({
   paymentMethod: zod
     .union([zod.literal("card"), zod.literal("invoice"), zod.literal(null)])
     .nullish(),
+  manualEntry: zod.boolean(),
   stripeSessionId: zod.string().nullish(),
   stripePaymentIntentId: zod.string().nullish(),
   stripeInvoiceId: zod.string().nullish(),
@@ -211,7 +240,16 @@ export const GetBookingBySessionResponse = zod
   .object({
     id: zod.number(),
     sessionToken: zod.string(),
-    status: zod.enum(["partial", "pending_payment", "paid", "invoiced", "cancelled", "disputed"]),
+    status: zod.enum([
+      "partial",
+      "pending_payment",
+      "paid",
+      "invoiced",
+      "transferred",
+      "cancelled",
+      "refunded",
+      "disputed",
+    ]),
     passType: zod.enum(["single", "business"]),
     attendeeType: zod.enum(["hr_professional", "consultant_vendor"]),
     quantity: zod.number(),
@@ -224,6 +262,7 @@ export const GetBookingBySessionResponse = zod
     paymentMethod: zod
       .union([zod.literal("card"), zod.literal("invoice"), zod.literal(null)])
       .nullish(),
+    manualEntry: zod.boolean(),
     stripeSessionId: zod.string().nullish(),
     stripePaymentIntentId: zod.string().nullish(),
     stripeInvoiceId: zod.string().nullish(),
@@ -350,6 +389,8 @@ export const UpdateAttendeeParams = zod.object({
   attendeeId: zod.coerce.number(),
 });
 
+export const updateAttendeeBodyNotesMax = 4000;
+
 export const UpdateAttendeeBody = zod.object({
   isTbc: zod.boolean().optional(),
   firstName: zod.string().optional(),
@@ -360,6 +401,11 @@ export const UpdateAttendeeBody = zod.object({
   phone: zod.string().nullish(),
   dietaryAccessibility: zod.string().nullish(),
   gdprConsent: zod.boolean().optional(),
+  notes: zod
+    .string()
+    .max(updateAttendeeBodyNotesMax)
+    .nullish()
+    .describe("Organiser-only notes. Ignored unless the request is authenticated as an admin."),
 });
 
 export const UpdateAttendeeResponse = zod.object({
@@ -832,7 +878,12 @@ export const AdminLoginResponse = zod.object({
 export const ListRegistrationsQueryParams = zod.object({
   status: zod.coerce.string().optional(),
   passType: zod.coerce.string().optional(),
-  search: zod.coerce.string().optional(),
+  search: zod.coerce
+    .string()
+    .optional()
+    .describe(
+      "Case-insensitive search across attendee name, email, company, job title, organiser notes, booking reference and applied promo code.",
+    ),
   needsAttention: zod
     .enum(["true", "false", "1", "0"])
     .optional()
@@ -854,6 +905,7 @@ export const ListRegistrationsResponse = zod.object({
       quantity: zod.number(),
       totalAmount: zod.number(),
       paymentMethod: zod.string().nullish(),
+      manualEntry: zod.boolean(),
       leadName: zod.string().nullish(),
       leadEmail: zod.string().nullish(),
       leadCompany: zod.string().nullish(),
@@ -902,6 +954,32 @@ export const ListRegistrationsResponse = zod.object({
 });
 
 /**
+ * Creates a one-person registration without running the public checkout,
+creating a Stripe invoice, or sending automatic emails. Current pass
+pricing and VAT are recorded, and the entry is labelled as manual.
+
+ * @summary Add a direct-invoice delegate manually (admin)
+ */
+
+export const createManualRegistrationBodyNotesMax = 4000;
+
+export const createManualRegistrationBodyPassTypeDefault = `single`;
+export const createManualRegistrationBodyStatusDefault = `invoiced`;
+
+export const CreateManualRegistrationBody = zod.object({
+  firstName: zod.string().min(1),
+  lastName: zod.string().min(1),
+  jobTitle: zod.string().min(1),
+  company: zod.string().min(1),
+  workEmail: zod.string().email(),
+  phone: zod.string().nullish(),
+  dietaryAccessibility: zod.string().nullish(),
+  notes: zod.string().max(createManualRegistrationBodyNotesMax).nullish(),
+  passType: zod.enum(["single", "business"]).default(createManualRegistrationBodyPassTypeDefault),
+  status: zod.enum(["invoiced", "paid"]).default(createManualRegistrationBodyStatusDefault),
+});
+
+/**
  * Retries the confirmation email, welcome emails, organiser notification,
 and Sheets sync for any flag that is still false on a paid/invoiced booking.
 Each side-effect is gated on its own boolean flag, so already-delivered
@@ -918,7 +996,16 @@ export const RedeliverRegistrationResponse = zod
   .object({
     id: zod.number(),
     sessionToken: zod.string(),
-    status: zod.enum(["partial", "pending_payment", "paid", "invoiced", "cancelled", "disputed"]),
+    status: zod.enum([
+      "partial",
+      "pending_payment",
+      "paid",
+      "invoiced",
+      "transferred",
+      "cancelled",
+      "refunded",
+      "disputed",
+    ]),
     passType: zod.enum(["single", "business"]),
     attendeeType: zod.enum(["hr_professional", "consultant_vendor"]),
     quantity: zod.number(),
@@ -931,6 +1018,7 @@ export const RedeliverRegistrationResponse = zod
     paymentMethod: zod
       .union([zod.literal("card"), zod.literal("invoice"), zod.literal(null)])
       .nullish(),
+    manualEntry: zod.boolean(),
     stripeSessionId: zod.string().nullish(),
     stripePaymentIntentId: zod.string().nullish(),
     stripeInvoiceId: zod.string().nullish(),
@@ -990,7 +1078,16 @@ export const ResendRegistrationConfirmationEmailResponse = zod
   .object({
     id: zod.number(),
     sessionToken: zod.string(),
-    status: zod.enum(["partial", "pending_payment", "paid", "invoiced", "cancelled", "disputed"]),
+    status: zod.enum([
+      "partial",
+      "pending_payment",
+      "paid",
+      "invoiced",
+      "transferred",
+      "cancelled",
+      "refunded",
+      "disputed",
+    ]),
     passType: zod.enum(["single", "business"]),
     attendeeType: zod.enum(["hr_professional", "consultant_vendor"]),
     quantity: zod.number(),
@@ -1003,6 +1100,7 @@ export const ResendRegistrationConfirmationEmailResponse = zod
     paymentMethod: zod
       .union([zod.literal("card"), zod.literal("invoice"), zod.literal(null)])
       .nullish(),
+    manualEntry: zod.boolean(),
     stripeSessionId: zod.string().nullish(),
     stripePaymentIntentId: zod.string().nullish(),
     stripeInvoiceId: zod.string().nullish(),
@@ -1063,7 +1161,16 @@ export const ResendRegistrationWelcomeEmailsResponse = zod
   .object({
     id: zod.number(),
     sessionToken: zod.string(),
-    status: zod.enum(["partial", "pending_payment", "paid", "invoiced", "cancelled", "disputed"]),
+    status: zod.enum([
+      "partial",
+      "pending_payment",
+      "paid",
+      "invoiced",
+      "transferred",
+      "cancelled",
+      "refunded",
+      "disputed",
+    ]),
     passType: zod.enum(["single", "business"]),
     attendeeType: zod.enum(["hr_professional", "consultant_vendor"]),
     quantity: zod.number(),
@@ -1076,6 +1183,7 @@ export const ResendRegistrationWelcomeEmailsResponse = zod
     paymentMethod: zod
       .union([zod.literal("card"), zod.literal("invoice"), zod.literal(null)])
       .nullish(),
+    manualEntry: zod.boolean(),
     stripeSessionId: zod.string().nullish(),
     stripePaymentIntentId: zod.string().nullish(),
     stripeInvoiceId: zod.string().nullish(),
@@ -1137,7 +1245,16 @@ export const SendRegistrationCommunitySocialEmailResponse = zod
   .object({
     id: zod.number(),
     sessionToken: zod.string(),
-    status: zod.enum(["partial", "pending_payment", "paid", "invoiced", "cancelled", "disputed"]),
+    status: zod.enum([
+      "partial",
+      "pending_payment",
+      "paid",
+      "invoiced",
+      "transferred",
+      "cancelled",
+      "refunded",
+      "disputed",
+    ]),
     passType: zod.enum(["single", "business"]),
     attendeeType: zod.enum(["hr_professional", "consultant_vendor"]),
     quantity: zod.number(),
@@ -1150,6 +1267,7 @@ export const SendRegistrationCommunitySocialEmailResponse = zod
     paymentMethod: zod
       .union([zod.literal("card"), zod.literal("invoice"), zod.literal(null)])
       .nullish(),
+    manualEntry: zod.boolean(),
     stripeSessionId: zod.string().nullish(),
     stripePaymentIntentId: zod.string().nullish(),
     stripeInvoiceId: zod.string().nullish(),
@@ -1212,6 +1330,7 @@ export const UpdateRegistrationStatusBody = zod.object({
   status: zod.enum([
     "paid",
     "invoiced",
+    "transferred",
     "partial",
     "pending_payment",
     "cancelled",
@@ -1230,6 +1349,7 @@ export const UpdateRegistrationStatusResponse = zod
     quantity: zod.number(),
     totalAmount: zod.number(),
     paymentMethod: zod.string().nullish(),
+    manualEntry: zod.boolean(),
     leadName: zod.string().nullish(),
     leadEmail: zod.string().nullish(),
     leadCompany: zod.string().nullish(),
@@ -1306,7 +1426,16 @@ export const GetRegistrationResponse = zod
   .object({
     id: zod.number(),
     sessionToken: zod.string(),
-    status: zod.enum(["partial", "pending_payment", "paid", "invoiced", "cancelled", "disputed"]),
+    status: zod.enum([
+      "partial",
+      "pending_payment",
+      "paid",
+      "invoiced",
+      "transferred",
+      "cancelled",
+      "refunded",
+      "disputed",
+    ]),
     passType: zod.enum(["single", "business"]),
     attendeeType: zod.enum(["hr_professional", "consultant_vendor"]),
     quantity: zod.number(),
@@ -1319,6 +1448,7 @@ export const GetRegistrationResponse = zod
     paymentMethod: zod
       .union([zod.literal("card"), zod.literal("invoice"), zod.literal(null)])
       .nullish(),
+    manualEntry: zod.boolean(),
     stripeSessionId: zod.string().nullish(),
     stripePaymentIntentId: zod.string().nullish(),
     stripeInvoiceId: zod.string().nullish(),
@@ -1357,24 +1487,35 @@ export const GetRegistrationResponse = zod
   .and(
     zod.object({
       attendees: zod.array(
-        zod.object({
-          id: zod.number(),
-          bookingId: zod.number(),
-          isLead: zod.boolean(),
-          firstName: zod.string(),
-          lastName: zod.string(),
-          jobTitle: zod.string(),
-          company: zod.string(),
-          workEmail: zod.string(),
-          phone: zod.string().nullish(),
-          isTbc: zod.boolean(),
-          gdprConsent: zod.boolean(),
-          gdprConsentAt: zod.coerce.date().nullish(),
-          dietaryAccessibility: zod.string().nullish(),
-          seatIndex: zod.number().optional(),
-          createdAt: zod.coerce.date(),
-          updatedAt: zod.coerce.date(),
-        }),
+        zod
+          .object({
+            id: zod.number(),
+            bookingId: zod.number(),
+            isLead: zod.boolean(),
+            firstName: zod.string(),
+            lastName: zod.string(),
+            jobTitle: zod.string(),
+            company: zod.string(),
+            workEmail: zod.string(),
+            phone: zod.string().nullish(),
+            isTbc: zod.boolean(),
+            gdprConsent: zod.boolean(),
+            gdprConsentAt: zod.coerce.date().nullish(),
+            dietaryAccessibility: zod.string().nullish(),
+            seatIndex: zod.number().optional(),
+            createdAt: zod.coerce.date(),
+            updatedAt: zod.coerce.date(),
+          })
+          .and(
+            zod.object({
+              notes: zod
+                .string()
+                .nullish()
+                .describe(
+                  "Organiser-only notes. Never returned through public attendee endpoints.",
+                ),
+            }),
+          ),
       ),
     }),
   );
@@ -1578,6 +1719,7 @@ export const GetAdminStatsResponse = zod.object({
       quantity: zod.number(),
       totalAmount: zod.number(),
       paymentMethod: zod.string().nullish(),
+      manualEntry: zod.boolean(),
       leadName: zod.string().nullish(),
       leadEmail: zod.string().nullish(),
       leadCompany: zod.string().nullish(),

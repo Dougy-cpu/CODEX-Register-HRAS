@@ -25,7 +25,9 @@ export const BookingStatus = {
   pending_payment: "pending_payment",
   paid: "paid",
   invoiced: "invoiced",
+  transferred: "transferred",
   cancelled: "cancelled",
+  refunded: "refunded",
   disputed: "disputed",
 } as const;
 
@@ -84,6 +86,7 @@ export interface Booking {
   totalAmount: number;
   /** @nullable */
   paymentMethod?: BookingPaymentMethod;
+  manualEntry: boolean;
   /** @nullable */
   stripeSessionId?: string | null;
   /** @nullable */
@@ -170,6 +173,18 @@ export type BookingWithAttendees = Booking & {
   attendees: Attendee[];
 };
 
+export type AdminAttendee = Attendee & {
+  /**
+   * Organiser-only notes. Never returned through public attendee endpoints.
+   * @nullable
+   */
+  notes?: string | null;
+};
+
+export type AdminBookingWithAttendees = Booking & {
+  attendees: AdminAttendee[];
+};
+
 export type CreateBookingBodyPassType =
   (typeof CreateBookingBodyPassType)[keyof typeof CreateBookingBodyPassType];
 
@@ -230,7 +245,9 @@ export const UpdateBookingBodyStatus = {
   pending_payment: "pending_payment",
   paid: "paid",
   invoiced: "invoiced",
+  transferred: "transferred",
   cancelled: "cancelled",
+  refunded: "refunded",
   disputed: "disputed",
 } as const;
 
@@ -308,6 +325,12 @@ export interface UpdateAttendeeBody {
   /** @nullable */
   dietaryAccessibility?: string | null;
   gdprConsent?: boolean;
+  /**
+   * Organiser-only notes. Ignored unless the request is authenticated as an admin.
+   * @maxLength 4000
+   * @nullable
+   */
+  notes?: string | null;
 }
 
 export type PricingRequestPassType =
@@ -667,6 +690,7 @@ export type AdminRegistrationStatusUpdateBodyStatus =
 export const AdminRegistrationStatusUpdateBodyStatus = {
   paid: "paid",
   invoiced: "invoiced",
+  transferred: "transferred",
   partial: "partial",
   pending_payment: "pending_payment",
   cancelled: "cancelled",
@@ -676,6 +700,45 @@ export const AdminRegistrationStatusUpdateBodyStatus = {
 
 export interface AdminRegistrationStatusUpdateBody {
   status: AdminRegistrationStatusUpdateBodyStatus;
+}
+
+export type ManualRegistrationBodyPassType =
+  (typeof ManualRegistrationBodyPassType)[keyof typeof ManualRegistrationBodyPassType];
+
+export const ManualRegistrationBodyPassType = {
+  single: "single",
+  business: "business",
+} as const;
+
+export type ManualRegistrationBodyStatus =
+  (typeof ManualRegistrationBodyStatus)[keyof typeof ManualRegistrationBodyStatus];
+
+export const ManualRegistrationBodyStatus = {
+  invoiced: "invoiced",
+  paid: "paid",
+} as const;
+
+export interface ManualRegistrationBody {
+  /** @minLength 1 */
+  firstName: string;
+  /** @minLength 1 */
+  lastName: string;
+  /** @minLength 1 */
+  jobTitle: string;
+  /** @minLength 1 */
+  company: string;
+  workEmail: string;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  dietaryAccessibility?: string | null;
+  /**
+   * @maxLength 4000
+   * @nullable
+   */
+  notes?: string | null;
+  passType?: ManualRegistrationBodyPassType;
+  status?: ManualRegistrationBodyStatus;
 }
 
 export type AdminRegistrationStatusUpdateResultStripeAction =
@@ -712,6 +775,7 @@ export interface RegistrationSummary {
   totalAmount: number;
   /** @nullable */
   paymentMethod?: string | null;
+  manualEntry: boolean;
   /** @nullable */
   leadName?: string | null;
   /** @nullable */
@@ -1031,6 +1095,9 @@ export const ListUnpaidInvoicesOrder = {
 export type ListRegistrationsParams = {
   status?: string;
   passType?: string;
+  /**
+   * Case-insensitive search across attendee name, email, company, job title, organiser notes, booking reference and applied promo code.
+   */
   search?: string;
   /**
    * When true, only return confirmed (paid or invoiced) bookings with at least one undelivered confirmation side-effect.

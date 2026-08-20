@@ -495,6 +495,7 @@ function seedBooking(over: Partial<Record<string, unknown>> = {}): Record<string
     vatAmount: "39.80",
     totalAmount: "238.80",
     paymentMethod: null,
+    manualEntry: false,
     stripeInvoiceId: null,
     stripePaymentIntentId: null,
     stripeInvoiceStatus: null,
@@ -535,6 +536,7 @@ function seedAttendee(over: Partial<Record<string, unknown>> = {}): Record<strin
     workEmail: "alice@acme.test",
     phone: null,
     dietaryAccessibility: null,
+    notes: null,
     isTbc: false,
     gdprConsent: true,
     gdprConsentAt: new Date(),
@@ -587,6 +589,54 @@ describe("admin audit trail — integration", () => {
     expect(data.failures).toBe(1);
   });
 
+  it("GET /admin/registrations searches company, job title and promo code case-insensitively", async () => {
+    seedBooking({
+      id: 101,
+      orderReference: "HRAS-SEARCH-1",
+      promoCode: "VIPTEAM",
+    });
+    seedAttendee({
+      id: 201,
+      bookingId: 101,
+      firstName: "Alex",
+      lastName: "Taylor",
+      workEmail: "alex@example.test",
+      company: "Northwind Foods",
+      jobTitle: "Director of Workforce Strategy",
+    });
+    seedBooking({
+      id: 102,
+      orderReference: "HRAS-SEARCH-2",
+      promoCode: "EARLYBIRD",
+    });
+    seedAttendee({
+      id: 202,
+      bookingId: 102,
+      firstName: "Morgan",
+      lastName: "Jones",
+      workEmail: "morgan@example.test",
+      company: "Contoso Retail",
+      jobTitle: "HR Manager",
+    });
+
+    for (const query of ["northwind", "workforce strategy", "  vipteam  "]) {
+      const res = await fetch(
+        `${baseUrl}/admin/registrations?search=${encodeURIComponent(query)}`,
+        { headers: { "x-admin-token": adminToken } },
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        total: number;
+        registrations: Array<{ id: number }>;
+      };
+      expect(body.total, query).toBe(1);
+      expect(
+        body.registrations.map((registration) => registration.id),
+        query,
+      ).toEqual([101]);
+    }
+  });
+
   it("PATCH /admin/registrations/:id/status records a status change with before/after diff", async () => {
     seedBooking({ id: 101, status: "partial", orderReference: "HRAS-12345" });
 
@@ -618,6 +668,88 @@ describe("admin audit trail — integration", () => {
     // against the audit row being written from stale data.
     const booking = getRows({ _name: "bookingsTable" })[0];
     expect(booking.status).toBe("paid");
+  });
+
+  it("POST /admin/registrations creates a labelled direct-invoice delegate without Stripe side-effects", async () => {
+    const res = await fetch(`${baseUrl}/admin/registrations`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-token": adminToken,
+      },
+      body: JSON.stringify({
+        firstName: "Jane",
+        lastName: "Invoice",
+        jobTitle: "People Director",
+        company: "Example Ltd",
+        workEmail: "Jane.Invoice@Example.test",
+        phone: "+44 7700 900000",
+        notes: "Invoice requested directly from the organiser",
+        passType: "single",
+        status: "invoiced",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.manualEntry).toBe(true);
+    expect(body.status).toBe("invoiced");
+    expect(body.paymentMethod).toBe("invoice");
+    expect(body.orderReference).toBe("HRAS26-6542");
+    expect(body.stripeInvoiceId).toBeUndefined();
+
+    const booking = getRows({ _name: "bookingsTable" })[0];
+    expect(booking.manualEntry).toBe(true);
+    expect(booking.status).toBe("invoiced");
+    expect(booking.invoiceDueDate).toBeInstanceOf(Date);
+    expect(booking.totalAmount).toBe("238.80");
+
+    const attendee = getRows({ _name: "attendeesTable" })[0];
+    expect(attendee.firstName).toBe("Jane");
+    expect(attendee.workEmail).toBe("jane.invoice@example.test");
+    expect(attendee.notes).toBe("Invoice requested directly from the organiser");
+
+    expect(stripeInvoicesPay).not.toHaveBeenCalled();
+    expect(stripeInvoicesVoid).not.toHaveBeenCalled();
+    expect(stripeRefundsCreate).not.toHaveBeenCalled();
+
+    const [audit] = activityRows();
+    expect(audit.type).toBe("admin_attendee_added");
+    const auditData = audit.data as Record<string, unknown>;
+    expect(auditData.summary).toContain("manually added delegate Jane Invoice");
+  });
+
+  it("PATCH /admin/registrations/:id/status marks a booking transferred without changing Stripe", async () => {
+    seedBooking({
+      id: 101,
+      status: "paid",
+      paymentMethod: "card",
+      stripePaymentIntentId: "pi_transfer",
+      paidAt: new Date(),
+      orderReference: "HRAS-12345",
+    });
+
+    const res = await fetch(`${baseUrl}/admin/registrations/101/status`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-token": adminToken,
+      },
+      body: JSON.stringify({ status: "transferred" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.status).toBe("transferred");
+    expect(body.stripeAction).toBe("skipped");
+    expect(stripeRefundsCreate).not.toHaveBeenCalled();
+    expect(stripeInvoicesVoid).not.toHaveBeenCalled();
+
+    const booking = getRows({ _name: "bookingsTable" })[0];
+    expect(booking.status).toBe("transferred");
+    expect(booking.stripePaymentIntentId).toBe("pi_transfer");
+    const auditData = activityRows()[0].data as Record<string, unknown>;
+    expect(auditData.summary).toBe("Booking HRAS-12345: paid → transferred");
   });
 
   it("PATCH /admin/registrations/:id/status marks a Stripe invoice paid out of band before setting an invoice booking paid", async () => {
@@ -1091,10 +1223,13 @@ describe("admin audit trail — integration", () => {
         jobTitle: "Head of People",
         company: "Acme",
         workEmail: "alicia@acme.test",
+        notes: "Transferred to SWP Summit 2027",
         gdprConsent: true,
       }),
     });
     expect(res.status).toBe(200);
+    const responseBody = (await res.json()) as Record<string, unknown>;
+    expect(responseBody).not.toHaveProperty("notes");
 
     const rows = activityRows();
     expect(rows).toHaveLength(1);
@@ -1115,6 +1250,7 @@ describe("admin audit trail — integration", () => {
     expect(after.firstName).toBe("***(6)"); // "Alicia"
     expect(before.workEmail).toMatch(/^\*\*\*\(/);
     expect(after.workEmail).toMatch(/^\*\*\*\(/);
+    expect(after.notes).toMatch(/^\*\*\*\(/);
     expect(before.isTbc).toBe(false);
     expect(after.isTbc).toBe(false);
 
@@ -1127,7 +1263,17 @@ describe("admin audit trail — integration", () => {
     const attendee = getRows({ _name: "attendeesTable" })[0];
     expect(attendee.firstName).toBe("Alicia");
     expect(attendee.workEmail).toBe("alicia@acme.test");
+    expect(attendee.notes).toBe("Transferred to SWP Summit 2027");
     expect(sendAttendeeChangeNotificationMock).not.toHaveBeenCalled();
+
+    const detailRes = await fetch(`${baseUrl}/admin/registrations/101`, {
+      headers: { "x-admin-token": adminToken },
+    });
+    expect(detailRes.status).toBe(200);
+    const detail = (await detailRes.json()) as {
+      attendees: Array<{ notes?: string | null }>;
+    };
+    expect(detail.attendees[0]?.notes).toBe("Transferred to SWP Summit 2027");
   });
 
   it("PATCH /attendees/:id/managed sends organisers the stored before-and-after attendee changes", async () => {

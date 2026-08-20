@@ -10,8 +10,10 @@ import { createAttendeeChangeSnapshot, getAttendeeFieldChanges } from "../lib/at
 const router: IRouter = Router();
 
 function formatAttendee(a: typeof attendeesTable.$inferSelect) {
+  const { notes, ...publicAttendee } = a;
+  void notes;
   return {
-    ...a,
+    ...publicAttendee,
     gdprConsentAt: a.gdprConsentAt ? a.gdprConsentAt.toISOString() : null,
     createdAt: a.createdAt.toISOString(),
     updatedAt: a.updatedAt.toISOString(),
@@ -36,7 +38,8 @@ router.post("/bookings/:bookingId/attendees", async (req, res): Promise<void> =>
     return;
   }
 
-  if (!isAdminRequest(req)) {
+  const admin = isAdminRequest(req);
+  if (!admin) {
     const sessionToken = req.headers["x-booking-session"] as string | undefined;
     if (!sessionToken || sessionToken !== booking.sessionToken) {
       res.status(403).json({ error: "Forbidden — session token mismatch" });
@@ -56,12 +59,22 @@ router.post("/bookings/:bookingId/attendees", async (req, res): Promise<void> =>
     isLead,
     seatIndex,
     isTbc,
+    notes,
   } = req.body;
 
   if (!isTbc && (!firstName || !lastName || !jobTitle || !company || !workEmail)) {
     res
       .status(400)
       .json({ error: "firstName, lastName, jobTitle, company, workEmail are required" });
+    return;
+  }
+
+  if (admin && notes !== undefined && notes !== null && typeof notes !== "string") {
+    res.status(400).json({ error: "notes must be a string" });
+    return;
+  }
+  if (admin && typeof notes === "string" && notes.length > 4000) {
+    res.status(400).json({ error: "notes must be 4,000 characters or fewer" });
     return;
   }
 
@@ -78,6 +91,7 @@ router.post("/bookings/:bookingId/attendees", async (req, res): Promise<void> =>
     workEmail: isTbc ? tbcEmail : workEmail,
     phone: phone || null,
     dietaryAccessibility: isTbc ? null : dietaryAccessibility || null,
+    notes: admin && typeof notes === "string" ? notes.trim() || null : null,
     gdprConsent: isTbc ? false : !!gdprConsent,
     gdprConsentAt: !isTbc && gdprConsent ? new Date() : null,
     isLead: !!isLead,
@@ -103,7 +117,7 @@ router.post("/bookings/:bookingId/attendees", async (req, res): Promise<void> =>
     [attendee] = await db.insert(attendeesTable).values(values).returning();
   }
 
-  if (isAdminRequest(req)) {
+  if (admin) {
     await logAdminAction({
       type: "admin_attendee_added",
       bookingId,
@@ -114,6 +128,7 @@ router.post("/bookings/:bookingId/attendees", async (req, res): Promise<void> =>
             firstName: existing.firstName,
             lastName: existing.lastName,
             workEmail: existing.workEmail,
+            notes: existing.notes,
             isTbc: existing.isTbc,
           }
         : undefined,
@@ -121,6 +136,7 @@ router.post("/bookings/:bookingId/attendees", async (req, res): Promise<void> =>
         firstName: attendee.firstName,
         lastName: attendee.lastName,
         workEmail: attendee.workEmail,
+        notes: attendee.notes,
         isTbc: attendee.isTbc,
       },
     });
@@ -145,7 +161,8 @@ router.patch("/bookings/:bookingId/attendees/:attendeeId", async (req, res): Pro
     return;
   }
 
-  if (!isAdminRequest(req)) {
+  const admin = isAdminRequest(req);
+  if (!admin) {
     const sessionToken = req.headers["x-booking-session"] as string | undefined;
     if (!sessionToken || sessionToken !== booking.sessionToken) {
       res.status(403).json({ error: "Forbidden — session token mismatch" });
@@ -173,6 +190,7 @@ router.patch("/bookings/:bookingId/attendees/:attendeeId", async (req, res): Pro
     dietaryAccessibility,
     gdprConsent,
     isTbc,
+    notes,
   } = req.body;
 
   const updateData: Partial<typeof attendeesTable.$inferInsert> = {};
@@ -212,13 +230,25 @@ router.patch("/bookings/:bookingId/attendees/:attendeeId", async (req, res): Pro
     }
   }
 
+  if (admin && notes !== undefined) {
+    if (notes !== null && typeof notes !== "string") {
+      res.status(400).json({ error: "notes must be a string" });
+      return;
+    }
+    if (notes.length > 4000) {
+      res.status(400).json({ error: "notes must be 4,000 characters or fewer" });
+      return;
+    }
+    updateData.notes = typeof notes === "string" ? notes.trim() || null : null;
+  }
+
   const [updated] = await db
     .update(attendeesTable)
     .set(updateData)
     .where(eq(attendeesTable.id, attendeeId))
     .returning();
 
-  if (isAdminRequest(req)) {
+  if (admin) {
     await logAdminAction({
       type: "admin_attendee_updated",
       bookingId,
@@ -230,6 +260,7 @@ router.patch("/bookings/:bookingId/attendees/:attendeeId", async (req, res): Pro
         jobTitle: existing.jobTitle,
         company: existing.company,
         workEmail: existing.workEmail,
+        notes: existing.notes,
         isTbc: existing.isTbc,
       },
       after: {
@@ -238,6 +269,7 @@ router.patch("/bookings/:bookingId/attendees/:attendeeId", async (req, res): Pro
         jobTitle: updated.jobTitle,
         company: updated.company,
         workEmail: updated.workEmail,
+        notes: updated.notes,
         isTbc: updated.isTbc,
       },
     });

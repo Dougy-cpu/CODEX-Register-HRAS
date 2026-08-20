@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import type Stripe from "stripe";
 import { eq, desc, asc, or, and, sql, count, notInArray, isNull } from "drizzle-orm";
 import ExcelJS from "exceljs";
+import { v4 as uuidv4 } from "uuid";
 import { db } from "@workspace/db";
 import {
   bookingsTable,
@@ -36,6 +37,8 @@ import {
 } from "../lib/email";
 import { getStripe } from "../lib/stripe-client";
 import { refreshReceiptDocumentForBooking } from "../lib/receipt-documents";
+import { calculatePricing } from "../lib/pricing";
+import { defaultOrderRef } from "../lib/order-reference";
 
 const router: IRouter = Router();
 
@@ -48,7 +51,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const INVOICE_PAYMENT_TERMS_DAYS = 14;
 
 function registrationDisplayDate(b: typeof bookingsTable.$inferSelect): Date {
-  const isConfirmed = b.status === "paid" || b.status === "invoiced";
+  const isConfirmed = b.status === "paid" || b.status === "invoiced" || b.status === "transferred";
 
   if (!isConfirmed) {
     return b.createdAt;
@@ -258,22 +261,27 @@ router.get("/admin/registrations", adminAuth, async (req, res): Promise<void> =>
   }
 
   if (search) {
-    const searchLower = search.toLowerCase();
-    const matchingAttendeeBookingIds = allAttendees
-      .filter(
-        (a) =>
-          a.firstName.toLowerCase().includes(searchLower) ||
-          a.lastName.toLowerCase().includes(searchLower) ||
-          a.workEmail.toLowerCase().includes(searchLower) ||
-          a.company.toLowerCase().includes(searchLower),
-      )
-      .map((a) => a.bookingId);
+    const searchLower = search.trim().toLowerCase();
+    if (searchLower) {
+      const matchingAttendeeBookingIds = allAttendees
+        .filter(
+          (a) =>
+            a.firstName.toLowerCase().includes(searchLower) ||
+            a.lastName.toLowerCase().includes(searchLower) ||
+            a.workEmail.toLowerCase().includes(searchLower) ||
+            a.company.toLowerCase().includes(searchLower) ||
+            a.jobTitle.toLowerCase().includes(searchLower) ||
+            a.notes?.toLowerCase().includes(searchLower),
+        )
+        .map((a) => a.bookingId);
 
-    filtered = filtered.filter(
-      (b) =>
-        matchingAttendeeBookingIds.includes(b.id) ||
-        (b.orderReference && b.orderReference.toLowerCase().includes(searchLower)),
-    );
+      filtered = filtered.filter(
+        (b) =>
+          matchingAttendeeBookingIds.includes(b.id) ||
+          b.orderReference?.toLowerCase().includes(searchLower) ||
+          b.promoCode?.toLowerCase().includes(searchLower),
+      );
+    }
   }
 
   const total = filtered.length;
@@ -290,6 +298,154 @@ router.get("/admin/registrations", adminAuth, async (req, res): Promise<void> =>
   });
 
   res.json({ registrations: result, total, page, limit });
+});
+
+router.post("/admin/registrations", adminAuth, async (req, res): Promise<void> => {
+  const {
+    firstName,
+    lastName,
+    jobTitle,
+    company,
+    workEmail,
+    phone,
+    dietaryAccessibility,
+    notes,
+    passType = "single",
+    status = "invoiced",
+  } = req.body as Record<string, unknown>;
+
+  const requiredText = { firstName, lastName, jobTitle, company, workEmail };
+  for (const [field, value] of Object.entries(requiredText)) {
+    if (typeof value !== "string" || !value.trim()) {
+      res.status(400).json({ error: `${field} is required` });
+      return;
+    }
+  }
+
+  const email = String(workEmail).trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    res.status(400).json({ error: "workEmail must be a valid email address" });
+    return;
+  }
+  if (passType !== "single" && passType !== "business") {
+    res.status(400).json({ error: "passType must be single or business" });
+    return;
+  }
+  if (status !== "invoiced" && status !== "paid") {
+    res.status(400).json({ error: "status must be invoiced or paid" });
+    return;
+  }
+  if (phone !== undefined && phone !== null && typeof phone !== "string") {
+    res.status(400).json({ error: "phone must be a string" });
+    return;
+  }
+  if (
+    dietaryAccessibility !== undefined &&
+    dietaryAccessibility !== null &&
+    typeof dietaryAccessibility !== "string"
+  ) {
+    res.status(400).json({ error: "dietaryAccessibility must be a string" });
+    return;
+  }
+  if (notes !== undefined && notes !== null && typeof notes !== "string") {
+    res.status(400).json({ error: "notes must be a string" });
+    return;
+  }
+  if (typeof notes === "string" && notes.length > 4000) {
+    res.status(400).json({ error: "notes must be 4,000 characters or fewer" });
+    return;
+  }
+
+  const pricing = await calculatePricing(passType, 1);
+  const now = new Date();
+  const invoiceDueDate =
+    status === "invoiced" ? new Date(now.getTime() + INVOICE_PAYMENT_TERMS_DAYS * DAY_MS) : null;
+  const attendeeType = passType === "business" ? "consultant_vendor" : "hr_professional";
+  const cleanFirstName = String(firstName).trim();
+  const cleanLastName = String(lastName).trim();
+  const cleanJobTitle = String(jobTitle).trim();
+  const cleanCompany = String(company).trim();
+
+  const created = await db.transaction(async (tx) => {
+    const [booking] = await tx
+      .insert(bookingsTable)
+      .values({
+        sessionToken: `manual-${uuidv4()}`,
+        status,
+        passType,
+        attendeeType,
+        quantity: 1,
+        subtotalAmount: pricing.subtotalAfterDiscounts.toFixed(2),
+        vatAmount: pricing.vatAmount.toFixed(2),
+        totalAmount: pricing.total.toFixed(2),
+        groupDiscountAmount:
+          pricing.groupDiscountAmount > 0 ? pricing.groupDiscountAmount.toFixed(2) : null,
+        promoDiscountAmount: null,
+        paymentMethod: "invoice",
+        manualEntry: true,
+        currentStep: 4,
+        billingName: `${cleanFirstName} ${cleanLastName}`,
+        billingCompany: cleanCompany,
+        billingEmail: email,
+        billingPhone: typeof phone === "string" ? phone.trim() || null : null,
+        invoiceDueDate,
+        paidAt: status === "paid" ? now : null,
+        managementToken: uuidv4(),
+      })
+      .returning();
+
+    const [bookingWithReference] = await tx
+      .update(bookingsTable)
+      .set({ orderReference: defaultOrderRef(booking.id) })
+      .where(eq(bookingsTable.id, booking.id))
+      .returning();
+
+    const [attendee] = await tx
+      .insert(attendeesTable)
+      .values({
+        bookingId: booking.id,
+        isLead: true,
+        seatIndex: 0,
+        firstName: cleanFirstName,
+        lastName: cleanLastName,
+        jobTitle: cleanJobTitle,
+        company: cleanCompany,
+        workEmail: email,
+        phone: typeof phone === "string" ? phone.trim() || null : null,
+        dietaryAccessibility:
+          typeof dietaryAccessibility === "string" ? dietaryAccessibility.trim() || null : null,
+        notes: typeof notes === "string" ? notes.trim() || null : null,
+        isTbc: false,
+        gdprConsent: false,
+        gdprConsentAt: null,
+      })
+      .returning();
+
+    return { booking: bookingWithReference, attendee };
+  });
+
+  await logAdminAction({
+    type: "admin_attendee_added",
+    bookingId: created.booking.id,
+    attendeeId: created.attendee.id,
+    summary: `Admin manually added delegate ${cleanFirstName} ${cleanLastName} as a direct-invoice registration`,
+    after: {
+      firstName: cleanFirstName,
+      lastName: cleanLastName,
+      jobTitle: cleanJobTitle,
+      company: cleanCompany,
+      workEmail: email,
+      notes: created.attendee.notes,
+      passType,
+      status,
+      manualEntry: true,
+    },
+  });
+
+  res.status(201).json({
+    ...formatBooking(created.booking),
+    attendees: [formatAttendee(created.attendee)],
+  });
 });
 
 router.get("/admin/registrations/export", adminAuth, async (req, res): Promise<void> => {
@@ -311,6 +467,7 @@ router.get("/admin/registrations/export", adminAuth, async (req, res): Promise<v
   const columns: ExcelJS.Column[] = [
     { header: "Booking Reference", key: "bookingRef", width: 18 },
     { header: "Status", key: "status", width: 14 },
+    { header: "Entry Source", key: "entrySource", width: 16 },
     { header: "Pass Type", key: "passType", width: 14 },
     { header: "Qty", key: "qty", width: 6 },
     { header: "Subtotal (ex VAT) £", key: "subtotal", width: 18 },
@@ -329,6 +486,7 @@ router.get("/admin/registrations/export", adminAuth, async (req, res): Promise<v
     { header: "Work Email", key: "workEmail", width: 28 },
     { header: "Phone", key: "phone", width: 16 },
     { header: "Dietary / Access", key: "dietary", width: 22 },
+    { header: "Attendee Notes", key: "notes", width: 36 },
     { header: "GDPR Consent", key: "gdpr", width: 14 },
     { header: "Registered At", key: "registeredAt", width: 22 },
   ] as ExcelJS.Column[];
@@ -350,6 +508,7 @@ router.get("/admin/registrations/export", adminAuth, async (req, res): Promise<v
       sheet.addRow({
         bookingRef: booking.orderReference || "",
         status: booking.status,
+        entrySource: booking.manualEntry ? "Manual direct invoice" : "Online checkout",
         passType: booking.passType,
         qty: booking.quantity,
         subtotal: parseFloat(booking.subtotalAmount?.toString() || "0"),
@@ -368,6 +527,7 @@ router.get("/admin/registrations/export", adminAuth, async (req, res): Promise<v
         workEmail: "",
         phone: "",
         dietary: "",
+        notes: "",
         gdpr: "",
         registeredAt,
       });
@@ -378,6 +538,7 @@ router.get("/admin/registrations/export", adminAuth, async (req, res): Promise<v
       const row = sheet.addRow({
         bookingRef: booking.orderReference || "",
         status: booking.status,
+        entrySource: booking.manualEntry ? "Manual direct invoice" : "Online checkout",
         passType: booking.passType,
         qty: booking.quantity,
         subtotal: parseFloat(booking.subtotalAmount?.toString() || "0"),
@@ -396,6 +557,7 @@ router.get("/admin/registrations/export", adminAuth, async (req, res): Promise<v
         workEmail: a.isTbc ? "" : a.workEmail || "",
         phone: a.isTbc ? "" : a.phone || "",
         dietary: a.isTbc ? "" : a.dietaryAccessibility || "",
+        notes: a.notes || "",
         gdpr: a.isTbc ? "" : a.gdprConsent ? "Yes" : "No",
         registeredAt,
       });
@@ -763,6 +925,7 @@ router.patch("/admin/registrations/:id/status", adminAuth, async (req, res): Pro
   const allowed = [
     "paid",
     "invoiced",
+    "transferred",
     "partial",
     "pending_payment",
     "cancelled",
@@ -1628,6 +1791,7 @@ const bucketSql = sql<AgingBucket>`
 const unpaidInvoiceWhereSql = and(
   eq(bookingsTable.paymentMethod, "invoice"),
   eq(bookingsTable.status, "invoiced"),
+  eq(bookingsTable.manualEntry, false),
   or(
     isNull(bookingsTable.stripeInvoiceStatus),
     notInArray(bookingsTable.stripeInvoiceStatus, ["paid", "void", "uncollectible"]),
