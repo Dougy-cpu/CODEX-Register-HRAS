@@ -36,6 +36,11 @@ import {
 } from "../lib/email";
 import { getStripe } from "../lib/stripe-client";
 import { refreshReceiptDocumentForBooking } from "../lib/receipt-documents";
+import {
+  buildSessionSchedulerExportRows,
+  createSessionSchedulerWorkbook,
+  getSessionSchedulerExportFilename,
+} from "../lib/session-scheduler-export";
 
 const router: IRouter = Router();
 
@@ -430,6 +435,27 @@ router.get("/admin/registrations/export", adminAuth, async (req, res): Promise<v
   res.setHeader("Content-Disposition", `attachment; filename="hras26-registrations-${date}.xlsx"`);
   await workbook.xlsx.write(res);
   res.end();
+});
+
+router.get("/admin/registrations/export/scheduler", adminAuth, async (_req, res): Promise<void> => {
+  const [bookings, attendees] = await Promise.all([
+    db.select().from(bookingsTable),
+    db.select().from(attendeesTable),
+  ]);
+  const rows = buildSessionSchedulerExportRows(bookings, attendees);
+  const workbook = createSessionSchedulerWorkbook(rows);
+  const buffer = await workbook.xlsx.writeBuffer();
+
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${getSessionSchedulerExportFilename()}"`,
+  );
+  res.setHeader("Cache-Control", "no-store, max-age=0");
+  res.send(Buffer.from(buffer));
 });
 
 router.get("/admin/registrations/:id", adminAuth, async (req, res): Promise<void> => {
