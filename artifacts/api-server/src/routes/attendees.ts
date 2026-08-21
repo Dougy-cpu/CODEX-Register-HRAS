@@ -235,7 +235,7 @@ router.patch("/bookings/:bookingId/attendees/:attendeeId", async (req, res): Pro
       res.status(400).json({ error: "notes must be a string" });
       return;
     }
-    if (notes.length > 4000) {
+    if (typeof notes === "string" && notes.length > 4000) {
       res.status(400).json({ error: "notes must be 4,000 characters or fewer" });
       return;
     }
